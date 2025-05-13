@@ -76,7 +76,7 @@ const FileUpload = () => {
   const uploadFile = (id: string) => {
     setFiles(files.map(file => {
       if (file.id === id) {
-        return { ...file, status: 'uploading', progress: 0 };
+        return { ...file, status: 'uploading' as FileStatus, progress: 0 };
       }
       return file;
     }));
@@ -90,7 +90,7 @@ const FileUpload = () => {
             
             if (newProgress >= 100) {
               clearInterval(interval);
-              return { ...file, status: 'success', progress: 100 };
+              return { ...file, status: 'success' as FileStatus, progress: 100 };
             }
             
             return { ...file, progress: newProgress };
@@ -218,35 +218,35 @@ const FileUpload = () => {
             </div>
             
             <div className="space-y-3">
-              {files.map((uploadFile) => (
-                <div key={uploadFile.id} className="flex items-center justify-between border rounded-md p-3">
+              {files.map((uploadedFile) => (
+                <div key={uploadedFile.id} className="flex items-center justify-between border rounded-md p-3">
                   <div className="flex items-center gap-3 flex-1">
-                    {getFileIcon(uploadFile.file)}
+                    {getFileIcon(uploadedFile.file)}
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
                         <p className="font-medium truncate max-w-[200px]">
-                          {uploadFile.file.name}
+                          {uploadedFile.file.name}
                         </p>
-                        {getStatusIcon(uploadFile.status)}
+                        {getStatusIcon(uploadedFile.status)}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {(uploadFile.file.size / 1024).toFixed(1)} KB
+                        {(uploadedFile.file.size / 1024).toFixed(1)} KB
                       </p>
                       
-                      {uploadFile.status === 'uploading' && (
-                        <Progress value={uploadFile.progress} className="mt-2 h-1" />
+                      {uploadedFile.status === 'uploading' && (
+                        <Progress value={uploadedFile.progress} className="mt-2 h-1" />
                       )}
                     </div>
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    {uploadFile.status === 'idle' && (
+                    {uploadedFile.status === 'idle' && (
                       <>
                         <Button 
                           size="icon" 
                           variant="ghost" 
                           className="h-8 w-8" 
-                          onClick={() => uploadFile(uploadFile.id)}
+                          onClick={() => uploadFile(uploadedFile.id)}
                         >
                           <Upload size={16} />
                         </Button>
@@ -254,20 +254,20 @@ const FileUpload = () => {
                           size="icon" 
                           variant="ghost" 
                           className="h-8 w-8" 
-                          onClick={() => removeFile(uploadFile.id)}
+                          onClick={() => removeFile(uploadedFile.id)}
                         >
                           <X size={16} />
                         </Button>
                       </>
                     )}
                     
-                    {uploadFile.status === 'success' && (
+                    {uploadedFile.status === 'success' && (
                       <Button size="sm" variant="outline" className="text-xs">
                         View
                       </Button>
                     )}
                     
-                    {uploadFile.status === 'error' && (
+                    {uploadedFile.status === 'error' && (
                       <Button size="sm" variant="outline" className="text-xs">
                         Retry
                       </Button>
