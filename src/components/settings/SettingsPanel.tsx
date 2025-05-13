@@ -23,7 +23,7 @@ import {
   ServerCog,
   Database,
   Cog,
-  CloudSync
+  CloudUpload
 } from "lucide-react";
 
 interface SettingsPanelProps {
@@ -648,29 +648,7 @@ const SettingsPanel = ({ isAdmin = false, isReadOnly = false }: SettingsPanelPro
                     <div className="space-y-1">
                       <div className="flex items-center justify-between p-2 rounded-lg border">
                         <div className="flex items-center space-x-3">
-                          <Database className="h-8 w-8 text-blue-500" />
-                          <div>
-                            <p className="font-medium">PostgreSQL</p>
-                            <p className="text-xs text-muted-foreground">Database Integration</p>
-                          </div>
-                        </div>
-                        <Switch defaultChecked />
-                      </div>
-                      
-                      <div className="flex items-center justify-between p-2 rounded-lg border">
-                        <div className="flex items-center space-x-3">
-                          <Database className="h-8 w-8 text-green-500" />
-                          <div>
-                            <p className="font-medium">MongoDB</p>
-                            <p className="text-xs text-muted-foreground">Database Integration</p>
-                          </div>
-                        </div>
-                        <Switch defaultChecked />
-                      </div>
-                      
-                      <div className="flex items-center justify-between p-2 rounded-lg border">
-                        <div className="flex items-center space-x-3">
-                          <CloudSync className="h-8 w-8 text-orange-500" />
+                          <CloudUpload className="h-8 w-8 text-orange-500" />
                           <div>
                             <p className="font-medium">SAP HANA</p>
                             <p className="text-xs text-muted-foreground">ERP Integration</p>
@@ -681,7 +659,7 @@ const SettingsPanel = ({ isAdmin = false, isReadOnly = false }: SettingsPanelPro
                       
                       <div className="flex items-center justify-between p-2 rounded-lg border">
                         <div className="flex items-center space-x-3">
-                          <CloudSync className="h-8 w-8 text-purple-500" />
+                          <CloudUpload className="h-8 w-8 text-purple-500" />
                           <div>
                             <p className="font-medium">Zoho CRM</p>
                             <p className="text-xs text-muted-foreground">CRM Integration</p>
