@@ -1,14 +1,23 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useAuth } from "@/components/auth/UserAuthContext";
+import LoginForm from "@/components/auth/LoginForm";
+import AppLayout from "@/components/layout/AppLayout";
+import Dashboard from "./Dashboard";
 
+// Main app entry point
 const Index = () => {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
-      </div>
-    </div>
-  );
+  const { isAuthenticated } = useAuth();
+  
+  // If user is authenticated, show the main application content
+  if (isAuthenticated) {
+    return (
+      <AppLayout>
+        <Dashboard />
+      </AppLayout>
+    );
+  }
+  
+  // Otherwise show the login form
+  return <LoginForm />;
 };
 
 export default Index;
