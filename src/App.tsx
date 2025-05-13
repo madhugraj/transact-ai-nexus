@@ -11,6 +11,8 @@ import Documents from "./pages/Documents";
 import EmailConnector from "./pages/EmailConnector";
 import Upload from "./pages/Upload";
 import Assistant from "./pages/Assistant";
+import Database from "./pages/Database";
+import Actions from "./pages/Actions";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +31,8 @@ const App = () => (
             <Route path="/email-connector" element={<EmailConnector />} />
             <Route path="/upload" element={<Upload />} />
             <Route path="/assistant" element={<Assistant />} />
+            <Route path="/database" element={<Database />} />
+            <Route path="/actions" element={<Actions />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
