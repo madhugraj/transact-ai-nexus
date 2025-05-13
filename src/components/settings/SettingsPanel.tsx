@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useAuth } from "@/components/auth/UserAuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,26 +7,45 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { 
-  User, 
-  Bell, 
-  Shield, 
-  Building, 
-  Users, 
-  CreditCard, 
-  Save, 
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import {
+  User,
+  Bell,
+  Shield,
+  Building,
+  Users,
+  CreditCard,
+  Save,
   Check,
-  Mail 
+  Mail,
+  ServerCog,
+  Database,
+  Cog,
+  CloudSync
 } from "lucide-react";
 
-const SettingsPanel = () => {
+interface SettingsPanelProps {
+  isAdmin?: boolean;
+  isReadOnly?: boolean;
+}
+
+const SettingsPanel = ({ isAdmin = false, isReadOnly = false }: SettingsPanelProps) => {
   const { user } = useAuth();
   const [notifyOnNewDocuments, setNotifyOnNewDocuments] = useState(true);
   const [notifyOnErrors, setNotifyOnErrors] = useState(true);
   const [notifyOnComments, setNotifyOnComments] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [compactMode, setCompactMode] = useState(false);
-
+  const [dataRetentionDays, setDataRetentionDays] = useState("90");
+  const [dataEncryption, setDataEncryption] = useState(true);
+  const [twoFactorAuth, setTwoFactorAuth] = useState(false);
+  const [backupFrequency, setBackupFrequency] = useState("daily");
+  const [auditLogging, setAuditLogging] = useState(true);
+  const [customApiKey, setCustomApiKey] = useState("");
+  const [webhookUrl, setWebhookUrl] = useState("");
+  
   const handleProfileUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     toast.success("Profile updated successfully");
@@ -36,6 +54,10 @@ const SettingsPanel = () => {
   const handlePasswordUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     toast.success("Password updated successfully");
+  };
+
+  const handleSaveAdvancedSettings = () => {
+    toast.success("Advanced settings saved successfully");
   };
 
   return (
@@ -55,6 +77,12 @@ const SettingsPanel = () => {
           <TabsTrigger value="organization"><Building size={16} className="mr-2" /> Organization</TabsTrigger>
           <TabsTrigger value="team"><Users size={16} className="mr-2" /> Team</TabsTrigger>
           <TabsTrigger value="billing"><CreditCard size={16} className="mr-2" /> Billing</TabsTrigger>
+          {isAdmin && (
+            <>
+              <TabsTrigger value="advanced"><Cog size={16} className="mr-2" /> Advanced</TabsTrigger>
+              <TabsTrigger value="integrations"><ServerCog size={16} className="mr-2" /> Integrations</TabsTrigger>
+            </>
+          )}
         </TabsList>
         
         <TabsContent value="profile">
@@ -70,17 +98,17 @@ const SettingsPanel = () => {
                 <form onSubmit={handleProfileUpdate} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">Full Name</Label>
-                    <Input id="name" defaultValue={user?.name} />
+                    <Input id="name" defaultValue={user?.name} disabled={isReadOnly} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" defaultValue={user?.email} />
+                    <Input id="email" type="email" defaultValue={user?.email} disabled={isReadOnly} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="role">Role</Label>
                     <Input id="role" defaultValue={user?.role.replace('_', ' ')} disabled />
                   </div>
-                  <Button type="submit">
+                  <Button type="submit" disabled={isReadOnly}>
                     <Save size={16} className="mr-2" />
                     Save Changes
                   </Button>
@@ -99,19 +127,28 @@ const SettingsPanel = () => {
                 <form onSubmit={handlePasswordUpdate} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="current-password">Current Password</Label>
-                    <Input id="current-password" type="password" />
+                    <Input id="current-password" type="password" disabled={isReadOnly} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="new-password">New Password</Label>
-                    <Input id="new-password" type="password" />
+                    <Input id="new-password" type="password" disabled={isReadOnly} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="confirm-password">Confirm New Password</Label>
-                    <Input id="confirm-password" type="password" />
+                    <Input id="confirm-password" type="password" disabled={isReadOnly} />
                   </div>
-                  <Button type="submit">
+                  <div className="flex items-center space-x-2 pt-2">
+                    <Switch
+                      id="two-factor-auth"
+                      checked={twoFactorAuth}
+                      onCheckedChange={setTwoFactorAuth}
+                      disabled={isReadOnly}
+                    />
+                    <Label htmlFor="two-factor-auth">Enable Two-Factor Authentication</Label>
+                  </div>
+                  <Button type="submit" disabled={isReadOnly}>
                     <Shield size={16} className="mr-2" />
-                    Update Password
+                    Update Security Settings
                   </Button>
                 </form>
               </CardContent>
@@ -139,6 +176,7 @@ const SettingsPanel = () => {
                   id="notify-documents"
                   checked={notifyOnNewDocuments}
                   onCheckedChange={setNotifyOnNewDocuments}
+                  disabled={isReadOnly}
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -152,6 +190,7 @@ const SettingsPanel = () => {
                   id="notify-errors"
                   checked={notifyOnErrors}
                   onCheckedChange={setNotifyOnErrors}
+                  disabled={isReadOnly}
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -165,10 +204,11 @@ const SettingsPanel = () => {
                   id="notify-comments"
                   checked={notifyOnComments}
                   onCheckedChange={setNotifyOnComments}
+                  disabled={isReadOnly}
                 />
               </div>
               <div className="pt-4">
-                <Button>
+                <Button disabled={isReadOnly}>
                   <Check size={16} className="mr-2" />
                   Save Preferences
                 </Button>
@@ -197,6 +237,7 @@ const SettingsPanel = () => {
                   id="dark-mode"
                   checked={darkMode}
                   onCheckedChange={setDarkMode}
+                  disabled={isReadOnly}
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -210,10 +251,11 @@ const SettingsPanel = () => {
                   id="compact-mode"
                   checked={compactMode}
                   onCheckedChange={setCompactMode}
+                  disabled={isReadOnly}
                 />
               </div>
               <div className="pt-4">
-                <Button>
+                <Button disabled={isReadOnly}>
                   <Check size={16} className="mr-2" />
                   Save Appearance
                 </Button>
@@ -233,17 +275,17 @@ const SettingsPanel = () => {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="org-name">Organization Name</Label>
-                <Input id="org-name" defaultValue="Acme Corporation" />
+                <Input id="org-name" defaultValue="Acme Corporation" disabled={isReadOnly} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="org-industry">Industry</Label>
-                <Input id="org-industry" defaultValue="Technology" />
+                <Input id="org-industry" defaultValue="Technology" disabled={isReadOnly} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="org-size">Company Size</Label>
-                <Input id="org-size" defaultValue="50-200 employees" />
+                <Input id="org-size" defaultValue="50-200 employees" disabled={isReadOnly} />
               </div>
-              <Button>
+              <Button disabled={isReadOnly}>
                 <Save size={16} className="mr-2" />
                 Save Changes
               </Button>
@@ -312,7 +354,7 @@ const SettingsPanel = () => {
                   </div>
                 </div>
                 
-                <Button variant="outline">
+                <Button variant="outline" disabled={isReadOnly || !isAdmin}>
                   <Users size={16} className="mr-2" />
                   Invite Team Member
                 </Button>
@@ -342,10 +384,10 @@ const SettingsPanel = () => {
                     Your plan renews on August 1, 2025
                   </p>
                   <div className="flex space-x-2">
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" disabled={isReadOnly || !isAdmin}>
                       Change Plan
                     </Button>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" disabled={isReadOnly || !isAdmin}>
                       Cancel Subscription
                     </Button>
                   </div>
@@ -428,6 +470,237 @@ const SettingsPanel = () => {
             </CardContent>
           </Card>
         </TabsContent>
+        
+        {/* New Advanced Tab - Admin Only */}
+        {isAdmin && (
+          <TabsContent value="advanced">
+            <Card>
+              <CardHeader>
+                <CardTitle>Advanced System Settings</CardTitle>
+                <CardDescription>
+                  Configure system-wide advanced settings
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Data Management</h3>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="data-retention">Data Retention Period (days)</Label>
+                      <Input 
+                        id="data-retention"
+                        type="number"
+                        value={dataRetentionDays}
+                        onChange={(e) => setDataRetentionDays(e.target.value)}
+                        min="1"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        How long to keep data before automatic archiving
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="data-encryption">Enhanced Data Encryption</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Use advanced encryption for sensitive data
+                        </p>
+                      </div>
+                      <Switch
+                        id="data-encryption"
+                        checked={dataEncryption}
+                        onCheckedChange={setDataEncryption}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="backup-frequency">Database Backup Frequency</Label>
+                      <Select 
+                        value={backupFrequency} 
+                        onValueChange={setBackupFrequency}
+                      >
+                        <SelectTrigger id="backup-frequency">
+                          <SelectValue placeholder="Select frequency" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="hourly">Hourly</SelectItem>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">System Logging</h3>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="audit-logging">Audit Logging</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Track all user actions for compliance
+                        </p>
+                      </div>
+                      <Switch
+                        id="audit-logging"
+                        checked={auditLogging}
+                        onCheckedChange={setAuditLogging}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="log-level">Log Level</Label>
+                      <Select defaultValue="info">
+                        <SelectTrigger id="log-level">
+                          <SelectValue placeholder="Select log level" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="error">Error</SelectItem>
+                          <SelectItem value="warn">Warning</SelectItem>
+                          <SelectItem value="info">Info</SelectItem>
+                          <SelectItem value="debug">Debug</SelectItem>
+                          <SelectItem value="trace">Trace</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  <Button onClick={handleSaveAdvancedSettings}>
+                    <Save size={16} className="mr-2" />
+                    Save Advanced Settings
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+        
+        {/* New Integrations Tab - Admin Only */}
+        {isAdmin && (
+          <TabsContent value="integrations">
+            <Card>
+              <CardHeader>
+                <CardTitle>API Integrations</CardTitle>
+                <CardDescription>
+                  Configure external API integrations and webhooks
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">API Configuration</h3>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="api-key">Custom API Key</Label>
+                      <Input
+                        id="api-key"
+                        value={customApiKey}
+                        onChange={(e) => setCustomApiKey(e.target.value)}
+                        placeholder="Enter your API key"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="webhook-url">Webhook URL</Label>
+                      <Input
+                        id="webhook-url"
+                        value={webhookUrl}
+                        onChange={(e) => setWebhookUrl(e.target.value)}
+                        placeholder="https://your-webhook-endpoint.com"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        URL to receive event notifications
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Webhook Events</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="flex items-center space-x-2">
+                          <Switch id="event-document" defaultChecked />
+                          <Label htmlFor="event-document">Document Events</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Switch id="event-user" defaultChecked />
+                          <Label htmlFor="event-user">User Events</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Switch id="event-system" defaultChecked />
+                          <Label htmlFor="event-system">System Events</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Switch id="event-billing" />
+                          <Label htmlFor="event-billing">Billing Events</Label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Integration Partners</h3>
+                    
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between p-2 rounded-lg border">
+                        <div className="flex items-center space-x-3">
+                          <Database className="h-8 w-8 text-blue-500" />
+                          <div>
+                            <p className="font-medium">PostgreSQL</p>
+                            <p className="text-xs text-muted-foreground">Database Integration</p>
+                          </div>
+                        </div>
+                        <Switch defaultChecked />
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-2 rounded-lg border">
+                        <div className="flex items-center space-x-3">
+                          <Database className="h-8 w-8 text-green-500" />
+                          <div>
+                            <p className="font-medium">MongoDB</p>
+                            <p className="text-xs text-muted-foreground">Database Integration</p>
+                          </div>
+                        </div>
+                        <Switch defaultChecked />
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-2 rounded-lg border">
+                        <div className="flex items-center space-x-3">
+                          <CloudSync className="h-8 w-8 text-orange-500" />
+                          <div>
+                            <p className="font-medium">SAP HANA</p>
+                            <p className="text-xs text-muted-foreground">ERP Integration</p>
+                          </div>
+                        </div>
+                        <Switch />
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-2 rounded-lg border">
+                        <div className="flex items-center space-x-3">
+                          <CloudSync className="h-8 w-8 text-purple-500" />
+                          <div>
+                            <p className="font-medium">Zoho CRM</p>
+                            <p className="text-xs text-muted-foreground">CRM Integration</p>
+                          </div>
+                        </div>
+                        <Switch />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <Button>
+                    <Save size={16} className="mr-2" />
+                    Save Integration Settings
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
