@@ -8,9 +8,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Mail, MailCheck, MailX, RefreshCw, Settings } from 'lucide-react';
+import { 
+  Mail, 
+  MailCheck, 
+  MailX, 
+  RefreshCw, 
+  Settings,
+  AlertCircle,
+  Clock,
+  Sliders 
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Separator } from '@/components/ui/separator';
 
 const EmailConnector = () => {
   const [connected, setConnected] = useState(false);
@@ -18,6 +36,11 @@ const EmailConnector = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [autoTagging, setAutoTagging] = useState(true);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [syncFrequency, setSyncFrequency] = useState('15');
+  const [retentionDays, setRetentionDays] = useState('30');
+  const [folderToSync, setFolderToSync] = useState('INBOX');
+  const [syncAttachmentsOnly, setSyncAttachmentsOnly] = useState(true);
   const { toast } = useToast();
   
   const handleConnect = (e: React.FormEvent) => {
@@ -53,6 +76,14 @@ const EmailConnector = () => {
       title: "Disconnected",
       description: "Email account has been disconnected",
     });
+  };
+
+  const saveAdvancedSettings = () => {
+    toast({
+      title: "Settings Saved",
+      description: "Advanced settings have been updated",
+    });
+    setShowAdvancedSettings(false);
   };
 
   return (
@@ -213,10 +244,101 @@ const EmailConnector = () => {
                     </div>
                     
                     <div className="flex justify-between pt-4">
-                      <Button variant="outline" onClick={() => {}}>
-                        <Settings size={16} className="mr-2" />
-                        Advanced Settings
-                      </Button>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="outline">
+                            <Sliders size={16} className="mr-2" />
+                            Advanced Settings
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[500px]">
+                          <DialogHeader>
+                            <DialogTitle>Advanced Email Settings</DialogTitle>
+                            <DialogDescription>
+                              Configure advanced options for email synchronization.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                              <div className="flex items-center">
+                                <Clock size={16} className="mr-2 text-muted-foreground" />
+                                <Label htmlFor="sync-frequency">Synchronization Frequency (minutes)</Label>
+                              </div>
+                              <Input
+                                id="sync-frequency"
+                                type="number"
+                                value={syncFrequency}
+                                onChange={(e) => setSyncFrequency(e.target.value)}
+                                min="5"
+                                max="1440"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                How often to check for new emails (minimum 5 minutes)
+                              </p>
+                            </div>
+                            
+                            <Separator />
+                            
+                            <div className="space-y-2">
+                              <div className="flex items-center">
+                                <Mail size={16} className="mr-2 text-muted-foreground" />
+                                <Label htmlFor="folder">Folder to Synchronize</Label>
+                              </div>
+                              <Input
+                                id="folder"
+                                value={folderToSync}
+                                onChange={(e) => setFolderToSync(e.target.value)}
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Which email folder to scan for documents (default: INBOX)
+                              </p>
+                            </div>
+                            
+                            <Separator />
+                            
+                            <div className="space-y-2">
+                              <div className="flex items-center">
+                                <AlertCircle size={16} className="mr-2 text-muted-foreground" />
+                                <Label htmlFor="retention">Data Retention (days)</Label>
+                              </div>
+                              <Input
+                                id="retention"
+                                type="number"
+                                value={retentionDays}
+                                onChange={(e) => setRetentionDays(e.target.value)}
+                                min="1"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                How long to keep processed emails in the system
+                              </p>
+                            </div>
+                            
+                            <Separator />
+                            
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id="attachments-only"
+                                checked={syncAttachmentsOnly}
+                                onCheckedChange={(checked) => setSyncAttachmentsOnly(checked as boolean)}
+                              />
+                              <label
+                                htmlFor="attachments-only"
+                                className="text-sm leading-none"
+                              >
+                                Only process emails with attachments
+                              </label>
+                            </div>
+                          </div>
+                          <div className="flex justify-end space-x-2">
+                            <Button variant="outline" onClick={() => setShowAdvancedSettings(false)}>
+                              Cancel
+                            </Button>
+                            <Button onClick={saveAdvancedSettings}>
+                              Save Settings
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
                       <Button variant="destructive" onClick={handleDisconnect}>
                         <MailX size={16} className="mr-2" />
                         Disconnect

@@ -13,6 +13,7 @@ import Upload from "./pages/Upload";
 import Assistant from "./pages/Assistant";
 import Database from "./pages/Database";
 import Actions from "./pages/Actions";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="/assistant" element={<Assistant />} />
             <Route path="/database" element={<Database />} />
             <Route path="/actions" element={<Actions />} />
+            <Route path="/settings" element={<Settings />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
