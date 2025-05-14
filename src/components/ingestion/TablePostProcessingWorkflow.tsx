@@ -31,7 +31,7 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
   const [currentStep, setCurrentStep] = useState<'preview' | 'validate' | 'complete'>('preview');
   const [activeTab, setActiveTab] = useState('document');
   const [isEditing, setIsEditing] = useState(false);
-  const [tableData, setTableData] = useState<api.TableData | null>(null);
+  const [tableData, setTableData] = useState<api.TableServiceTableData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
@@ -103,7 +103,7 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
     setError(null);
     
     try {
-      const response = await api.getTablePreview(fileId);
+      const response = await api.getTableServicePreview(fileId);
       
       if (!response.success) {
         setError(response.error || 'Failed to load table data');
@@ -140,7 +140,7 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
     }
 
     try {
-      const response = await api.exportTableData(fileId, format);
+      const response = await api.exportTableServiceData(fileId, format);
       
       if (!response.success) {
         toast({
