@@ -1,69 +1,98 @@
 
 import { Agent, ProcessingContext } from "./types";
-import * as api from '@/services/api';
-import { UploadedFile } from '@/types/fileUpload';
+import { UploadedFile } from "@/types/fileUpload";
 
 export class DataInputAgent implements Agent {
   id: string = "DataInput";
   name: string = "Data Input Agent";
-  description: string = "Processes input files and prepares them for further processing";
+  description: string = "Processes input files and prepares them for the agent pipeline";
   
-  async process(data: UploadedFile[], context?: ProcessingContext): Promise<any> {
-    if (!Array.isArray(data) || data.length === 0) {
-      throw new Error("No files to process");
+  async process(data: any, context?: ProcessingContext): Promise<any> {
+    console.log("🤖 DataInputAgent starting processing");
+    
+    // Extract files from input data (should be an array of UploadedFile objects)
+    const files = this.validateAndExtractFiles(data);
+    
+    if (files.length === 0) {
+      throw new Error("No valid files provided for processing");
     }
     
-    // Count file types for decision making by other agents
-    const fileTypes = {
-      documents: 0,
-      spreadsheets: 0,
-      images: 0,
-      others: 0
-    };
+    // Count file types
+    const fileTypes = this.countFileTypes(files);
     
-    // Get backend file IDs for uploaded files
-    const fileIds: string[] = [];
-    const fileObjects: File[] = [];
+    // Get backend file IDs for processing
+    const fileIds = files
+      .filter(file => file.backendId)
+      .map(file => file.backendId as string);
     
-    for (const file of data) {
-      // Only process files that have been uploaded to the backend
-      if (file.status === 'success' && file.backendId) {
-        fileIds.push(file.backendId);
-        
-        // Categorize files
-        const fileType = file.file.type;
-        if (fileType.includes('pdf') || fileType.includes('document')) {
-          fileTypes.documents++;
-        } else if (fileType.includes('spreadsheet') || fileType.includes('csv') || fileType.includes('excel')) {
-          fileTypes.spreadsheets++;
-        } else if (fileType.includes('image')) {
-          fileTypes.images++;
-        } else {
-          fileTypes.others++;
-        }
-        
-        // Store file objects for direct processing (like with Gemini)
-        fileObjects.push(file.file);
-      }
-    }
+    // Get actual File objects for direct processing with Gemini
+    const fileObjects = files
+      .filter(file => file.file)
+      .map(file => file.file);
     
-    if (fileIds.length === 0) {
-      throw new Error("No successfully uploaded files found");
-    }
+    console.log(`✅ DataInputAgent processed ${files.length} files (${fileTypes.documents} documents, ${fileTypes.data} data, ${fileTypes.images} images)`);
     
-    // Generate a processing ID
-    const processingId = `proc-${Date.now()}`;
+    // Generate a unique processing ID
+    const processingId = `proc_${Date.now()}`;
     
     return {
       processingId,
       fileIds,
       fileObjects,
       fileTypes,
-      timestamp: new Date().toISOString()
+      totalFiles: files.length
     };
   }
   
   canProcess(data: any): boolean {
+    // Can process if data is an array with at least one valid file
     return Array.isArray(data) && data.length > 0;
+  }
+  
+  private validateAndExtractFiles(data: any): UploadedFile[] {
+    if (!Array.isArray(data)) {
+      console.error("Data is not an array:", data);
+      return [];
+    }
+    
+    return data.filter(item => {
+      const isValid = item && 
+        typeof item === 'object' && 
+        'id' in item && 
+        ('file' in item || 'backendId' in item);
+      
+      if (!isValid) {
+        console.warn("Invalid file item:", item);
+      }
+      
+      return isValid;
+    });
+  }
+  
+  private countFileTypes(files: UploadedFile[]): { documents: number; data: number; images: number } {
+    const result = { documents: 0, data: 0, images: 0 };
+    
+    for (const file of files) {
+      if (!file.file) continue;
+      
+      const type = file.file.type;
+      
+      if (type === 'application/pdf') {
+        result.documents++;
+      } else if (type.startsWith('image/')) {
+        result.images++;
+      } else if (
+        type === 'text/csv' || 
+        type === 'application/vnd.ms-excel' || 
+        type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      ) {
+        result.data++;
+      } else {
+        // Unknown file type, assume document
+        result.documents++;
+      }
+    }
+    
+    return result;
   }
 }

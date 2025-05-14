@@ -8,6 +8,8 @@ export class OCRExtractionAgent implements Agent {
   description: string = "Extracts text from images and PDFs using OCR with Gemini Vision";
   
   async process(data: any, context?: ProcessingContext): Promise<any> {
+    console.log("🤖 OCRExtractionAgent processing with Gemini:", context?.options?.useGemini);
+    
     // Extract file IDs from previous agent
     const { fileIds, options } = this.extractInputData(data, context);
     
@@ -16,7 +18,7 @@ export class OCRExtractionAgent implements Agent {
       enabled: true,
       enhanceResolution: true,
       language: "eng",
-      useGemini: true,
+      useGemini: context?.options?.useGemini || false,
       ...options?.ocrSettings
     };
     
@@ -24,6 +26,7 @@ export class OCRExtractionAgent implements Agent {
     
     // Check if we should use Gemini Vision for enhanced OCR
     if (ocrSettings.useGemini && data.fileObjects && data.fileObjects.length > 0) {
+      console.log("🔍 Using Gemini Vision for OCR processing");
       // Process each file with Gemini Vision
       const geminiResults = [];
       
@@ -31,6 +34,7 @@ export class OCRExtractionAgent implements Agent {
         try {
           // Only process image files with Gemini Vision
           if (file.type.startsWith('image/')) {
+            console.log(`Processing ${file.name} with Gemini Vision`);
             const base64Image = await api.fileToBase64(file);
             const prompt = "Extract all text content from this image, maintaining the original formatting as much as possible. If there are tables, please format them properly. If there are multiple columns, preserve the column structure.";
             
@@ -42,6 +46,9 @@ export class OCRExtractionAgent implements Agent {
                 extractedText: geminiResponse.data,
                 processed: true
               });
+              console.log(`✅ Successfully processed ${file.name} with Gemini Vision`);
+            } else {
+              console.error(`❌ Failed to process ${file.name} with Gemini Vision:`, geminiResponse.error);
             }
           }
         } catch (error) {
@@ -60,10 +67,13 @@ export class OCRExtractionAgent implements Agent {
           extractedTextContent: geminiResults.map(r => r.extractedText).join('\n\n'),
           ocrProvider: "gemini"
         };
+      } else {
+        console.log("No Gemini results, falling back to standard OCR");
       }
     }
     
     // Fall back to regular OCR API if Gemini processing failed or wasn't applicable
+    console.log("Using standard OCR processing");
     response = await api.processFile(
       fileIds, 
       'table_extraction', 

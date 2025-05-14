@@ -30,6 +30,7 @@ export function useAgentProcessing() {
     }
     
     setIsProcessing(true);
+    console.log("Processing files with options:", options);
     
     try {
       toast({
@@ -38,9 +39,22 @@ export function useAgentProcessing() {
       });
       
       const context = { options };
+      
+      // Log important information before processing
+      console.log(`Starting agent processing with ${files.length} files`);
+      console.log("Files:", files.map(f => ({ 
+        id: f.id, 
+        name: f.file?.name, 
+        type: f.file?.type,
+        backendId: f.backendId
+      })));
+      console.log("Using Gemini:", options.useGemini);
+      
+      // Process through the agent pipeline
       const result = await agentGraph.process(files, "DataInput", context);
       
       if (result.success) {
+        console.log("Agent processing completed successfully:", result.data);
         setProcessingId(result.data.processingId);
         setProcessingResults(result.data);
         setProcessingComplete(true);
@@ -50,6 +64,7 @@ export function useAgentProcessing() {
           description: `${files.length} files processed successfully`,
         });
       } else {
+        console.error("Agent processing failed:", result.error);
         toast({
           title: "Processing failed",
           description: result.error || "An unknown error occurred",
@@ -57,6 +72,7 @@ export function useAgentProcessing() {
         });
       }
     } catch (error) {
+      console.error("Agent processing error:", error);
       toast({
         title: "Processing error",
         description: error instanceof Error ? error.message : "An unknown error occurred",

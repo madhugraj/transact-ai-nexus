@@ -34,10 +34,12 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
   
   // Start processing with the agent system
   const handleStartProcessing = async () => {
+    console.log("Starting processing with options:", options);
     await processFiles(files, {
       ...options,
       useGemini: true  // Enable Gemini processing
     });
+    
     // Notify parent component when processing is complete
     if (onComplete && processingResults) {
       onComplete(processingResults);
@@ -155,6 +157,17 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
                     </h4>
                     <div className="text-sm">
                       {processingResults.insights.summary || "No insights available"}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Extracted Text Sample */}
+                {processingResults.extractedText && (
+                  <div className="p-4 border rounded-md bg-muted/10 mt-2">
+                    <h4 className="text-sm font-medium mb-2">Extracted Text Sample</h4>
+                    <div className="text-sm max-h-40 overflow-y-auto whitespace-pre-wrap">
+                      {processingResults.extractedText.substring(0, 500)}
+                      {processingResults.extractedText.length > 500 ? '...' : ''}
                     </div>
                   </div>
                 )}
