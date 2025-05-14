@@ -15,7 +15,8 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  LogOut
+  LogOut,
+  FileText
 } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
@@ -64,6 +65,7 @@ const AppSidebar = () => {
     { label: "Database", icon: Database, href: "/database" },
     { label: "AI Assistant", icon: MessageCircle, href: "/assistant" },
     { label: "Actions", icon: Send, href: "/actions" },
+    { label: "SAP Data", icon: FileText, href: "/sap-data" },
     { label: "Settings", icon: Settings, href: "/settings" },
   ];
 

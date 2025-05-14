@@ -28,7 +28,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen w-full overflow-hidden">
       <AppSidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
         <div className="h-16 border-b flex items-center justify-between px-6">

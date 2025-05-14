@@ -17,7 +17,14 @@ import Settings from "./pages/Settings";
 import SapData from "./pages/SapData";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -37,7 +44,6 @@ const App = () => (
             <Route path="/actions" element={<Actions />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/sap-data" element={<SapData />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

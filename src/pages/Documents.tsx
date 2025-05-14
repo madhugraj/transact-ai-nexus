@@ -44,14 +44,14 @@ const Documents = () => {
                 className="flex items-center gap-2 py-3 px-5 data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary"
               >
                 <FileText className="w-4 h-4" />
-                Process Transactions
+                <span>Process Transactions</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="upload" 
                 className="flex items-center gap-2 py-3 px-5 data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary"
               >
                 <Upload className="w-4 h-4" />
-                File Upload
+                <span>File Upload</span>
               </TabsTrigger>
             </TabsList>
             
