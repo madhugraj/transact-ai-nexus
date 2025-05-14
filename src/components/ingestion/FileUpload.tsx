@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -11,12 +10,20 @@ import { FileList } from './FileList';
 import DropZone from './DropZone';
 import FileActions from './FileActions';
 import { UploadedFile, FileStatus } from '@/types/fileUpload';
+import PostProcessingWorkflow from './PostProcessingWorkflow';
+import { useWorkflowNavigation } from '@/hooks/useWorkflowNavigation';
 
 const FileUpload = () => {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [showProcessingDialog, setShowProcessingDialog] = useState(false);
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
   const [currentAction, setCurrentAction] = useState<PostProcessAction>('table_extraction');
+  const [processingComplete, setProcessingComplete] = useState(false);
+  const { toast } = useToast();
+  
+  // Add workflow navigation hook
+  const { navigateToStep } = useWorkflowNavigation();
+  
   const [processingOptions, setProcessingOptions] = useState<ProcessingOptions>({
     tableFormat: {
       hasHeaders: true,
@@ -35,7 +42,6 @@ const FileUpload = () => {
       createIfNotExists: true,
     }
   });
-  const { toast } = useToast();
   
   // Add files to the state
   const addFiles = (newFiles: File[]) => {
@@ -191,12 +197,16 @@ const FileUpload = () => {
     setTimeout(() => {
       toast({
         title: "Processing complete",
-        description: `Files have been processed successfully. ${
-          currentAction === 'push_to_db' 
-            ? `Data is available in the ${processingOptions.databaseOptions?.tableName} table.` 
-            : 'Results are available in the Dashboard.'
-        }`,
+        description: `Files have been processed successfully.`,
       });
+      
+      // Show next steps workflow
+      setProcessingComplete(true);
+      
+      // Store the table name in localStorage for other components to use
+      if (currentAction === 'push_to_db' && processingOptions.databaseOptions?.tableName) {
+        localStorage.setItem('lastProcessedTable', processingOptions.databaseOptions.tableName);
+      }
     }, 2000);
   };
 
@@ -239,6 +249,11 @@ const FileUpload = () => {
     openProcessingDialog(fileIds);
   };
 
+  // Handle workflow completion
+  const handleWorkflowComplete = () => {
+    setProcessingComplete(false);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -248,10 +263,19 @@ const FileUpload = () => {
         </p>
       </div>
       
+      {/* Post-processing workflow */}
+      {processingComplete && (
+        <PostProcessingWorkflow
+          tableName={processingOptions.databaseOptions?.tableName}
+          processingType={currentAction}
+          onClose={handleWorkflowComplete}
+        />
+      )}
+      
       {/* File drop zone */}
       <DropZone onFilesSelected={addFiles} />
       
-      {files.length > 0 && (
+      {files.length > 0 && !processingComplete && (
         <Card>
           <CardContent className="p-6">
             {/* File actions */}

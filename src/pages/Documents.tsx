@@ -1,12 +1,22 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import ProcessTransactions from "@/components/processing/ProcessTransactions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import FileUpload from "@/components/ingestion/FileUpload";
 
 const Documents = () => {
-  const [currentTab, setCurrentTab] = useState("transactions");
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const [currentTab, setCurrentTab] = useState(tabParam === "upload" ? "upload" : "transactions");
+  
+  // Update tab when URL parameters change
+  useEffect(() => {
+    if (tabParam === "upload") {
+      setCurrentTab("upload");
+    }
+  }, [tabParam]);
   
   return (
     <AppLayout>
@@ -14,7 +24,6 @@ const Documents = () => {
         <h1 className="text-2xl font-semibold">Document Processing</h1>
         
         <Tabs 
-          defaultValue="transactions" 
           value={currentTab}
           onValueChange={setCurrentTab}
           className="w-full"
