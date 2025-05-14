@@ -362,7 +362,7 @@ const FileUpload = () => {
               className="hidden"
               data-directory=""
               // Using webkitdirectory as a boolean attribute
-              webkitdirectory=""
+              webkitdirectory={true}
               onChange={handleFileChange}
             />
           </div>

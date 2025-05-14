@@ -3,5 +3,5 @@
 
 // Extend the HTMLInputElement interface to include webkitdirectory attribute
 interface HTMLInputElement {
-  webkitdirectory?: string;
+  webkitdirectory?: boolean;
 }
