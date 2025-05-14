@@ -27,6 +27,16 @@ export function useFileProcessing() {
       connection: 'ERP Database',
       tableName: '',
       createIfNotExists: true,
+    },
+    ocrOptions: {
+      enabled: false,
+      enhanceImage: true,
+      language: 'eng',
+    },
+    extractionOptions: {
+      confidenceThreshold: 0.8,
+      retainFormatting: false,
+      detectMultipleTables: false,
     }
   });
   
@@ -121,7 +131,7 @@ export function useFileProcessing() {
     return file.type.includes('excel') || file.type.includes('spreadsheet') || file.type === 'text/csv';
   };
 
-  // Open processing dialog for selected files
+  // Select files for processing
   const selectFilesForProcessing = (fileIds: string[]) => {
     setSelectedFileIds(fileIds);
     
@@ -132,8 +142,26 @@ export function useFileProcessing() {
     
     if (allDocuments) {
       setCurrentAction('table_extraction');
+      
+      // Enable OCR by default for scanned documents (PDFs and images)
+      setProcessingOptions(prev => ({
+        ...prev,
+        ocrOptions: {
+          ...prev.ocrOptions,
+          enabled: true
+        }
+      }));
     } else if (allData) {
       setCurrentAction('combine_data');
+      
+      // Disable OCR for data files
+      setProcessingOptions(prev => ({
+        ...prev,
+        ocrOptions: {
+          ...prev.ocrOptions,
+          enabled: false
+        }
+      }));
     } else {
       setCurrentAction('insights');
     }

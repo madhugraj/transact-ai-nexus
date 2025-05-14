@@ -18,4 +18,14 @@ export interface ProcessingOptions {
     tableName: string;
     createIfNotExists: boolean;
   };
+  ocrOptions?: {
+    enabled: boolean;
+    enhanceImage: boolean;
+    language: string;
+  };
+  extractionOptions?: {
+    confidenceThreshold: number;
+    retainFormatting: boolean;
+    detectMultipleTables: boolean;
+  };
 }
