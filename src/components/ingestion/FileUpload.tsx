@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect, ChangeEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -362,8 +361,7 @@ const FileUpload = () => {
               multiple
               className="hidden"
               data-directory=""
-              // Remove the directory attribute as it's not supported in standard HTML
-              // Use webkitdirectory which is more widely supported
+              // Using webkitdirectory as a boolean attribute
               webkitdirectory=""
               onChange={handleFileChange}
             />
