@@ -14,6 +14,8 @@ interface UIData {
   extractedText?: string;
   aiProvider?: string;
   geminiResults?: any[];
+  tableData?: any;
+  extractedTables?: any[];
 }
 
 export class DisplayAgent implements Agent {
@@ -22,7 +24,12 @@ export class DisplayAgent implements Agent {
   description: string = "Prepares processed data for display in the UI";
   
   async process(data: any, context?: ProcessingContext): Promise<any> {
-    console.log("🤖 DisplayAgent preparing results for UI");
+    console.log("🤖 DisplayAgent preparing results for UI", { 
+      processingId: data.processingId,
+      hasGeminiResults: data.geminiResults && data.geminiResults.length > 0,
+      hasTableData: Boolean(data.tableData),
+      hasExtractedTables: data.extractedTables && data.extractedTables.length > 0,
+    });
     
     // Get file IDs and other metadata
     const processingId = data.processingId || `display-${Date.now()}`;
@@ -31,7 +38,8 @@ export class DisplayAgent implements Agent {
     const insights = data.insights || {};
     
     // Count tables if available
-    const tableCount = (data.tables && Array.isArray(data.tables)) ? data.tables.length : 0;
+    const tableCount = data.extractedTables ? data.extractedTables.length : 
+                      (data.tables && Array.isArray(data.tables)) ? data.tables.length : 0;
     
     // Check if we used Gemini
     const usingGemini = Boolean(geminiResults.length > 0 || data.ocrProvider === "gemini");
@@ -57,6 +65,18 @@ export class DisplayAgent implements Agent {
       uiData.extractedText = data.extractedTextContent;
     }
     
+    // Add table data if available
+    if (data.tableData) {
+      uiData.tableData = data.tableData;
+    }
+    
+    // Add extracted tables if available
+    if (data.extractedTables && data.extractedTables.length > 0) {
+      uiData.extractedTables = data.extractedTables;
+    } else if (data.tables && data.tables.length > 0) {
+      uiData.extractedTables = data.tables;
+    }
+    
     // Add gemini results if available
     if (usingGemini) {
       uiData.aiProvider = "Gemini";
@@ -66,7 +86,12 @@ export class DisplayAgent implements Agent {
       }
     }
     
-    console.log("✅ DisplayAgent completed processing");
+    console.log("✅ DisplayAgent completed processing", { 
+      processingId: uiData.processingId,
+      tableCount: uiData.tableCount,
+      hasExtractedText: Boolean(uiData.extractedText),
+      hasInsights: Boolean(uiData.insights)
+    });
     
     return uiData;
   }

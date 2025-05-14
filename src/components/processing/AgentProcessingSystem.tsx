@@ -12,6 +12,7 @@ import { ProcessingOptions } from '@/types/processing';
 import { FileText, Database, Layers, Sparkles, Settings, Brain, Eye, Table } from 'lucide-react';
 import DocumentPreview from '../ingestion/DocumentPreview';
 import ExtractedTablePreview from '../ingestion/ExtractedTablePreview';
+import { useToast } from '@/hooks/use-toast';
 
 interface AgentProcessingSystemProps {
   files: UploadedFile[];
@@ -34,21 +35,31 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
   } = useAgentProcessing();
   
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
+  const { toast } = useToast();
   
   // Start processing with the agent system
   const handleStartProcessing = async () => {
     console.log("Starting processing with files:", files);
     console.log("Starting processing with options:", options);
     
-    await processFiles(files, {
-      ...options,
-      useGemini: true  // Enable Gemini processing
-    });
-    
-    // Notify parent component when processing is complete
-    if (onComplete && processingResults) {
-      console.log("Processing complete, notifying parent with results:", processingResults);
-      onComplete(processingResults);
+    try {
+      await processFiles(files, {
+        ...options,
+        useGemini: true  // Enable Gemini processing
+      });
+      
+      // Notify parent component when processing is complete
+      if (onComplete && processingResults) {
+        console.log("Processing complete, notifying parent with results:", processingResults);
+        onComplete(processingResults);
+      }
+    } catch (error) {
+      console.error("Processing failed:", error);
+      toast({
+        title: "Processing failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive"
+      });
     }
   };
   
@@ -72,6 +83,10 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
     if (!hasFileToPreview) return null;
     return URL.createObjectURL(files[0].file!);
   };
+  
+  // Check if we have table data to display
+  const hasTableData = processingResults?.tableData || 
+                       (processingResults?.extractedTables && processingResults.extractedTables.length > 0);
 
   return (
     <div className="space-y-6">
@@ -171,7 +186,7 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
                       <Eye className="h-3.5 w-3.5" /> Document
                     </TabsTrigger>
                     <TabsTrigger value="extraction" className="flex items-center gap-1">
-                      <Table className="h-3.5 w-3.5" /> Extracted Data
+                      <Table className="h-3.5 w-3.5" /> Extracted Tables
                     </TabsTrigger>
                   </TabsList>
                   
@@ -186,21 +201,39 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
                   </TabsContent>
                   
                   <TabsContent value="extraction" className="mt-4">
-                    {processingResults.extractedText ? (
+                    {hasTableData ? (
                       <div className="space-y-4">
-                        <div className="border rounded-md p-4 bg-muted/10">
-                          <h4 className="text-sm font-medium mb-2">Extracted Text</h4>
-                          <div className="text-sm max-h-60 overflow-y-auto whitespace-pre-wrap bg-muted/5 p-3 rounded">
-                            {processingResults.extractedText}
+                        {processingResults.extractedText && (
+                          <div className="border rounded-md p-4 bg-muted/10">
+                            <h4 className="text-sm font-medium mb-2">Extracted Text</h4>
+                            <div className="text-sm max-h-60 overflow-y-auto whitespace-pre-wrap bg-muted/5 p-3 rounded">
+                              {processingResults.extractedText}
+                            </div>
                           </div>
-                        </div>
+                        )}
                         
-                        <ExtractedTablePreview 
-                          initialData={{
-                            headers: ['Column 1', 'Column 2', 'Column 3'],
-                            rows: [['Data 1', 'Data 2', 'Data 3']]
-                          }}
-                        />
+                        <div className="border rounded-md p-4">
+                          <h4 className="text-sm font-medium mb-2">Extracted Tables</h4>
+                          {processingResults.tableData ? (
+                            <ExtractedTablePreview 
+                              initialData={{
+                                headers: processingResults.tableData.headers,
+                                rows: processingResults.tableData.rows
+                              }}
+                            />
+                          ) : processingResults.extractedTables && processingResults.extractedTables.length > 0 ? (
+                            <ExtractedTablePreview 
+                              initialData={{
+                                headers: processingResults.extractedTables[0].headers,
+                                rows: processingResults.extractedTables[0].rows
+                              }}
+                            />
+                          ) : (
+                            <div className="text-center p-6 text-muted-foreground">
+                              No tables were extracted from this document
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <div className="text-center p-6 text-muted-foreground">
