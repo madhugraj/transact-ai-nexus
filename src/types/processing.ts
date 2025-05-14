@@ -28,4 +28,5 @@ export interface ProcessingOptions {
     retainFormatting: boolean;
     detectMultipleTables: boolean;
   };
+  useGemini?: boolean; // Added this property to support Gemini AI processing
 }
