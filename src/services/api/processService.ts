@@ -1,68 +1,84 @@
 
-import { ProcessingOptions, PostProcessAction } from "@/types/processing";
 import { ApiResponse } from './types';
+import { ProcessingOptions, PostProcessAction } from '@/types/processing';
 
-// Interface for the processing response
-export interface ProcessingResponse {
-  processingId: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  message: string;
-}
-
-// Process file with specified options
-export async function processFile(
-  fileIds: string[], 
+/**
+ * Process uploaded files with specified action and options
+ */
+export const processFile = async (
+  fileIds: string[],
   action: PostProcessAction,
-  options: ProcessingOptions
-): Promise<ApiResponse<ProcessingResponse>> {
+  options: ProcessingOptions = {}
+): Promise<ApiResponse<{ processingId: string }>> => {
   try {
-    console.log("Processing files:", fileIds, "with action:", action);
+    // Mock API for now, would call actual API in production
+    console.log(`Processing files: ${fileIds} with action: ${action}`);
     
-    // Mock implementation
-    return new Promise(resolve => {
-      setTimeout(() => {
-        resolve({
-          success: true,
-          data: {
-            processingId: `process-${Date.now()}`,
-            status: 'pending',
-            message: 'Processing started'
-          }
-        });
-      }, 1000);
-    });
+    // Simulate API request
+    return {
+      success: true,
+      data: {
+        processingId: `proc_${Date.now()}`
+      }
+    };
   } catch (error) {
-    console.error('Error processing file:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error during processing' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to process files'
     };
   }
-}
+};
 
-// Get processing status
-export async function getProcessingStatus(processingId: string): Promise<ApiResponse<ProcessingResponse>> {
+/**
+ * Check the status of a processing job
+ */
+export const checkProcessingStatus = async (
+  processingId: string
+): Promise<ApiResponse<{ 
+  status: 'processing' | 'completed' | 'failed';
+  progress?: number;
+  tables?: any[];
+  error?: string;
+}>> => {
   try {
-    console.log("Checking status for:", processingId);
+    // Mock API for now, would call actual API in production
+    console.log(`Checking status for processing ID: ${processingId}`);
     
-    // Mock implementation that completes after a few seconds
-    return new Promise(resolve => {
-      setTimeout(() => {
-        resolve({
-          success: true,
-          data: {
-            processingId: processingId,
-            status: 'completed',
-            message: 'Processing completed successfully'
+    // Simulate processing completion after 3 seconds
+    const timestamp = parseInt(processingId.split('_')[1]);
+    const elapsed = Date.now() - timestamp;
+    
+    if (elapsed < 3000) {
+      return {
+        success: true,
+        data: {
+          status: 'processing',
+          progress: Math.min(95, Math.floor((elapsed / 3000) * 100))
+        }
+      };
+    }
+    
+    // Mock successful completion
+    return {
+      success: true,
+      data: {
+        status: 'completed',
+        progress: 100,
+        tables: [
+          {
+            id: 'table_1',
+            name: 'Extracted Table 1',
+            rows: 15,
+            columns: 5,
+            headers: ['Date', 'Description', 'Amount', 'Category', 'Reference']
           }
-        });
-      }, 3000);
-    });
+        ]
+      }
+    };
   } catch (error) {
-    console.error('Error getting processing status:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error getting status' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to check processing status'
     };
   }
-}
+};
