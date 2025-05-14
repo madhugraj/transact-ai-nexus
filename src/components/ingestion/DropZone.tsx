@@ -91,10 +91,9 @@ const DropZone = ({ onFilesSelected }: DropZoneProps) => {
               type="file"
               multiple
               className="hidden"
-              // Fix for webkitdirectory attribute
-              // Using a proper string value instead of boolean
-              webkitdirectory="true"
-              directory="true"
+              // Fix for webkitdirectory attribute - use empty string instead of boolean
+              webkitdirectory=""
+              directory=""
               onChange={handleFileChange}
             />
           </div>
