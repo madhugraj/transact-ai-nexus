@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
 import { UploadedFile } from '@/types/fileUpload';
 import { ProcessingOptions } from '@/types/processing';
-import { FileText, Database, Layers, Sparkles, Settings } from 'lucide-react';
+import { FileText, Database, Layers, Sparkles, Settings, Brain } from 'lucide-react';
 
 interface AgentProcessingSystemProps {
   files: UploadedFile[];
@@ -34,7 +34,10 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
   
   // Start processing with the agent system
   const handleStartProcessing = async () => {
-    await processFiles(files, options);
+    await processFiles(files, {
+      ...options,
+      useGemini: true  // Enable Gemini processing
+    });
     // Notify parent component when processing is complete
     if (onComplete && processingResults) {
       onComplete(processingResults);
@@ -58,7 +61,13 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
       <Card>
         <CardHeader>
           <CardTitle className="flex justify-between items-center">
-            <span>Agent Processing System</span>
+            <div className="flex items-center gap-2">
+              <span>Agent Processing System</span>
+              <Badge variant="outline" className="bg-blue-50/50 text-blue-600 hover:bg-blue-100">
+                <Brain className="h-3.5 w-3.5 mr-1" />
+                Gemini AI
+              </Badge>
+            </div>
             {isProcessing && (
               <Badge variant="outline" className="bg-blue-50 text-blue-600">
                 Processing
@@ -75,7 +84,7 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
           <div className="space-y-5">
             {/* Agent List */}
             <div className="space-y-3">
-              <h3 className="text-sm font-medium">Processing Agents</h3>
+              <h3 className="text-sm font-medium">Processing Agents with Gemini AI</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {agents.map((agent) => (
                   <div 
@@ -102,7 +111,7 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
             {isProcessing && (
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span>Processing...</span>
+                  <span>Processing with Gemini AI...</span>
                   <span>Please wait</span>
                 </div>
                 <Progress value={65} className="h-2" />
@@ -129,10 +138,26 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
                     </div>
                   </div>
                   <div className="p-3 border rounded-md bg-muted/10">
-                    <div className="text-xs text-muted-foreground">Display Ready</div>
-                    <div className="font-medium">{processingResults.displayReady ? "Yes" : "No"}</div>
+                    <div className="text-xs text-muted-foreground">AI Provider</div>
+                    <div className="font-medium flex items-center">
+                      <Brain className="h-3.5 w-3.5 mr-1 text-blue-500" />
+                      Gemini
+                    </div>
                   </div>
                 </div>
+                
+                {/* Insights from Gemini */}
+                {processingResults.insights && (
+                  <div className="p-4 border rounded-md bg-blue-50/30 mt-4">
+                    <h4 className="text-sm font-medium mb-2 flex items-center">
+                      <Sparkles className="h-4 w-4 mr-1 text-blue-500" /> 
+                      Gemini AI Insights
+                    </h4>
+                    <div className="text-sm">
+                      {processingResults.insights.summary || "No insights available"}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             
@@ -155,7 +180,7 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
                     disabled={isProcessing || files.length === 0}
                     className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
                   >
-                    Start Processing
+                    Start Processing with Gemini
                   </Button>
                 </>
               )}

@@ -1,24 +1,43 @@
 
-import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card } from "@/components/ui/card";
 import ProcessingTab from "@/components/processing/ProcessingTab";
+import GeminiVisionTest from "@/components/ingestion/GeminiVisionTest";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Brain } from "lucide-react";
 
 const Documents = () => {
+  const [activeTab, setActiveTab] = useState<string>("processing");
+  
   return (
     <AppLayout>
       <div className="space-y-6">
         <div className="flex flex-col mb-6">
           <h1 className="text-3xl font-semibold">Document Processing</h1>
           <p className="text-muted-foreground mt-1">
-            Process and analyze financial documents using our agent system
+            Process and analyze financial documents using our agent system with Gemini AI
           </p>
         </div>
         
-        <Card className="overflow-hidden border-muted/40 shadow-sm hover:shadow-md transition-all duration-200 p-6">
-          <ProcessingTab />
-        </Card>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="processing">Agent Processing</TabsTrigger>
+            <TabsTrigger value="gemini" className="flex items-center gap-1">
+              <Brain className="h-3.5 w-3.5" /> Gemini Vision Test
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="processing" className="mt-4">
+            <Card className="overflow-hidden border-muted/40 shadow-sm hover:shadow-md transition-all duration-200 p-6">
+              <ProcessingTab />
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="gemini" className="mt-4">
+            <GeminiVisionTest />
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );

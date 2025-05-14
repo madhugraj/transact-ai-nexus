@@ -1,73 +1,79 @@
 
 import { Agent, ProcessingContext } from "./types";
+import * as api from '@/services/api';
 
 export class DisplayAgent implements Agent {
   id: string = "DisplayAgent";
   name: string = "Display Agent";
-  description: string = "Prepares processed data for display and visualization";
+  description: string = "Prepares processed data for display with insights";
   
   async process(data: any, context?: ProcessingContext): Promise<any> {
-    // Extract normalized tables from previous agents
-    const tables = data.normalizedTables || data.tables || [];
-    const processingId = data.processingId;
-    
-    // Prepare visualization data
-    const visualizationData = this.prepareVisualizationData(tables);
-    
-    // Return processed display data
-    return {
-      processingId,
+    // Prepare processed data for display
+    const displayData = {
+      ...data,
       displayReady: true,
-      tables,
-      visualizations: visualizationData,
-      summary: this.generateSummary(tables, data),
-      exportOptions: this.getExportOptions(tables)
+      timestamp: new Date().toISOString()
     };
+    
+    // Generate insights if we have normalized tables
+    if (data.normalizedTables && data.normalizedTables.length > 0) {
+      try {
+        const insights = await this.generateInsightsWithGemini(data.normalizedTables);
+        displayData.insights = insights;
+      } catch (error) {
+        console.error("Error generating insights:", error);
+        displayData.insights = { error: "Failed to generate insights" };
+      }
+    }
+    
+    return displayData;
   }
   
   canProcess(data: any): boolean {
-    return data && 
-           (data.normalizedTables || data.tables || data.extractionComplete);
+    return data && (data.normalizedTables || data.tables || data.extractedTextContent);
   }
   
-  private prepareVisualizationData(tables: any[]) {
-    // In a real implementation, this would prepare data for charts
-    // For now, return a simplified structure
-    return {
-      charts: [
+  private async generateInsightsWithGemini(tables: any[]): Promise<any> {
+    try {
+      const prompt = `
+        Analyze the following tables and provide insights:
+        ${JSON.stringify(tables, null, 2)}
+        
+        Please provide:
+        1. A summary of the data
+        2. Key patterns or trends
+        3. Any anomalies or outliers
+        4. Suggested visualizations that would be useful
+        
+        Format your response as JSON with the following structure:
         {
-          type: "bar",
-          title: "Data Distribution",
-          data: [] // Would be populated with actual data
+          "summary": "...",
+          "patterns": ["...", "..."],
+          "anomalies": ["...", "..."],
+          "visualizationSuggestions": ["...", "..."]
         }
-      ],
-      insights: this.generateInsights(tables)
-    };
-  }
-  
-  private generateSummary(tables: any[], data: any) {
-    return {
-      tableCount: tables.length,
-      totalRows: tables.reduce((sum, table) => sum + (table.rows?.length || 0), 0),
-      processingTime: data.processingTime || "Unknown",
-      fileTypes: data.fileTypes || {}
-    };
-  }
-  
-  private generateInsights(tables: any[]) {
-    return [
-      "Data patterns detected in column 2",
-      "Possible date formats found in column 3",
-      // More insights would be generated from actual data
-    ];
-  }
-  
-  private getExportOptions(tables: any[]) {
-    return [
-      { format: "CSV", available: true },
-      { format: "Excel", available: true },
-      { format: "JSON", available: true },
-      { format: "Database", available: tables.length > 0 }
-    ];
+      `;
+      
+      const geminiResponse = await api.processTextWithGemini(prompt);
+      
+      if (geminiResponse.success && geminiResponse.data) {
+        try {
+          return JSON.parse(geminiResponse.data);
+        } catch (error) {
+          return {
+            summary: geminiResponse.data,
+            generatedBy: "gemini"
+          };
+        }
+      }
+      
+      return {
+        summary: "No insights could be generated",
+        generatedBy: "system"
+      };
+    } catch (error) {
+      console.error("Error generating insights with Gemini:", error);
+      throw error;
+    }
   }
 }
