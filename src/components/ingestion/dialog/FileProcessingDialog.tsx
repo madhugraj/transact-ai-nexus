@@ -3,7 +3,6 @@ import React from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Settings } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 
 import { ActionSelector } from './ActionSelector';
@@ -12,12 +11,12 @@ import { DataCombiningSettings } from './DataCombiningSettings';
 import { DatabasePushSettings } from './DatabasePushSettings';
 import { InsightSettings } from './InsightSettings';
 import { DocumentSummarySettings } from './DocumentSummarySettings';
-import { ProcessingWorkflow } from './ProcessingWorkflow';
 import { Badge } from '@/components/ui/badge';
 
 import { UploadedFile } from '@/types/fileUpload';
 import { PostProcessAction, ProcessingOptions } from '@/types/processing';
-import { Skeleton } from '@/components/ui/skeleton';
+import SelectedFilesDisplay from '../SelectedFilesDisplay';
+import FileProcessingOptionsTabs from '../FileProcessingOptionsTabs';
 
 interface FileProcessingDialogProps {
   open: boolean;
@@ -46,7 +45,6 @@ export const FileProcessingDialog: React.FC<FileProcessingDialogProps> = ({
   isDocumentFile,
   isDataFile
 }) => {
-  
   // Get the selected files for display
   const selectedFiles = files.filter(file => selectedFileIds.includes(file.id));
   
@@ -86,15 +84,7 @@ export const FileProcessingDialog: React.FC<FileProcessingDialogProps> = ({
         <div className="py-4">
           <div className="space-y-4">
             {/* Selected files display */}
-            {selectedFiles.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-4">
-                {selectedFiles.map(file => (
-                  <Badge key={file.id} variant="secondary" className="px-3 py-1">
-                    {file.file.name}
-                  </Badge>
-                ))}
-              </div>
-            )}
+            <SelectedFilesDisplay selectedFiles={selectedFiles} />
             
             <div>
               <label className="text-sm font-medium mb-2 block">Select Action</label>
@@ -111,50 +101,12 @@ export const FileProcessingDialog: React.FC<FileProcessingDialogProps> = ({
             <Separator className="my-4" />
             
             {/* Action-specific settings */}
-            <Tabs defaultValue="settings" className="w-full">
-              <TabsList className="w-full bg-muted/30 rounded-md">
-                <TabsTrigger 
-                  value="settings" 
-                  className="flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm"
-                >
-                  Settings
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="preview" 
-                  className="flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm"
-                >
-                  Preview
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="workflow" 
-                  className="flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm"
-                >
-                  Workflow
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="settings" className="space-y-4 py-4">
-                {renderActionSettings()}
-              </TabsContent>
-              
-              <TabsContent value="preview">
-                <div className="p-6 text-center text-muted-foreground border rounded-md flex flex-col items-center justify-center min-h-[200px] mt-2 bg-muted/10">
-                  <Settings className="h-8 w-8 mb-2 opacity-50" />
-                  <p>Preview will be generated after processing begins</p>
-                  <div className="mt-4 space-y-2 w-full max-w-sm">
-                    <Skeleton className="h-4 w-3/4 mx-auto" />
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-5/6 mx-auto" />
-                  </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="workflow">
-                <div className="py-4">
-                  <ProcessingWorkflow />
-                </div>
-              </TabsContent>
-            </Tabs>
+            <FileProcessingOptionsTabs
+              currentAction={currentAction}
+              processingOptions={processingOptions}
+              setProcessingOptions={setProcessingOptions}
+              renderActionSettings={renderActionSettings}
+            />
           </div>
         </div>
         

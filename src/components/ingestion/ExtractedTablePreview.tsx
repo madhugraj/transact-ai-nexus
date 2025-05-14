@@ -186,8 +186,13 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
           <PaginationContent>
             <PaginationItem>
               <PaginationPrevious 
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
+                href="#" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  setCurrentPage(prev => Math.max(1, prev - 1));
+                }}
+                aria-disabled={currentPage === 1}
+                className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
               />
             </PaginationItem>
             
@@ -199,7 +204,11 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
               ) : (
                 <PaginationItem key={`page-${pageNum}`}>
                   <PaginationLink 
-                    onClick={() => setCurrentPage(pageNum as number)}
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentPage(pageNum as number);
+                    }}
                     isActive={currentPage === pageNum}
                   >
                     {pageNum}
@@ -210,8 +219,13 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
             
             <PaginationItem>
               <PaginationNext 
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setCurrentPage(prev => Math.min(totalPages, prev + 1));
+                }}
+                aria-disabled={currentPage === totalPages}
+                className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
               />
             </PaginationItem>
           </PaginationContent>

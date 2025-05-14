@@ -2,7 +2,9 @@
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { FileStatus, UploadedFile } from '@/types/fileUpload';
-import { ProcessingOptions, PostProcessAction } from '@/types/processing';
+import { PostProcessAction } from '@/types/processing';
+import { useFileProcessingOptions } from './useFileProcessingOptions';
+import { useFileTypeDetection } from './useFileTypeDetection';
 
 export function useFileProcessing() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -11,34 +13,14 @@ export function useFileProcessing() {
   const [processingComplete, setProcessingComplete] = useState(false);
   const { toast } = useToast();
   
-  const [processingOptions, setProcessingOptions] = useState<ProcessingOptions>({
-    tableFormat: {
-      hasHeaders: true,
-      headerRow: 1,
-      skipRows: 0,
-      delimiter: 'auto',
-    },
-    dataProcessing: {
-      normalizeData: true,
-      removeEmptyRows: true,
-      detectTypes: true,
-    },
-    databaseOptions: {
-      connection: 'ERP Database',
-      tableName: '',
-      createIfNotExists: true,
-    },
-    ocrOptions: {
-      enabled: false,
-      enhanceImage: true,
-      language: 'eng',
-    },
-    extractionOptions: {
-      confidenceThreshold: 0.8,
-      retainFormatting: false,
-      detectMultipleTables: false,
-    }
-  });
+  const { 
+    processingOptions, 
+    setProcessingOptions,
+    setDefaultTableName,
+    updateOcrSettings
+  } = useFileProcessingOptions();
+  
+  const { isDocumentFile, isDataFile, detectFileTypes } = useFileTypeDetection();
   
   // Add files to the state
   const addFiles = (newFiles: File[]) => {
@@ -121,61 +103,29 @@ export function useFileProcessing() {
     });
   };
 
-  // Determine if file is a document (PDF/image) or data file (CSV/Excel)
-  const isDocumentFile = (file: File) => {
-    return file.type === 'application/pdf' || file.type.startsWith('image/');
-  };
-
-  // Determine if file is a data file (CSV/Excel)
-  const isDataFile = (file: File) => {
-    return file.type.includes('excel') || file.type.includes('spreadsheet') || file.type === 'text/csv';
-  };
-
   // Select files for processing
   const selectFilesForProcessing = (fileIds: string[]) => {
     setSelectedFileIds(fileIds);
     
     // Set appropriate default action based on file types
     const selectedFiles = files.filter(file => fileIds.includes(file.id));
-    const allDocuments = selectedFiles.every(file => isDocumentFile(file.file));
-    const allData = selectedFiles.every(file => isDataFile(file.file));
+    const { allDocuments, allData } = detectFileTypes(selectedFiles);
     
     if (allDocuments) {
       setCurrentAction('table_extraction');
-      
-      // Enable OCR by default for scanned documents (PDFs and images)
-      setProcessingOptions(prev => ({
-        ...prev,
-        ocrOptions: {
-          ...prev.ocrOptions,
-          enabled: true
-        }
-      }));
+      // Enable OCR by default for scanned documents
+      updateOcrSettings(true);
     } else if (allData) {
       setCurrentAction('combine_data');
-      
       // Disable OCR for data files
-      setProcessingOptions(prev => ({
-        ...prev,
-        ocrOptions: {
-          ...prev.ocrOptions,
-          enabled: false
-        }
-      }));
+      updateOcrSettings(false);
     } else {
       setCurrentAction('insights');
     }
     
     // Set default table name if pushing to DB
     if (selectedFiles.length === 1) {
-      const fileName = selectedFiles[0].file.name.split('.')[0].toLowerCase().replace(/[^a-z0-9]/g, '_');
-      setProcessingOptions(prev => ({
-        ...prev,
-        databaseOptions: {
-          ...prev.databaseOptions,
-          tableName: fileName
-        }
-      }));
+      setDefaultTableName(selectedFiles[0].file.name);
     } else {
       setProcessingOptions(prev => ({
         ...prev,
