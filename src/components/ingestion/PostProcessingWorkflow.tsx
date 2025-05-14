@@ -9,12 +9,16 @@ interface PostProcessingWorkflowProps {
   tableName?: string;
   processingType: PostProcessAction;
   onClose: () => void;
+  processingId?: string;
+  fileId?: string;
 }
 
 const PostProcessingWorkflow = ({ 
   tableName,
   processingType,
-  onClose 
+  onClose,
+  processingId,
+  fileId
 }: PostProcessingWorkflowProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -31,6 +35,8 @@ const PostProcessingWorkflow = ({
   if (processingType === 'table_extraction') {
     return (
       <TablePostProcessingWorkflow
+        processingId={processingId}
+        fileId={fileId}
         tableName={tableName}
         onClose={onClose}
         onViewInDatabase={handleViewInDatabase}

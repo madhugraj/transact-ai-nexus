@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Table, 
   TableBody, 
@@ -19,39 +19,140 @@ import {
 } from '@/components/ui/pagination';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Download } from 'lucide-react';
+import { Search, Download, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import * as api from '@/services/api';
 
 interface ExtractedTablePreviewProps {
-  tableData?: Array<Array<string>>;
-  headers?: Array<string>;
+  fileId?: string;
+  initialData?: {
+    headers: string[];
+    rows: string[][];
+  };
   isLoading?: boolean;
   onExport?: (format: 'csv' | 'excel') => void;
 }
 
 const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
-  tableData = [],
-  headers = [],
-  isLoading = false,
+  fileId,
+  initialData,
+  isLoading: externalIsLoading = false,
   onExport
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(externalIsLoading);
+  const [tableData, setTableData] = useState<api.TableData | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const rowsPerPage = 10;
+  const { toast } = useToast();
 
-  // Filter data based on search term
-  const filteredData = tableData.filter(row => 
-    row.some(cell => 
-      cell.toString().toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+  // Fetch table data when fileId changes or search/pagination parameters change
+  useEffect(() => {
+    const fetchTableData = async () => {
+      if (!fileId) {
+        // If no fileId is provided but we have initialData, use that
+        if (initialData) {
+          setTableData({
+            headers: initialData.headers,
+            rows: initialData.rows,
+            metadata: {
+              totalRows: initialData.rows.length,
+              confidence: 0,
+              sourceFile: ''
+            }
+          });
+        }
+        return;
+      }
 
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredData.length / rowsPerPage);
-  const startIndex = (currentPage - 1) * rowsPerPage;
-  const paginatedData = filteredData.slice(startIndex, startIndex + rowsPerPage);
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await api.getTablePreview(fileId, currentPage, rowsPerPage, searchTerm);
+        
+        if (!response.success) {
+          setError(response.error || 'Failed to fetch table data');
+          toast({
+            title: "Error loading table",
+            description: response.error,
+            variant: "destructive",
+          });
+        } else {
+          setTableData(response.data!);
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error loading table data';
+        setError(errorMessage);
+        toast({
+          title: "Error loading table",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTableData();
+  }, [fileId, currentPage, searchTerm, initialData, toast]);
+
+  // Handle export with real API
+  const handleExport = async (format: 'csv' | 'excel') => {
+    if (onExport) {
+      onExport(format);
+      return;
+    }
+
+    if (!fileId) {
+      toast({
+        title: "Export error",
+        description: "No file to export",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await api.exportTableData(fileId, format);
+      
+      if (!response.success) {
+        toast({
+          title: "Export failed",
+          description: response.error,
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Create download link
+      const url = window.URL.createObjectURL(response.data!);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `table-data.${format === 'csv' ? 'csv' : 'xlsx'}`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      toast({
+        title: "Export successful",
+        description: `Table exported as ${format.toUpperCase()}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Export error",
+        description: error instanceof Error ? error.message : 'Unknown error during export',
+        variant: "destructive",
+      });
+    }
+  };
 
   // Generate page numbers for pagination
   const getPageNumbers = () => {
+    if (!tableData) return [];
+    
+    const totalPages = Math.ceil(tableData.metadata.totalRows / rowsPerPage);
     const pageNumbers = [];
     const maxVisiblePages = 5;
 
@@ -100,6 +201,10 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
     return pageNumbers;
   };
 
+  const headers = tableData?.headers || [];
+  const rows = tableData?.rows || [];
+  const totalPages = tableData ? Math.ceil(tableData.metadata.totalRows / rowsPerPage) : 0;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -117,8 +222,8 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={() => onExport && onExport('csv')}
-            disabled={isLoading || !tableData.length}
+            onClick={() => handleExport('csv')}
+            disabled={isLoading || !tableData?.rows.length}
           >
             <Download className="mr-2 h-4 w-4" />
             Export CSV
@@ -126,8 +231,8 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={() => onExport && onExport('excel')}
-            disabled={isLoading || !tableData.length}
+            onClick={() => handleExport('excel')}
+            disabled={isLoading || !tableData?.rows.length}
           >
             <Download className="mr-2 h-4 w-4" />
             Export Excel
@@ -153,14 +258,26 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
                   colSpan={headers.length || 1}
                   className="h-24 text-center"
                 >
-                  Loading table data...
+                  <div className="flex items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                    Loading table data...
+                  </div>
                 </TableCell>
               </TableRow>
-            ) : paginatedData.length > 0 ? (
-              paginatedData.map((row, rowIndex) => (
-                <TableRow key={`row-${startIndex + rowIndex}`}>
+            ) : error ? (
+              <TableRow>
+                <TableCell
+                  colSpan={headers.length || 1}
+                  className="h-24 text-center text-red-500"
+                >
+                  Error: {error}
+                </TableCell>
+              </TableRow>
+            ) : rows.length > 0 ? (
+              rows.map((row, rowIndex) => (
+                <TableRow key={`row-${rowIndex}`}>
                   {row.map((cell, cellIndex) => (
-                    <TableCell key={`cell-${startIndex + rowIndex}-${cellIndex}`}>
+                    <TableCell key={`cell-${rowIndex}-${cellIndex}`}>
                       {cell}
                     </TableCell>
                   ))}
@@ -230,6 +347,13 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
             </PaginationItem>
           </PaginationContent>
         </Pagination>
+      )}
+      
+      {/* Show confidence score if available */}
+      {tableData?.metadata.confidence !== undefined && (
+        <div className="text-sm text-muted-foreground">
+          Extraction confidence: {Math.round(tableData.metadata.confidence * 100)}%
+        </div>
       )}
     </div>
   );

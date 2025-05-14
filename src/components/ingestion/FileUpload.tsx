@@ -30,7 +30,9 @@ const FileUpload = () => {
     selectFilesForProcessing,
     processFiles,
     selectByType,
-    handleWorkflowComplete
+    getUnprocessedFiles,
+    handleWorkflowComplete,
+    processingId
   } = useFileProcessing();
 
   // Open processing dialog for selected files
@@ -45,6 +47,14 @@ const FileUpload = () => {
     processFiles();
     setShowProcessingDialog(false);
     setTimeout(() => setIsLoading(false), 1000);
+  };
+
+  // Find the processed file for the current processing
+  const getProcessedFileId = () => {
+    if (!selectedFileIds.length) return undefined;
+    
+    const selectedFile = files.find(file => selectedFileIds.includes(file.id));
+    return selectedFile?.backendId;
   };
 
   return (
@@ -62,6 +72,8 @@ const FileUpload = () => {
           tableName={processingOptions.databaseOptions?.tableName}
           processingType={currentAction}
           onClose={handleWorkflowComplete}
+          processingId={processingId || undefined}
+          fileId={getProcessedFileId()}
         />
       )}
       

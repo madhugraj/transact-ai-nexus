@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,14 +7,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChevronRight, Table as TableIcon, Database, Download, Edit, Check } from 'lucide-react';
 import ExtractedTablePreview from './ExtractedTablePreview';
 import { useToast } from '@/hooks/use-toast';
+import * as api from '@/services/api';
 
 interface TablePostProcessingWorkflowProps {
+  processingId?: string;
+  fileId?: string; 
   tableName?: string;
   onClose: () => void;
   onViewInDatabase?: () => void;
 }
 
 const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = ({ 
+  processingId,
+  fileId,
   tableName = 'extracted_table',
   onClose,
   onViewInDatabase
@@ -22,24 +27,90 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState<'preview' | 'validate' | 'complete'>('preview');
   const [isEditing, setIsEditing] = useState(false);
-  
-  // Sample data for demonstration
-  const mockHeaders = ['Invoice Number', 'Date', 'Customer', 'Amount', 'Status'];
-  const mockData = [
-    ['INV-001', '2023-05-10', 'Acme Corp', '$1,200.00', 'Paid'],
-    ['INV-002', '2023-05-15', 'Globex Inc', '$850.50', 'Pending'],
-    ['INV-003', '2023-05-18', 'Stark Industries', '$3,400.75', 'Paid'],
-    ['INV-004', '2023-05-22', 'Wayne Enterprises', '$1,740.20', 'Overdue'],
-    ['INV-005', '2023-05-25', 'Umbrella Corp', '$920.30', 'Pending']
-  ];
+  const [tableData, setTableData] = useState<api.TableData | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock export function
-  const handleExport = (format: 'csv' | 'excel') => {
-    toast({
-      title: `Exporting as ${format.toUpperCase()}`,
-      description: `Your table is being exported as ${format.toUpperCase()} file.`,
-    });
-    // In a real app, this would trigger an actual export
+  // Load table data when component mounts if fileId is provided
+  useEffect(() => {
+    const loadTableData = async () => {
+      if (!fileId) return;
+      
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        const response = await api.getTablePreview(fileId);
+        
+        if (!response.success) {
+          setError(response.error || 'Failed to load table data');
+          toast({
+            title: "Error loading table",
+            description: response.error,
+            variant: "destructive",
+          });
+        } else {
+          setTableData(response.data || null);
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+        setError(errorMessage);
+        toast({
+          title: "Error loading table",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadTableData();
+  }, [fileId, toast]);
+
+  // Handle export
+  const handleExport = async (format: 'csv' | 'excel') => {
+    if (!fileId) {
+      toast({
+        title: "Export error",
+        description: "No file to export",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await api.exportTableData(fileId, format);
+      
+      if (!response.success) {
+        toast({
+          title: "Export failed",
+          description: response.error,
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Create download link
+      const url = window.URL.createObjectURL(response.data!);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${tableName}.${format === 'csv' ? 'csv' : 'xlsx'}`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      toast({
+        title: "Export successful",
+        description: `Table exported as ${format.toUpperCase()}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Export error",
+        description: error instanceof Error ? error.message : 'Unknown error during export',
+        variant: "destructive",
+      });
+    }
   };
 
   // Get steps for the current workflow
@@ -99,15 +170,16 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
                 <Button 
                   onClick={() => setCurrentStep('validate')}
                   className="gap-1"
+                  disabled={!tableData && !isLoading}
                 >
                   Continue <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
               
               <ExtractedTablePreview 
-                headers={mockHeaders}
-                tableData={mockData}
-                onExport={handleExport}
+                fileId={fileId}
+                initialData={tableData ? { headers: tableData.headers, rows: tableData.rows } : undefined}
+                isLoading={isLoading}
               />
             </div>
           </TabsContent>
@@ -120,6 +192,7 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
                   <Button 
                     variant="outline" 
                     onClick={() => setIsEditing(!isEditing)}
+                    disabled={!tableData}
                   >
                     {isEditing ? 'Done Editing' : (
                       <>
@@ -142,16 +215,14 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
                     Table editing mode would be implemented here
                   </p>
                   <ExtractedTablePreview 
-                    headers={mockHeaders}
-                    tableData={mockData}
-                    onExport={handleExport}
+                    fileId={fileId}
+                    initialData={tableData ? { headers: tableData.headers, rows: tableData.rows } : undefined}
                   />
                 </div>
               ) : (
                 <ExtractedTablePreview 
-                  headers={mockHeaders}
-                  tableData={mockData}
-                  onExport={handleExport}
+                  fileId={fileId}
+                  initialData={tableData ? { headers: tableData.headers, rows: tableData.rows } : undefined}
                 />
               )}
             </div>
@@ -178,7 +249,8 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
                 <Button 
                   variant="outline" 
                   className="w-full"
-                  onClick={() => handleExport('csv')}
+                  onClick={() => fileId && handleExport('csv')}
+                  disabled={!fileId}
                 >
                   <Download className="mr-2 h-4 w-4" />
                   Export Data

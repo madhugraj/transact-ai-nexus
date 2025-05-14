@@ -12,8 +12,10 @@ declare module "@/types/fileUpload" {
     file: File;
     status: FileStatus;
     progress: number;
+    backendId?: string; // Backend-assigned ID for the uploaded file
     error?: string;
     processed?: boolean;
+    processing?: boolean; // Flag to indicate if the file is being processed
   }
   
   // File processing options

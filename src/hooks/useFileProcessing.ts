@@ -1,16 +1,19 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { FileStatus, UploadedFile } from '@/types/fileUpload';
 import { PostProcessAction } from '@/types/processing';
 import { useFileProcessingOptions } from './useFileProcessingOptions';
 import { useFileTypeDetection } from './useFileTypeDetection';
+import * as api from '@/services/api';
 
 export function useFileProcessing() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
   const [currentAction, setCurrentAction] = useState<PostProcessAction>('table_extraction');
   const [processingComplete, setProcessingComplete] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
   const { toast } = useToast();
   
   const { 
@@ -21,6 +24,56 @@ export function useFileProcessing() {
   } = useFileProcessingOptions();
   
   const { isDocumentFile, isDataFile, detectFileTypes } = useFileTypeDetection();
+  
+  // Poll for processing status when there's an active processingId
+  useEffect(() => {
+    let intervalId: number;
+    
+    if (processingId && isPolling) {
+      intervalId = window.setInterval(async () => {
+        const response = await api.getProcessingStatus(processingId);
+        
+        if (!response.success) {
+          toast({
+            title: "Error checking status",
+            description: response.error,
+            variant: "destructive",
+          });
+          setIsPolling(false);
+          return;
+        }
+        
+        const { status, message } = response.data!;
+        
+        if (status === 'completed') {
+          toast({
+            title: "Processing complete",
+            description: message || "Files have been processed successfully.",
+          });
+          setIsPolling(false);
+          setProcessingComplete(true);
+          
+          // Store the table name in localStorage for other components to use
+          if (currentAction === 'push_to_db' && processingOptions.databaseOptions?.tableName) {
+            localStorage.setItem('lastProcessedTable', processingOptions.databaseOptions.tableName);
+          }
+        } else if (status === 'failed') {
+          toast({
+            title: "Processing failed",
+            description: message || "An error occurred during processing.",
+            variant: "destructive",
+          });
+          setIsPolling(false);
+        }
+      }, 2000);
+    }
+    
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [processingId, isPolling, toast, currentAction, processingOptions]);
   
   // Add files to the state
   const addFiles = (newFiles: File[]) => {
@@ -50,8 +103,11 @@ export function useFileProcessing() {
     setFiles(files.filter(file => file.id !== id));
   };
   
-  // Process file upload
-  const uploadFile = (id: string) => {
+  // Process file upload to backend
+  const uploadFile = async (id: string) => {
+    const fileToUpload = files.find(file => file.id === id);
+    if (!fileToUpload) return;
+    
     setFiles(files.map(file => {
       if (file.id === id) {
         return { ...file, status: 'uploading' as FileStatus, progress: 0 };
@@ -59,26 +115,83 @@ export function useFileProcessing() {
       return file;
     }));
     
-    // Simulate upload process
-    const interval = setInterval(() => {
-      setFiles(prevFiles => {
-        const updatedFiles = prevFiles.map(file => {
-          if (file.id === id && file.status === 'uploading') {
-            const newProgress = file.progress + 10;
-            
-            if (newProgress >= 100) {
-              clearInterval(interval);
-              return { ...file, status: 'success' as FileStatus, progress: 100 };
+    // Set up progress tracking
+    let progressTracker = 0;
+    const progressInterval = setInterval(() => {
+      progressTracker += 5;
+      if (progressTracker <= 95) {
+        setFiles(prevFiles => {
+          return prevFiles.map(file => {
+            if (file.id === id) {
+              return { ...file, progress: progressTracker };
             }
-            
-            return { ...file, progress: newProgress };
+            return file;
+          });
+        });
+      }
+    }, 200);
+    
+    try {
+      const response = await api.uploadFile(fileToUpload.file);
+      
+      clearInterval(progressInterval);
+      
+      if (!response.success) {
+        setFiles(prevFiles => {
+          return prevFiles.map(file => {
+            if (file.id === id) {
+              return { ...file, status: 'error' as FileStatus, progress: 0, error: response.error };
+            }
+            return file;
+          });
+        });
+        
+        toast({
+          title: "Upload failed",
+          description: response.error,
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Update file with backend ID
+      setFiles(prevFiles => {
+        return prevFiles.map(file => {
+          if (file.id === id) {
+            return { 
+              ...file, 
+              status: 'success' as FileStatus, 
+              progress: 100,
+              backendId: response.data!.fileId
+            };
           }
           return file;
         });
-        
-        return updatedFiles;
       });
-    }, 300);
+      
+    } catch (error) {
+      clearInterval(progressInterval);
+      
+      setFiles(prevFiles => {
+        return prevFiles.map(file => {
+          if (file.id === id) {
+            return { 
+              ...file, 
+              status: 'error' as FileStatus, 
+              progress: 0,
+              error: error instanceof Error ? error.message : 'Upload failed'
+            };
+          }
+          return file;
+        });
+      });
+      
+      toast({
+        title: "Upload error",
+        description: error instanceof Error ? error.message : 'Unknown error during upload',
+        variant: "destructive",
+      });
+    }
   };
   
   // Start upload for all files
@@ -140,36 +253,58 @@ export function useFileProcessing() {
   };
 
   // Process the selected files with the chosen action
-  const processFiles = () => {
-    // Simulate processing
+  const processFiles = async () => {
+    // Get backend file IDs for selected files
+    const selectedFiles = files.filter(file => selectedFileIds.includes(file.id));
+    const backendFileIds = selectedFiles
+      .filter(file => file.backendId)
+      .map(file => file.backendId as string);
+    
+    if (backendFileIds.length === 0) {
+      toast({
+        title: "No files ready for processing",
+        description: "Please wait for files to finish uploading.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     toast({
       title: "Processing started",
-      description: `Processing ${selectedFileIds.length} files`,
+      description: `Processing ${backendFileIds.length} files`,
     });
     
-    // Mark files as processed
-    setFiles(prev => prev.map(file => {
-      if (selectedFileIds.includes(file.id)) {
-        return { ...file, processed: true };
+    try {
+      const response = await api.processFile(backendFileIds, currentAction, processingOptions);
+      
+      if (!response.success) {
+        toast({
+          title: "Processing failed",
+          description: response.error,
+          variant: "destructive",
+        });
+        return;
       }
-      return file;
-    }));
-    
-    // Simulate completion after a delay
-    setTimeout(() => {
+      
+      // Start polling for status
+      setProcessingId(response.data!.processingId);
+      setIsPolling(true);
+      
+      // Mark files as being processed
+      setFiles(prev => prev.map(file => {
+        if (selectedFileIds.includes(file.id)) {
+          return { ...file, processing: true };
+        }
+        return file;
+      }));
+      
+    } catch (error) {
       toast({
-        title: "Processing complete",
-        description: `Files have been processed successfully.`,
+        title: "Processing error",
+        description: error instanceof Error ? error.message : 'Unknown error during processing',
+        variant: "destructive",
       });
-      
-      // Show next steps workflow
-      setProcessingComplete(true);
-      
-      // Store the table name in localStorage for other components to use
-      if (currentAction === 'push_to_db' && processingOptions.databaseOptions?.tableName) {
-        localStorage.setItem('lastProcessedTable', processingOptions.databaseOptions.tableName);
-      }
-    }, 2000);
+    }
   };
 
   // Group selection by file type
@@ -202,6 +337,7 @@ export function useFileProcessing() {
   // Handle workflow completion
   const handleWorkflowComplete = () => {
     setProcessingComplete(false);
+    setProcessingId(null);
   };
 
   return {
@@ -222,6 +358,7 @@ export function useFileProcessing() {
     processFiles,
     selectByType,
     getUnprocessedFiles,
-    handleWorkflowComplete
+    handleWorkflowComplete,
+    processingId
   };
 }
