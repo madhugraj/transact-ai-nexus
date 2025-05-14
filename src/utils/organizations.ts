@@ -27,15 +27,15 @@ export function getOrganizations(): Organization[] {
   }
   
   // Default organizations if none exist
-  const defaultOrgs = [
+  const defaultOrgs: Organization[] = [
     { 
       id: 1, 
       name: "Acme Corporation", 
-      plan: "Enterprise" as const,
+      plan: "Enterprise",
       industry: "Technology",
       companySize: "501-1000",
       contactEmail: "admin@acmecorp.com",
-      paymentStatus: "active",
+      paymentStatus: "active" as const,
       usageStats: {
         users: 45,
         documents: 3200,
@@ -46,11 +46,11 @@ export function getOrganizations(): Organization[] {
     { 
       id: 2, 
       name: "Globex Industries", 
-      plan: "Professional" as const,
+      plan: "Professional",
       industry: "Manufacturing",
       companySize: "101-500",
       contactEmail: "info@globex.com",
-      paymentStatus: "active",
+      paymentStatus: "active" as const,
       usageStats: {
         users: 12,
         documents: 450,
@@ -61,11 +61,11 @@ export function getOrganizations(): Organization[] {
     { 
       id: 3, 
       name: "Stark Enterprises", 
-      plan: "Enterprise" as const,
+      plan: "Enterprise",
       industry: "Defense",
       companySize: "1001+",
       contactEmail: "tony@stark.com",
-      paymentStatus: "active",
+      paymentStatus: "active" as const,
       usageStats: {
         users: 78,
         documents: 7500,
@@ -76,11 +76,11 @@ export function getOrganizations(): Organization[] {
     { 
       id: 4, 
       name: "Wayne Industries", 
-      plan: "Professional" as const,
+      plan: "Professional",
       industry: "Research",
       companySize: "101-500",
       contactEmail: "bruce@wayne.com",
-      paymentStatus: "active",
+      paymentStatus: "active" as const,
       usageStats: {
         users: 15,
         documents: 820,
@@ -91,11 +91,11 @@ export function getOrganizations(): Organization[] {
     { 
       id: 5, 
       name: "Umbrella Corp", 
-      plan: "Starter" as const,
+      plan: "Starter",
       industry: "Healthcare",
       companySize: "1-50",
       contactEmail: "hello@umbrella.com",
-      paymentStatus: "pending",
+      paymentStatus: "pending" as const,
       usageStats: {
         users: 3,
         documents: 45,

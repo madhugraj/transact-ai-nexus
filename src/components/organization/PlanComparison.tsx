@@ -9,16 +9,22 @@ interface PlanComparisonProps {
   currentPlan?: string;
 }
 
+interface FeatureDef {
+  name: string;
+  accessor: keyof PlanFeatures;
+  format: (val: number | boolean) => string | JSX.Element | boolean;
+}
+
 export function PlanComparison({ currentPlan }: PlanComparisonProps) {
   const plans = ["Starter", "Professional", "Enterprise"];
-  const features = [
-    { name: "Users", accessor: "maxUsers", format: (val: number) => `${val} users` },
-    { name: "Documents", accessor: "maxDocuments", format: (val: number) => `${val.toLocaleString()} docs` },
-    { name: "Storage", accessor: "maxStorage", format: (val: number) => `${val} GB` },
-    { name: "AI Assistant", accessor: "aiAssistant", format: (val: boolean) => val ? "✓" : "✗" },
-    { name: "Advanced Analytics", accessor: "advancedAnalytics", format: (val: boolean) => val ? "✓" : "✗" },
-    { name: "Priority Support", accessor: "prioritySupport", format: (val: boolean) => val ? "✓" : "✗" },
-    { name: "Custom Integrations", accessor: "customIntegrations", format: (val: boolean) => val ? "✓" : "✗" },
+  const features: FeatureDef[] = [
+    { name: "Users", accessor: "maxUsers", format: (val: number | boolean) => `${val} users` },
+    { name: "Documents", accessor: "maxDocuments", format: (val: number | boolean) => `${Number(val).toLocaleString()} docs` },
+    { name: "Storage", accessor: "maxStorage", format: (val: number | boolean) => `${val} GB` },
+    { name: "AI Assistant", accessor: "aiAssistant", format: (val: number | boolean) => val ? "✓" : "✗" },
+    { name: "Advanced Analytics", accessor: "advancedAnalytics", format: (val: number | boolean) => val ? "✓" : "✗" },
+    { name: "Priority Support", accessor: "prioritySupport", format: (val: number | boolean) => val ? "✓" : "✗" },
+    { name: "Custom Integrations", accessor: "customIntegrations", format: (val: number | boolean) => val ? "✓" : "✗" },
   ];
 
   return (
@@ -53,8 +59,8 @@ export function PlanComparison({ currentPlan }: PlanComparisonProps) {
                 const planData = planFeatures[plan];
                 if (!planData) return <td key={plan}>-</td>;
                 
-                const value = planData[feature.accessor as keyof PlanFeatures];
-                const formattedValue = feature.format(value as any);
+                const value = planData[feature.accessor];
+                const formattedValue = feature.format(value);
                 
                 return (
                   <td 

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -151,7 +150,7 @@ export function CreateOrgDialog({ open, onOpenChange, onCreateOrg }: CreateOrgDi
     setIsSubmitting(true);
     
     // Create organization with all collected data
-    const newOrg = {
+    const newOrg: Omit<Organization, "id" | "createdAt" | "usageStats"> = {
       name: basicInfo.name,
       plan: selectedPlan as "Starter" | "Professional" | "Enterprise",
       industry: basicInfo.industry,
@@ -160,7 +159,7 @@ export function CreateOrgDialog({ open, onOpenChange, onCreateOrg }: CreateOrgDi
       billingAddress: billingInfo ? 
         `${billingInfo.address}, ${billingInfo.city}, ${billingInfo.state} ${billingInfo.postalCode}, ${billingInfo.country}` : 
         undefined,
-      paymentStatus: selectedPlan === "Starter" ? "active" : "active",
+      paymentStatus: selectedPlan === "Starter" ? "active" : "active" as const,
     };
     
     // Simulate API delay
