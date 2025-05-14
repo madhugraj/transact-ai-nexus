@@ -3,19 +3,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { X, Upload, FileText, FileImage, File } from 'lucide-react';
-
-// Defines file status used in the component
-type FileStatus = 'idle' | 'uploading' | 'success' | 'error';
-
-// Interface for the uploaded file with status and progress
-interface UploadedFile {
-  id: string;
-  file: File;
-  status: FileStatus;
-  progress: number;
-  error?: string;
-  processed?: boolean;
-}
+import { UploadedFile, FileStatus } from '@/types/fileUpload';
 
 interface FileListProps {
   files: UploadedFile[];

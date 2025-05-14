@@ -22,7 +22,7 @@ export const useBulkFileUpload = () => {
     const newUploadedFiles: UploadedFile[] = validFiles.map(file => ({
       id: `${file.name}-${Date.now()}`,
       file,
-      status: 'idle',
+      status: 'idle' as FileStatus,
       progress: 0
     }));
     
@@ -36,7 +36,7 @@ export const useBulkFileUpload = () => {
   const uploadFile = (id: string) => {
     setFiles(prev => prev.map(file => {
       if (file.id === id) {
-        return { ...file, status: 'uploading', progress: 0 };
+        return { ...file, status: 'uploading' as FileStatus, progress: 0 };
       }
       return file;
     }));
@@ -50,7 +50,7 @@ export const useBulkFileUpload = () => {
             
             if (newProgress >= 100) {
               clearInterval(interval);
-              return { ...file, status: 'success', progress: 100 };
+              return { ...file, status: 'success' as FileStatus, progress: 100 };
             }
             
             return { ...file, progress: newProgress };
