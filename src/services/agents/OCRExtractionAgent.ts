@@ -11,11 +11,11 @@ export class OCRExtractionAgent implements Agent {
     console.log("🤖 OCRExtractionAgent processing with data:", {
       processingId: data.processingId,
       fileIds: data.fileIds,
-      fileObjects: data.fileObjects ? data.fileObjects.length : 0,
+      fileObjectsCount: data.fileObjects ? data.fileObjects.length : 0,
       fileObjectsTypes: data.fileObjects ? data.fileObjects.map(f => f.type) : []
     });
     console.log("OCRExtractionAgent context:", context);
-    console.log("Using Gemini:", context?.options?.useGemini);
+    console.log("Using Gemini:", Boolean(context?.options?.useGemini));
     
     // Extract file IDs from previous agent
     const { fileIds, options } = this.extractInputData(data, context);
@@ -25,7 +25,7 @@ export class OCRExtractionAgent implements Agent {
       enabled: true,
       enhanceResolution: true,
       language: "eng",
-      useGemini: context?.options?.useGemini || false,
+      useGemini: Boolean(context?.options?.useGemini),
       ...options?.ocrSettings
     };
     

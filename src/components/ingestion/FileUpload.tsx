@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useFileProcessing } from '@/hooks/useFileProcessing';
@@ -74,8 +73,7 @@ const FileUpload = () => {
         useGemini: true // Enable Gemini processing
       });
       
-      // Still call processFiles for backward compatibility
-      processFiles();
+      console.log("Agent processing complete, results:", processingResults);
       
       toast({
         title: "Processing complete",
