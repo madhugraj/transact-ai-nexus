@@ -1,37 +1,37 @@
 
 import { ApiResponse } from './types';
 
-// Interface for the upload response
+/**
+ * Upload a file to the backend
+ */
 export interface UploadResponse {
   fileId: string;
-  originalName: string;
-  path: string;
+  name: string;
+  type: string;
+  status: 'success';
 }
 
-// Upload file to backend - mocking the API response for testing
-export async function uploadFile(file: File): Promise<ApiResponse<UploadResponse>> {
+export const uploadFile = async (file: File): Promise<ApiResponse<UploadResponse>> => {
+  console.log(`Uploading file: ${file.name} (${file.type})`);
+  
   try {
-    // Mock implementation for testing
-    console.log("Uploading file:", file.name);
+    // Mock implementation - in a real app this would call an API endpoint
+    // Simulate network delay for more realistic behavior
+    await new Promise(resolve => setTimeout(resolve, 800));
     
-    // Create a mock response after a short delay to simulate network request
-    return new Promise(resolve => {
-      setTimeout(() => {
-        resolve({
-          success: true,
-          data: {
-            fileId: `file-${Date.now()}`,
-            originalName: file.name,
-            path: `/uploads/${file.name}`
-          }
-        });
-      }, 1000);
-    });
+    return {
+      success: true,
+      data: {
+        fileId: `file-${Date.now()}`,
+        name: file.name,
+        type: file.type,
+        status: 'success'
+      }
+    };
   } catch (error) {
-    console.error('Error uploading file:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error during file upload' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error uploading file'
     };
   }
-}
+};

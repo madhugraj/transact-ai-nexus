@@ -2,83 +2,62 @@
 import { ApiResponse } from './types';
 import { ProcessingOptions, PostProcessAction } from '@/types/processing';
 
+export interface ProcessResponse {
+  processingId: string;
+  status: 'queued' | 'processing' | 'completed' | 'failed';
+}
+
 /**
- * Process uploaded files with specified action and options
+ * Process uploaded files with the specified action
  */
 export const processFile = async (
   fileIds: string[],
   action: PostProcessAction,
-  options: ProcessingOptions = {}
-): Promise<ApiResponse<{ processingId: string }>> => {
+  options: ProcessingOptions
+): Promise<ApiResponse<ProcessResponse>> => {
+  console.log(`Processing files ${fileIds.join(', ')} with action: ${action}`);
+  console.log('Processing options:', options);
+  
   try {
-    // Mock API for now, would call actual API in production
-    console.log(`Processing files: ${fileIds} with action: ${action}`);
+    // Mock implementation - in a real app this would call an API endpoint
+    // Simulate network delay for more realistic behavior
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Simulate API request
     return {
       success: true,
       data: {
-        processingId: `proc_${Date.now()}`
+        processingId: `proc-${Date.now()}`,
+        status: 'queued'
       }
     };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to process files'
+      error: error instanceof Error ? error.message : 'Error processing files'
     };
   }
 };
 
 /**
- * Check the status of a processing job
+ * Check the status of a file processing job
  */
-export const checkProcessingStatus = async (
-  processingId: string
-): Promise<ApiResponse<{ 
-  status: 'processing' | 'completed' | 'failed';
-  progress?: number;
-  tables?: any[];
-  error?: string;
-}>> => {
+export const checkProcessingStatus = async (processingId: string): Promise<ApiResponse<ProcessResponse & { progress: number }>> => {
+  console.log(`Checking processing status for: ${processingId}`);
+  
   try {
-    // Mock API for now, would call actual API in production
-    console.log(`Checking status for processing ID: ${processingId}`);
-    
-    // Simulate processing completion after 3 seconds
-    const timestamp = parseInt(processingId.split('_')[1]);
-    const elapsed = Date.now() - timestamp;
-    
-    if (elapsed < 3000) {
-      return {
-        success: true,
-        data: {
-          status: 'processing',
-          progress: Math.min(95, Math.floor((elapsed / 3000) * 100))
-        }
-      };
-    }
-    
-    // Mock successful completion
+    // Simulate processing status - in a real app this would call an API endpoint
     return {
       success: true,
       data: {
+        processingId,
         status: 'completed',
-        progress: 100,
-        tables: [
-          {
-            id: 'table_1',
-            name: 'Extracted Table 1',
-            rows: 15,
-            columns: 5,
-            headers: ['Date', 'Description', 'Amount', 'Category', 'Reference']
-          }
-        ]
+        progress: 100
       }
     };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to check processing status'
+      error: error instanceof Error ? error.message : 'Error checking processing status'
     };
   }
 };
