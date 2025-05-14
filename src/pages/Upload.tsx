@@ -4,13 +4,13 @@ import { useNavigate } from "react-router-dom";
 
 const Upload = () => {
   const navigate = useNavigate();
-  
+
   useEffect(() => {
-    // Redirect to the Documents page with the upload tab selected
+    // Redirect to documents page with upload tab
     navigate("/documents?tab=upload");
   }, [navigate]);
 
-  return null; // This component will not render as it redirects immediately
+  return null;
 };
 
 export default Upload;
