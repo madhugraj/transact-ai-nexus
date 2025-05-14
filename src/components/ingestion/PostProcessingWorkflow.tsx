@@ -30,6 +30,12 @@ const PostProcessingWorkflow: React.FC<PostProcessingWorkflowProps> = ({
   console.log("PostProcessingWorkflow with processingId:", processingId);
   console.log("PostProcessingWorkflow with fileId:", fileId);
   console.log("ProcessingResults available:", processingResults);
+  
+  // Debug log the table data specifically
+  if (processingResults) {
+    console.log("Table data in results:", processingResults.tableData);
+    console.log("Extracted tables in results:", processingResults.extractedTables);
+  }
 
   const handleViewInDatabase = () => {
     toast({

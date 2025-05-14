@@ -34,22 +34,24 @@ export class DynamicTableDetectionAgent implements Agent {
     if (extractedTables.length > 0) {
       console.log("Using tables from PDFTableExtractionAgent:", extractedTables);
       
-      // Format the table data for UI display
-      const tableData = extractedTables.map(table => ({
-        headers: table.headers,
-        rows: table.rows,
+      // Format the table data for UI display - this is crucial for it to appear in the UI
+      const tableData = {
+        headers: extractedTables[0].headers,
+        rows: extractedTables[0].rows,
         metadata: {
-          totalRows: table.rows.length,
-          confidence: table.confidence || 0.9,
+          totalRows: extractedTables[0].rows.length,
+          confidence: extractedTables[0].confidence || 0.9,
           sourceFile: data.processingId || "unknown"
         }
-      }));
+      };
+      
+      console.log("Formatted table data for UI:", tableData);
       
       return {
         ...data, 
         dynamicTableDetection: true,
         extractedTables: extractedTables,
-        tableData: tableData[0] || null, // use the first table for display
+        tableData: tableData, // Make sure this is properly formatted
         extractionComplete: true
       };
     }

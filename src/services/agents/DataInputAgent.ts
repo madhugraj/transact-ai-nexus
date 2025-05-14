@@ -4,92 +4,79 @@ import { Agent, ProcessingContext } from "./types";
 export class DataInputAgent implements Agent {
   id: string = "DataInput";
   name: string = "Data Input Agent";
-  description: string = "Loads and validates input files for processing";
+  description: string = "Processes input files and prepares them for extraction";
   
-  async process(data: any, context?: ProcessingContext): Promise<any> {
-    console.log("🤖 DataInputAgent processing started");
+  async process(files: any[], context?: ProcessingContext): Promise<any> {
+    console.log("🤖 DataInputAgent processing started", { 
+      fileCount: files.length,
+      context
+    });
     
-    // Handle both array of files and direct file objects
-    const files = Array.isArray(data) ? data : [data];
+    // Get file types information
+    const fileStats = this.getFileTypeStatistics(files);
+    console.log("File statistics:", fileStats);
     
-    console.log(`Processing ${files.length} files:`, files.map(f => 
-      f.file ? {name: f.file.name, type: f.file.type, size: f.file.size} : {id: f.id}
-    ));
-    
-    // Count file types for downstream agents
-    const fileTypes = this.countFileTypes(files);
-    console.log("File types count:", fileTypes);
+    // Generate processing ID
+    const processingId = `process_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    console.log("Generated processing ID:", processingId);
     
     // Extract file IDs
     const fileIds = files
       .filter(file => file.backendId)
       .map(file => file.backendId);
     
-    // Store File objects for actual processing
+    console.log("Extracted file IDs:", fileIds);
+    
+    // Extract file objects for direct manipulation
     const fileObjects = files
-      .filter(file => file.file instanceof File)
+      .filter(file => file.file)
       .map(file => file.file);
-      
-    console.log(`Extracted ${fileIds.length} backend file IDs`);
-    console.log(`Extracted ${fileObjects.length} File objects for processing`);
     
-    if (fileObjects.length === 0 && fileIds.length === 0) {
-      console.warn("No valid files found for processing");
-      throw new Error("No valid files found for processing");
-    }
-
-    // Create a unique processing ID
-    const processingId = `proc-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    console.log(`Created processing ID: ${processingId}`);
+    console.log("Extracted file objects:", fileObjects.map(f => f.name));
     
-    console.log("✅ DataInputAgent completed processing");
-    
-    // Return data for next agent in pipeline
+    // Return processed data for next agent
     return {
       processingId,
       fileIds,
-      fileObjects, // Pass the actual File objects for real processing
-      fileTypes,
+      fileObjects,
+      fileTypes: fileStats,
+      timestamp: new Date().toISOString()
     };
   }
   
   canProcess(data: any): boolean {
-    // Can process any input data that contains files
-    const canProcess = data != null && (
-      (Array.isArray(data) && data.length > 0) ||
-      (data.file instanceof File) ||
-      (data.backendId != null)
-    );
-    console.log("DataInputAgent.canProcess:", canProcess);
-    return canProcess;
+    return Array.isArray(data) && data.length > 0;
   }
   
-  private countFileTypes(files: any[]): { documents: number; data: number; images: number; other: number } {
-    const counts = { documents: 0, data: 0, images: 0, other: 0 };
+  // Helper method to categorize files
+  private getFileTypeStatistics(files: any[]): { documents: number, images: number, data: number, other: number } {
+    const stats = {
+      documents: 0,
+      images: 0,
+      data: 0,
+      other: 0
+    };
     
-    for (const file of files) {
-      if (!file.file) {
-        counts.other++;
-        continue;
-      }
+    files.forEach(file => {
+      if (!file.file) return;
       
       const type = file.file.type;
       
-      if (type === 'application/pdf' || 
-          type === 'application/msword' || 
-          type.includes('officedocument.wordprocessing')) {
-        counts.documents++;
-      } else if (type.includes('spreadsheet') || 
-                type === 'text/csv' || 
-                type === 'application/vnd.ms-excel') {
-        counts.data++;
+      if (type === 'application/pdf') {
+        stats.documents++;
       } else if (type.startsWith('image/')) {
-        counts.images++;
+        stats.images++;
+      } else if (
+        type === 'text/csv' || 
+        type === 'application/vnd.ms-excel' || 
+        type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      ) {
+        stats.data++;
       } else {
-        counts.other++;
+        stats.other++;
       }
-    }
+    });
     
-    return counts;
+    return stats;
   }
 }

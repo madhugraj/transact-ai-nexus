@@ -64,6 +64,16 @@ export function useAgentProcessing() {
       if (result.success) {
         console.log("Agent processing completed successfully:", result.data);
         setProcessingId(result.data.processingId);
+        
+        // Make sure to log table data specifically for debugging
+        if (result.data.tableData) {
+          console.log("Table data received:", result.data.tableData);
+        } else if (result.data.extractedTables && result.data.extractedTables.length > 0) {
+          console.log("Extracted tables received:", result.data.extractedTables);
+        } else {
+          console.warn("No table data found in processing results");
+        }
+        
         setProcessingResults(result.data);
         setProcessingComplete(true);
         
