@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter
 } from "@/components/ui/dialog";
 import { Separator } from '@/components/ui/separator';
 import {
@@ -40,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useWorkflowNavigation } from '@/hooks/useWorkflowNavigation';
 
 const EmailConnector = () => {
   const [connected, setConnected] = useState(false);
@@ -53,6 +54,7 @@ const EmailConnector = () => {
   const [folderToSync, setFolderToSync] = useState('INBOX');
   const [syncAttachmentsOnly, setSyncAttachmentsOnly] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+  const [showDbSyncDialog, setShowDbSyncDialog] = useState(false);
   // New advanced filter states
   const [subjectFilter, setSubjectFilter] = useState('');
   const [senderFilter, setSenderFilter] = useState('');
@@ -69,8 +71,10 @@ const EmailConnector = () => {
   // OCR and processing settings
   const [enableOcr, setEnableOcr] = useState(true);
   const [confidenceThreshold, setConfidenceThreshold] = useState('75');
+  const [syncing, setSyncing] = useState(false);
   
   const { toast } = useToast();
+  const { navigateToStep } = useWorkflowNavigation();
   
   const handleConnect = (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,6 +135,25 @@ const EmailConnector = () => {
     );
   };
 
+  const handleDbSync = () => {
+    setSyncing(true);
+    
+    // Simulate sync process
+    setTimeout(() => {
+      setSyncing(false);
+      setShowDbSyncDialog(false);
+      toast({
+        title: "Sync Complete",
+        description: "Email data has been synchronized with the database",
+      });
+      
+      // Navigate to database page
+      setTimeout(() => {
+        navigateToStep('database', { tableName: 'email_documents' });
+      }, 500);
+    }, 2000);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -141,14 +164,14 @@ const EmailConnector = () => {
       </div>
       
       <Tabs defaultValue="gmail" className="w-full">
-        <TabsList>
-          <TabsTrigger value="gmail">Gmail</TabsTrigger>
-          <TabsTrigger value="outlook">Outlook</TabsTrigger>
-          <TabsTrigger value="imap">IMAP/SMTP</TabsTrigger>
+        <TabsList className="bg-muted/30">
+          <TabsTrigger value="gmail" className="data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary">Gmail</TabsTrigger>
+          <TabsTrigger value="outlook" className="data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary">Outlook</TabsTrigger>
+          <TabsTrigger value="imap" className="data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary">IMAP/SMTP</TabsTrigger>
         </TabsList>
         
         <div className="pt-6">
-          <Card>
+          <Card className="shadow-sm hover:shadow-md transition-all duration-200">
             <CardHeader>
               <div className="flex justify-between items-center">
                 <div>
@@ -208,7 +231,7 @@ const EmailConnector = () => {
                 </form>
               ) : (
                 <div className="space-y-6">
-                  <div className="rounded-lg bg-secondary p-4">
+                  <div className="rounded-lg bg-secondary/30 p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
                         <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -221,7 +244,7 @@ const EmailConnector = () => {
                           </p>
                         </div>
                       </div>
-                      <Button variant="outline" size="icon">
+                      <Button variant="outline" size="icon" className="hover:bg-primary/10">
                         <RefreshCw size={16} />
                       </Button>
                     </div>
@@ -291,7 +314,7 @@ const EmailConnector = () => {
                     <div className="flex flex-wrap gap-2 pt-4">
                       <Dialog>
                         <DialogTrigger asChild>
-                          <Button variant="outline">
+                          <Button variant="outline" className="hover:bg-blue-50/60 transition-colors">
                             <Sliders size={16} className="mr-2" />
                             Advanced Settings
                           </Button>
@@ -455,7 +478,7 @@ const EmailConnector = () => {
                       
                       <Dialog>
                         <DialogTrigger asChild>
-                          <Button variant="outline">
+                          <Button variant="outline" className="hover:bg-amber-50/60 transition-colors">
                             <Filter size={16} className="mr-2" />
                             Email Filters
                           </Button>
@@ -585,9 +608,13 @@ const EmailConnector = () => {
                         </DialogContent>
                       </Dialog>
                       
-                      <Dialog>
+                      {/* New DB Sync Dialog */}
+                      <Dialog open={showDbSyncDialog} onOpenChange={setShowDbSyncDialog}>
                         <DialogTrigger asChild>
-                          <Button variant="outline">
+                          <Button 
+                            variant="outline" 
+                            className="hover:bg-green-50/60 transition-colors"
+                          >
                             <Database size={16} className="mr-2" />
                             Database Sync
                           </Button>
@@ -630,6 +657,15 @@ const EmailConnector = () => {
                               </Select>
                             </div>
                             
+                            <div className="space-y-2">
+                              <Label htmlFor="target-table">Target Table</Label>
+                              <Input 
+                                id="target-table" 
+                                placeholder="email_documents" 
+                                defaultValue="email_documents"
+                              />
+                            </div>
+                            
                             <div className="flex items-center space-x-2">
                               <Checkbox id="db-logging" defaultChecked />
                               <label
@@ -640,14 +676,28 @@ const EmailConnector = () => {
                               </label>
                             </div>
                           </div>
-                          <div className="flex justify-end space-x-2">
-                            <Button variant="outline">
+                          <DialogFooter>
+                            <Button variant="outline" onClick={() => setShowDbSyncDialog(false)}>
                               Cancel
                             </Button>
-                            <Button>
-                              Save Settings
+                            <Button 
+                              onClick={handleDbSync}
+                              disabled={syncing}
+                              className="relative"
+                            >
+                              {syncing ? (
+                                <>
+                                  <RefreshCw size={16} className="mr-2 animate-spin" />
+                                  Syncing...
+                                </>
+                              ) : (
+                                <>
+                                  <Database size={16} className="mr-2" />
+                                  Sync Now
+                                </>
+                              )}
                             </Button>
-                          </div>
+                          </DialogFooter>
                         </DialogContent>
                       </Dialog>
                       
@@ -668,8 +718,8 @@ const EmailConnector = () => {
       
       <div className="pt-4">
         <Card className={cn(
-          "border-dashed",
-          connected && "bg-muted"
+          "border-dashed shadow-sm",
+          connected ? "bg-muted/20" : ""
         )}>
           <CardHeader>
             <CardTitle>Recent Email Activity</CardTitle>

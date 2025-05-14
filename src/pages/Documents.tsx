@@ -17,6 +17,8 @@ const Documents = () => {
   useEffect(() => {
     if (tabParam === "upload") {
       setCurrentTab("upload");
+    } else if (tabParam === "transactions") {
+      setCurrentTab("transactions");
     }
   }, [tabParam]);
   
@@ -30,29 +32,35 @@ const Documents = () => {
           </p>
         </div>
         
-        <Card className="overflow-hidden border-muted/40">
+        <Card className="overflow-hidden border-muted/40 shadow-sm hover:shadow-md transition-all duration-200">
           <Tabs 
             value={currentTab}
             onValueChange={setCurrentTab}
             className="w-full"
           >
             <TabsList className="w-full bg-muted/30 rounded-none border-b">
-              <TabsTrigger value="transactions" className="flex items-center gap-2 py-3 px-5 data-[state=active]:bg-background">
+              <TabsTrigger 
+                value="transactions" 
+                className="flex items-center gap-2 py-3 px-5 data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary"
+              >
                 <FileText className="w-4 h-4" />
                 Process Transactions
               </TabsTrigger>
-              <TabsTrigger value="upload" className="flex items-center gap-2 py-3 px-5 data-[state=active]:bg-background">
+              <TabsTrigger 
+                value="upload" 
+                className="flex items-center gap-2 py-3 px-5 data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary"
+              >
                 <Upload className="w-4 h-4" />
                 File Upload
               </TabsTrigger>
             </TabsList>
             
             <div className="p-6">
-              <TabsContent value="transactions" className="mt-0">
+              <TabsContent value="transactions" className="mt-0 p-0">
                 <ProcessTransactions />
               </TabsContent>
               
-              <TabsContent value="upload" className="mt-0">
+              <TabsContent value="upload" className="mt-0 p-0">
                 <FileUpload />
               </TabsContent>
             </div>
