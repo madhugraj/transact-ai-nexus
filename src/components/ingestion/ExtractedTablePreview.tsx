@@ -47,7 +47,7 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
       setError(null);
       
       try {
-        const response = await api.getTableServicePreview(fileId);
+        const response = await api.getTablePreview(fileId);
         
         if (response.success && response.data) {
           setTableData({

@@ -93,7 +93,7 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
     setError(null);
     
     try {
-      const response = await api.getTableServicePreview(fileId);
+      const response = await api.getTablePreview(fileId);
       
       if (!response.success) {
         setError(response.error || 'Failed to load table data');
@@ -130,7 +130,7 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
     }
 
     try {
-      const response = await api.exportTableServiceData(fileId, format);
+      const response = await api.exportTableData(fileId, format);
       
       if (!response.success) {
         toast({
