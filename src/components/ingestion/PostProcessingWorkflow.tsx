@@ -13,6 +13,7 @@ interface PostProcessingWorkflowProps {
   onClose: () => void;
   processingId?: string;
   fileId?: string;
+  processingResults?: any;
 }
 
 const PostProcessingWorkflow: React.FC<PostProcessingWorkflowProps> = ({
@@ -20,10 +21,10 @@ const PostProcessingWorkflow: React.FC<PostProcessingWorkflowProps> = ({
   tableName,
   onClose,
   processingId,
-  fileId
+  fileId,
+  processingResults
 }) => {
   const { toast } = useToast();
-  const { processingResults } = useAgentProcessing();
   const [showInDatabase, setShowInDatabase] = useState(false);
 
   console.log("PostProcessingWorkflow with processingId:", processingId);
