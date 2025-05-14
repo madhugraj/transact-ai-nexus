@@ -1,16 +1,22 @@
 
-import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { FileUpload } from "@/components/ingestion/FileUpload";
+import AppLayout from "@/components/layout/AppLayout";
 
 const Upload = () => {
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    // Redirect to documents page with upload tab
-    navigate("/documents?tab=upload");
-  }, [navigate]);
-
-  return null;
+  return (
+    <AppLayout>
+      <div className="space-y-6">
+        <div className="flex flex-col mb-6">
+          <h1 className="text-3xl font-semibold">File Upload</h1>
+          <p className="text-muted-foreground mt-1">
+            Upload and process your financial documents
+          </p>
+        </div>
+        
+        <FileUpload />
+      </div>
+    </AppLayout>
+  );
 };
 
 export default Upload;

@@ -59,13 +59,13 @@ const AppSidebar = () => {
 
   const navItems = [
     { label: "Dashboard", icon: BarChart, href: "/dashboard" },
-    { label: "Documents", icon: File, href: "/documents" },
+    { label: "Documents", icon: FileText, href: "/documents" },
     { label: "Email Connector", icon: Mail, href: "/email-connector" },
     { label: "Upload", icon: Upload, href: "/upload" },
     { label: "Database", icon: Database, href: "/database" },
     { label: "AI Assistant", icon: MessageCircle, href: "/assistant" },
     { label: "Actions", icon: Send, href: "/actions" },
-    { label: "SAP Data", icon: FileText, href: "/sap-data" },
+    { label: "SAP Data", icon: File, href: "/sap-data" },
     { label: "Settings", icon: Settings, href: "/settings" },
   ];
 
