@@ -1,6 +1,21 @@
 
 import { Agent, ProcessingContext } from "./types";
 
+// Define an interface for the UI data to fix TypeScript errors
+interface UIData {
+  processingId: string;
+  fileIds: string[];
+  tableCount: number;
+  extractionComplete: boolean;
+  processingComplete: boolean;
+  usingGemini: boolean;
+  timestamp: string;
+  insights?: any;
+  extractedText?: string;
+  aiProvider?: string;
+  geminiResults?: any[];
+}
+
 export class DisplayAgent implements Agent {
   id: string = "DisplayAgent";
   name: string = "Display Agent";
@@ -21,8 +36,8 @@ export class DisplayAgent implements Agent {
     // Check if we used Gemini
     const usingGemini = Boolean(geminiResults.length > 0 || data.ocrProvider === "gemini");
     
-    // Basic UI metadata
-    const uiData = {
+    // Basic UI metadata with proper typing
+    const uiData: UIData = {
       processingId,
       fileIds,
       tableCount,
