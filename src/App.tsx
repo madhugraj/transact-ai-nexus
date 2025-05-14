@@ -14,6 +14,7 @@ import Assistant from "./pages/Assistant";
 import Database from "./pages/Database";
 import Actions from "./pages/Actions";
 import Settings from "./pages/Settings";
+import SapData from "./pages/SapData";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/database" element={<Database />} />
             <Route path="/actions" element={<Actions />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/sap-data" element={<SapData />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
