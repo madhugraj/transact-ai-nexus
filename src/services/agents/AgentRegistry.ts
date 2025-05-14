@@ -80,13 +80,30 @@ class AgentProcessingGraph {
           console.log(`Running agent: ${agent.id}`);
           // Process and update data
           data = await agent.process(data, context);
-          console.log(`Agent ${agent.id} completed processing`);
+          console.log(`Agent ${agent.id} completed processing, keys: ${Object.keys(data).join(', ')}`);
+          
+          // Special logging for tables
+          if (data.tableData) {
+            console.log(`Table data after ${agent.id}:`, {
+              headers: data.tableData.headers,
+              rowCount: data.tableData.rows.length
+            });
+          }
+          if (data.extractedTables) {
+            console.log(`Extracted tables after ${agent.id}:`, {
+              count: data.extractedTables.length,
+              firstTable: data.extractedTables.length > 0 ? {
+                headers: data.extractedTables[0].headers,
+                rowCount: data.extractedTables[0].rows.length
+              } : 'none'
+            });
+          }
         } else {
           console.log(`Agent ${agent.id} cannot process current data, skipping`);
         }
       }
       
-      console.log("Agent processing completed");
+      console.log("Agent processing completed successfully");
       
       return {
         success: true,

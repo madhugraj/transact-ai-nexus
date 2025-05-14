@@ -4,53 +4,57 @@ import { Agent, ProcessingContext } from "./types";
 export class DataInputAgent implements Agent {
   id: string = "DataInput";
   name: string = "Data Input Agent";
-  description: string = "Processes input files and prepares them for extraction";
+  description: string = "Prepares files for processing in the agent system";
   
-  async process(files: any[], context?: ProcessingContext): Promise<any> {
-    console.log("🤖 DataInputAgent processing started", { 
-      fileCount: files.length,
-      context
+  async process(data: any, context?: ProcessingContext): Promise<any> {
+    console.log("🤖 DataInputAgent processing with data:", {
+      fileCount: Array.isArray(data) ? data.length : 0,
+      dataType: typeof data,
+      isArray: Array.isArray(data)
     });
     
-    // Get file types information
-    const fileStats = this.getFileTypeStatistics(files);
-    console.log("File statistics:", fileStats);
+    // Extract file objects for further processing
+    const files = Array.isArray(data) ? data : [];
+    console.log(`DataInputAgent found ${files.length} files for processing`);
     
-    // Generate processing ID
-    const processingId = `process_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-    console.log("Generated processing ID:", processingId);
+    // Count file types for processing decisions
+    const fileTypes = this.countFileTypes(files);
     
-    // Extract file IDs
-    const fileIds = files
-      .filter(file => file.backendId)
-      .map(file => file.backendId);
-    
-    console.log("Extracted file IDs:", fileIds);
-    
-    // Extract file objects for direct manipulation
+    // Create an array of File objects for downstream processing
     const fileObjects = files
-      .filter(file => file.file)
+      .filter(file => file.file instanceof File)
       .map(file => file.file);
     
-    console.log("Extracted file objects:", fileObjects.map(f => f.name));
+    console.log("Prepared file objects:", {
+      count: fileObjects.length,
+      types: fileObjects.map(f => f.type),
+      names: fileObjects.map(f => f.name)
+    });
     
-    // Return processed data for next agent
+    // Initialize processing ID
+    const processingId = `process-${Date.now()}`;
+    
+    // Get file IDs
+    const fileIds = files.map(file => file.id);
+    
+    // Return structured data for next agents
     return {
       processingId,
       fileIds,
       fileObjects,
-      fileTypes: fileStats,
-      timestamp: new Date().toISOString()
+      fileTypes,
+      processedBy: 'DataInputAgent'
     };
   }
   
   canProcess(data: any): boolean {
-    return Array.isArray(data) && data.length > 0;
+    const canProcess = Array.isArray(data) && data.length > 0;
+    console.log("DataInputAgent.canProcess:", canProcess);
+    return canProcess;
   }
   
-  // Helper method to categorize files
-  private getFileTypeStatistics(files: any[]): { documents: number, images: number, data: number, other: number } {
-    const stats = {
+  private countFileTypes(files: any[]): Record<string, number> {
+    const counts = {
       documents: 0,
       images: 0,
       data: 0,
@@ -60,23 +64,19 @@ export class DataInputAgent implements Agent {
     files.forEach(file => {
       if (!file.file) return;
       
-      const type = file.file.type;
+      const { type } = file.file;
       
       if (type === 'application/pdf') {
-        stats.documents++;
+        counts.documents++;
       } else if (type.startsWith('image/')) {
-        stats.images++;
-      } else if (
-        type === 'text/csv' || 
-        type === 'application/vnd.ms-excel' || 
-        type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      ) {
-        stats.data++;
+        counts.images++;
+      } else if (type === 'text/csv' || type.includes('excel') || type.includes('spreadsheet')) {
+        counts.data++;
       } else {
-        stats.other++;
+        counts.other++;
       }
     });
     
-    return stats;
+    return counts;
   }
 }

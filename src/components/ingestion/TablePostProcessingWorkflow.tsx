@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,7 +30,7 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
   const [currentStep, setCurrentStep] = useState<'preview' | 'validate' | 'complete'>('preview');
   const [activeTab, setActiveTab] = useState('document');
   const [isEditing, setIsEditing] = useState(false);
-  const [tableData, setTableData] = useState<api.TableServiceTableData | null>(null);
+  const [tableData, setTableData] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
@@ -42,22 +41,18 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
   console.log("TablePostProcessingWorkflow - fileId:", fileId);
   console.log("TablePostProcessingWorkflow - processingId:", processingId);
 
-  // Load table data when component mounts if processingResults are available
+  // Load table data and file information from processing results
   useEffect(() => {
     if (processingResults) {
-      console.log("Using processingResults for table data:", processingResults);
+      console.log("Processing results for table workflow:", {
+        hasTableData: Boolean(processingResults.tableData),
+        hasExtractedTables: Boolean(processingResults.extractedTables),
+        hasFileObjects: Boolean(processingResults.fileObjects && processingResults.fileObjects.length)
+      });
       
       // Extract table data from processing results
       if (processingResults.tableData) {
-        setTableData({
-          headers: processingResults.tableData.headers,
-          rows: processingResults.tableData.rows,
-          metadata: processingResults.tableData.metadata || {
-            totalRows: processingResults.tableData.rows.length,
-            confidence: 0.95,
-            sourceFile: fileId || processingId || ""
-          }
-        });
+        setTableData(processingResults.tableData);
         setIsLoading(false);
       } else if (processingResults.extractedTables && processingResults.extractedTables.length > 0) {
         const firstTable = processingResults.extractedTables[0];
@@ -71,10 +66,15 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
           }
         });
         setIsLoading(false);
-      } else {
-        // No table data found in processing results
-        setIsLoading(false);
-        setError("No table data found in processing results");
+      }
+      
+      // Extract file for document preview
+      if (processingResults.fileObjects && processingResults.fileObjects.length > 0) {
+        const file = processingResults.fileObjects[0];
+        setFileUrl(URL.createObjectURL(file));
+        setFileName(file.name);
+        setFileType(file.type);
+        console.log("Created file URL for preview:", file.name, file.type);
       }
     } else if (fileId) {
       // Fallback to API if no processing results but we have a fileId
@@ -85,17 +85,7 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
     }
   }, [processingResults, fileId]);
 
-  // Load file data for preview
-  useEffect(() => {
-    if (processingResults && processingResults.fileObjects && processingResults.fileObjects.length > 0) {
-      const file = processingResults.fileObjects[0];
-      setFileUrl(URL.createObjectURL(file));
-      setFileName(file.name);
-      setFileType(file.type);
-    }
-  }, [processingResults]);
-
-  // Load table data when component mounts if fileId is provided
+  // Load table data from API if not provided in processing results
   const loadTableData = async () => {
     if (!fileId) return;
     

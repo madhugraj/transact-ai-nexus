@@ -17,8 +17,9 @@ export class OCRExtractionAgent implements Agent {
     console.log("OCRExtractionAgent context:", context);
     console.log("Using Gemini:", Boolean(context?.options?.useGemini));
     
-    // Extract file IDs from previous agent
-    const { fileIds, options } = this.extractInputData(data, context);
+    // Extract file IDs and file objects
+    const { fileIds, fileObjects } = data;
+    const { options } = context || {};
     
     // Default OCR settings
     const ocrSettings = {
@@ -30,26 +31,24 @@ export class OCRExtractionAgent implements Agent {
     };
     
     console.log("OCR settings:", ocrSettings);
-    console.log("File objects available:", Boolean(data.fileObjects && data.fileObjects.length > 0));
+    console.log("File objects available:", Boolean(fileObjects && fileObjects.length > 0));
     
-    let response;
+    let extractedTextContent = "";
+    let geminiResults = [];
     
     // Check if we should use Gemini Vision for enhanced OCR
-    if (ocrSettings.useGemini && data.fileObjects && data.fileObjects.length > 0) {
+    if (ocrSettings.useGemini && fileObjects && fileObjects.length > 0) {
       console.log("🔍 Using Gemini Vision for OCR processing");
-      // Process each file with Gemini Vision
-      const geminiResults = [];
       
-      for (const file of data.fileObjects) {
+      // Process each file with Gemini Vision
+      for (const file of fileObjects) {
         try {
-          // Only process image files with Gemini Vision
+          // Only process image files and PDFs with Gemini Vision
           console.log(`Processing file: ${file.name}, type: ${file.type}`);
           
           if (file.type.startsWith('image/') || file.type === 'application/pdf') {
             console.log(`Processing ${file.name} with Gemini Vision`);
             
-            // For PDF files, we'd need to convert them to images first
-            // For this implementation, we'll just handle them directly
             const base64Image = await api.fileToBase64(file);
             console.log(`Converted ${file.name} to base64, length: ${base64Image.length}`);
             
@@ -69,6 +68,9 @@ export class OCRExtractionAgent implements Agent {
                 extractedText: geminiResponse.data,
                 processed: true
               });
+              
+              // Append to overall extracted text
+              extractedTextContent += geminiResponse.data + "\n\n";
               console.log(`✅ Successfully processed ${file.name} with Gemini Vision`);
             } else {
               console.error(`❌ Failed to process ${file.name} with Gemini Vision:`, geminiResponse.error);
@@ -92,41 +94,17 @@ export class OCRExtractionAgent implements Agent {
           });
         }
       }
-      
-      console.log("Gemini processing results:", geminiResults.map(r => ({
-        fileName: r.fileName,
-        processed: r.processed,
-        textLength: r.extractedText?.length
-      })));
-      
-      // If we have Gemini results, add them to the processed data
-      if (geminiResults.length > 0) {
-        console.log("Returning Gemini OCR results");
-        return {
-          processingId: data.processingId || `gemini-ocr-${Date.now()}`,
-          fileIds,
-          fileObjects: data.fileObjects, // Pass through the file objects
-          ocrApplied: true,
-          ocrSettings,
-          geminiResults,
-          extractedTextContent: geminiResults
-            .filter(r => r.processed)
-            .map(r => r.extractedText)
-            .join('\n\n'),
-          ocrProvider: "gemini"
-        };
-      } else {
-        console.log("No Gemini results, falling back to standard OCR");
-      }
     }
     
-    // Fall back to regular OCR API if Gemini processing failed or wasn't applicable
-    console.log("Using standard OCR processing");
-    
-    try {
-      // For demo, just create mock OCR data
-      const mockExtractedText = data.fileObjects && data.fileObjects.length > 0 
-        ? `Sample Bank Statement
+    // If we don't have Gemini results, generate mock content based on file type
+    if (extractedTextContent.length === 0 && fileObjects && fileObjects.length > 0) {
+      console.log("Using standard OCR processing or mock data");
+      
+      // Generate content based on the first file's type
+      const firstFile = fileObjects[0];
+      
+      if (firstFile.type === 'application/pdf' || firstFile.type.includes('document')) {
+        extractedTextContent = `Sample Bank Statement
 Account Number: XXXX-XXXX-1234
 Statement Period: 01/25/2023 - 02/25/2023
 
@@ -144,24 +122,26 @@ Account Summary:
 Starting Balance: $3,371.54
 Total Deposits: $2,450.00
 Total Withdrawals: $2,195.63
-Ending Balance: $3,625.91`
-        : "No file content available for OCR processing";
-      
-      console.log("✅ Standard OCR processing complete with mock data");
-      
-      return {
-        processingId: data.processingId,
-        fileIds,
-        fileObjects: data.fileObjects, // Pass through the file objects
-        ocrApplied: true,
-        ocrSettings,
-        ocrProvider: "standard",
-        extractedTextContent: mockExtractedText
-      };
-    } catch (error) {
-      console.error("Standard OCR processing error:", error);
-      throw error;
+Ending Balance: $3,625.91`;
+      } else if (firstFile.type.includes('image')) {
+        extractedTextContent = "This is extracted text from an image file. The image appears to contain financial information that could be processed into a table.";
+      } else {
+        extractedTextContent = "Extracted content from uploaded file";
+      }
     }
+    
+    // Return processed data including file objects for document preview!
+    return {
+      processingId: data.processingId,
+      fileIds: data.fileIds,
+      fileObjects: data.fileObjects, // Pass through the file objects for document preview
+      ocrApplied: true,
+      ocrSettings,
+      geminiResults: geminiResults.length > 0 ? geminiResults : undefined,
+      extractedTextContent,
+      ocrProvider: geminiResults.length > 0 ? "gemini" : "standard",
+      processedBy: 'OCRExtractionAgent'
+    };
   }
   
   canProcess(data: any): boolean {
@@ -170,8 +150,7 @@ Ending Balance: $3,625.91`
       (
         (data.fileIds && Array.isArray(data.fileIds) && data.fileIds.length > 0) ||
         (data.fileObjects && Array.isArray(data.fileObjects) && data.fileObjects.length > 0)
-      ) &&
-      (data.fileTypes?.documents > 0 || data.fileTypes?.images > 0) // Process documents or images
+      )
     );
     
     console.log("OCRExtractionAgent.canProcess:", canProcess, {
@@ -181,12 +160,5 @@ Ending Balance: $3,625.91`
       images: data?.fileTypes?.images
     });
     return canProcess;
-  }
-  
-  private extractInputData(data: any, context?: ProcessingContext) {
-    const fileIds = data.fileIds || [];
-    const options = context?.options || {};
-    
-    return { fileIds, options };
   }
 }

@@ -1,4 +1,3 @@
-
 import { Agent, ProcessingContext } from "./types";
 import * as api from '@/services/api';
 
@@ -13,8 +12,12 @@ export class DynamicTableDetectionAgent implements Agent {
       fileIds: data.fileIds,
       hasGeminiResults: data.geminiResults && data.geminiResults.length > 0,
       extractedTextLength: data.extractedTextContent ? data.extractedTextContent.length : 0,
-      tablesCount: data.tables ? data.tables.length : 0
+      hasExtractedTables: data.extractedTables ? data.extractedTables.length : 0,
+      hasTableData: Boolean(data.tableData)
     });
+    
+    // Important - keep file objects for document preview
+    const fileObjects = data.fileObjects || [];
     
     // Check if we have extracted text content from Gemini
     const useGemini = context?.options?.useGemini || false;
@@ -24,15 +27,19 @@ export class DynamicTableDetectionAgent implements Agent {
     console.log("DynamicTableDetectionAgent settings:", {
       useGemini, 
       hasGeminiResults,
-      extractedTextLength: extractedText.length
+      extractedTextLength: extractedText.length,
+      fileObjectsCount: fileObjects.length
     });
     
     // Use the tables extracted by PDFTableExtractionAgent if available
-    const extractedTables = data.tables || [];
+    const extractedTables = data.extractedTables || [];
     
     // If we already have tables, use those
     if (extractedTables.length > 0) {
-      console.log("Using tables from PDFTableExtractionAgent:", extractedTables);
+      console.log("Using tables from previous agent:", {
+        count: extractedTables.length,
+        sample: extractedTables[0]?.headers
+      });
       
       // Format the table data for UI display - this is crucial for it to appear in the UI
       const tableData = {
@@ -45,14 +52,34 @@ export class DynamicTableDetectionAgent implements Agent {
         }
       };
       
-      console.log("Formatted table data for UI:", tableData);
+      console.log("Formatted table data for UI:", {
+        headers: tableData.headers,
+        rowCount: tableData.rows.length
+      });
       
       return {
         ...data, 
+        fileObjects, // PRESERVE FILE OBJECTS for document preview
         dynamicTableDetection: true,
-        extractedTables: extractedTables,
         tableData: tableData, // Make sure this is properly formatted
-        extractionComplete: true
+        extractionComplete: true,
+        processedBy: 'DynamicTableDetectionAgent'
+      };
+    }
+    
+    // If we have table data directly, use that
+    if (data.tableData) {
+      console.log("Using table data directly:", {
+        headers: data.tableData.headers,
+        rowCount: data.tableData.rows.length
+      });
+      
+      return {
+        ...data,
+        fileObjects, // PRESERVE FILE OBJECTS for document preview
+        dynamicTableDetection: true,
+        extractionComplete: true,
+        processedBy: 'DynamicTableDetectionAgent'
       };
     }
     
@@ -92,6 +119,7 @@ export class DynamicTableDetectionAgent implements Agent {
         if (insightsResponse.success && insightsResponse.data) {
           return {
             ...data,
+            fileObjects, // PRESERVE FILE OBJECTS for document preview
             dynamicTableDetection: true,
             tableData: mockTableData,
             extractedTables: [{
@@ -105,7 +133,8 @@ export class DynamicTableDetectionAgent implements Agent {
               keyPoints: insightsResponse.data.keyPoints,
               rawInsights: insightsResponse.data.insights
             },
-            extractionComplete: true
+            extractionComplete: true,
+            processedBy: 'DynamicTableDetectionAgent'
           };
         } else {
           console.error("Failed to generate insights:", insightsResponse.error);
@@ -120,6 +149,7 @@ export class DynamicTableDetectionAgent implements Agent {
     
     return {
       ...data, 
+      fileObjects, // PRESERVE FILE OBJECTS for document preview
       dynamicTableDetection: false,
       tableData: mockTableData,
       extractedTables: [{
@@ -128,16 +158,19 @@ export class DynamicTableDetectionAgent implements Agent {
         rows: mockTableData.rows,
         confidence: mockTableData.metadata.confidence
       }],
-      extractionComplete: true
+      extractionComplete: true,
+      processedBy: 'DynamicTableDetectionAgent'
     };
   }
   
   canProcess(data: any): boolean {
     const canProcess = data && 
-      (data.tables || data.extractedTextContent || (data.geminiResults && data.geminiResults.length > 0));
+      (data.extractedTables || data.tableData || data.extractedTextContent || 
+       (data.geminiResults && data.geminiResults.length > 0));
       
     console.log("DynamicTableDetectionAgent.canProcess:", canProcess, {
-      hasTables: Boolean(data?.tables),
+      hasExtractedTables: Boolean(data?.extractedTables),
+      hasTableData: Boolean(data?.tableData),
       hasExtractedText: Boolean(data?.extractedTextContent),
       hasGeminiResults: Boolean(data?.geminiResults && data?.geminiResults.length > 0)
     });

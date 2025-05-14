@@ -5,6 +5,7 @@ import { Agent, ProcessingContext } from "./types";
 interface UIData {
   processingId: string;
   fileIds: string[];
+  fileObjects?: any[];
   tableCount: number;
   extractionComplete: boolean;
   processingComplete: boolean;
@@ -29,7 +30,35 @@ export class DisplayAgent implements Agent {
       hasGeminiResults: data.geminiResults && data.geminiResults.length > 0,
       hasTableData: Boolean(data.tableData),
       hasExtractedTables: data.extractedTables && data.extractedTables.length > 0,
+      hasFileObjects: data.fileObjects && data.fileObjects.length > 0
     });
+    
+    // Log detailed table information for debugging
+    if (data.tableData) {
+      console.log("Table data received:", {
+        headers: data.tableData.headers,
+        rowCount: data.tableData.rows.length
+      });
+    }
+    
+    if (data.extractedTables && data.extractedTables.length > 0) {
+      console.log("Extracted tables received:", {
+        count: data.extractedTables.length,
+        sample: {
+          headers: data.extractedTables[0].headers,
+          rowCount: data.extractedTables[0].rows.length
+        }
+      });
+    }
+    
+    // Log file objects information
+    if (data.fileObjects && data.fileObjects.length > 0) {
+      console.log("File objects received:", {
+        count: data.fileObjects.length,
+        types: data.fileObjects.map(f => f.type),
+        names: data.fileObjects.map(f => f.name)
+      });
+    }
     
     // Get file IDs and other metadata
     const processingId = data.processingId || `display-${Date.now()}`;
@@ -48,6 +77,7 @@ export class DisplayAgent implements Agent {
     const uiData: UIData = {
       processingId,
       fileIds,
+      fileObjects: data.fileObjects, // CRITICALLY IMPORTANT to pass through file objects
       tableCount,
       extractionComplete: data.extractionComplete || false,
       processingComplete: true,
@@ -65,14 +95,25 @@ export class DisplayAgent implements Agent {
       uiData.extractedText = data.extractedTextContent;
     }
     
-    // Add table data if available
+    // Add table data if available - IMPORTANT for UI display
     if (data.tableData) {
       uiData.tableData = data.tableData;
+      console.log("Table data being passed to UI:", {
+        headers: data.tableData.headers,
+        rowCount: data.tableData.rows.length
+      });
     }
     
     // Add extracted tables if available
     if (data.extractedTables && data.extractedTables.length > 0) {
       uiData.extractedTables = data.extractedTables;
+      console.log("Extracted tables being passed to UI:", {
+        count: data.extractedTables.length,
+        sample: {
+          headers: data.extractedTables[0].headers,
+          rowCount: data.extractedTables[0].rows.length
+        }
+      });
     } else if (data.tables && data.tables.length > 0) {
       uiData.extractedTables = data.tables;
     }
@@ -90,7 +131,9 @@ export class DisplayAgent implements Agent {
       processingId: uiData.processingId,
       tableCount: uiData.tableCount,
       hasExtractedText: Boolean(uiData.extractedText),
-      hasInsights: Boolean(uiData.insights)
+      hasInsights: Boolean(uiData.insights),
+      hasTableData: Boolean(uiData.tableData),
+      hasFileObjects: Boolean(uiData.fileObjects && uiData.fileObjects.length)
     });
     
     return uiData;
