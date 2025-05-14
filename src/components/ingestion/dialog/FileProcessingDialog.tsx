@@ -1,8 +1,8 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Settings } from 'lucide-react';
+import { Settings, Check } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
 import { ActionSelector } from './ActionSelector';
@@ -17,6 +17,7 @@ import { UploadedFile } from '@/types/fileUpload';
 import { PostProcessAction, ProcessingOptions } from '@/types/processing';
 import SelectedFilesDisplay from '../SelectedFilesDisplay';
 import FileProcessingOptionsTabs from '../FileProcessingOptionsTabs';
+import DocumentPreview from '../DocumentPreview';
 
 interface FileProcessingDialogProps {
   open: boolean;
@@ -47,6 +48,13 @@ export const FileProcessingDialog: React.FC<FileProcessingDialogProps> = ({
 }) => {
   // Get the selected files for display
   const selectedFiles = files.filter(file => selectedFileIds.includes(file.id));
+  const [previewTab, setPreviewTab] = useState('settings');
+  
+  // Get file URL for the first selected file
+  const getFilePreviewUrl = () => {
+    if (selectedFiles.length === 0 || !selectedFiles[0].file) return null;
+    return URL.createObjectURL(selectedFiles[0].file);
+  };
   
   // Render appropriate settings based on current action
   const renderActionSettings = () => {
@@ -100,12 +108,19 @@ export const FileProcessingDialog: React.FC<FileProcessingDialogProps> = ({
             
             <Separator className="my-4" />
             
-            {/* Action-specific settings */}
+            {/* Action-specific settings with preview tab */}
             <FileProcessingOptionsTabs
               currentAction={currentAction}
               processingOptions={processingOptions}
               setProcessingOptions={setProcessingOptions}
               renderActionSettings={renderActionSettings}
+              previewContent={
+                <DocumentPreview 
+                  fileUrl={getFilePreviewUrl()} 
+                  fileName={selectedFiles.length > 0 ? selectedFiles[0].file?.name : undefined}
+                  fileType={selectedFiles.length > 0 ? selectedFiles[0].file?.type : undefined}
+                />
+              }
             />
           </div>
         </div>
@@ -114,8 +129,11 @@ export const FileProcessingDialog: React.FC<FileProcessingDialogProps> = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={onProcess} className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700">
-            Start Processing
+          <Button 
+            onClick={onProcess} 
+            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+          >
+            <Check className="h-4 w-4 mr-1" /> Start Processing
           </Button>
         </DialogFooter>
       </DialogContent>

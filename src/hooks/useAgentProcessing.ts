@@ -10,6 +10,7 @@ export function useAgentProcessing() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingComplete, setProcessingComplete] = useState(false);
   const [processingResults, setProcessingResults] = useState<any>(null);
+  const [processingError, setProcessingError] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Initialize the agent graph
@@ -21,6 +22,7 @@ export function useAgentProcessing() {
     options: ProcessingOptions = {}
   ) => {
     if (files.length === 0) {
+      console.error("No files provided for processing");
       toast({
         title: "No files to process",
         description: "Please select files for processing",
@@ -30,7 +32,8 @@ export function useAgentProcessing() {
     }
     
     setIsProcessing(true);
-    console.log("Processing files with options:", options);
+    setProcessingError(null);
+    console.log("Starting processing with options:", options);
     
     try {
       toast({
@@ -46,12 +49,17 @@ export function useAgentProcessing() {
         id: f.id, 
         name: f.file?.name, 
         type: f.file?.type,
-        backendId: f.backendId
+        backendId: f.backendId,
+        size: f.file?.size,
+        lastModified: f.file?.lastModified
       })));
       console.log("Using Gemini:", options.useGemini);
+      console.log("Options:", JSON.stringify(options, null, 2));
       
       // Process through the agent pipeline
       const result = await agentGraph.process(files, "DataInput", context);
+      
+      console.log("Agent processing result:", result);
       
       if (result.success) {
         console.log("Agent processing completed successfully:", result.data);
@@ -65,6 +73,8 @@ export function useAgentProcessing() {
         });
       } else {
         console.error("Agent processing failed:", result.error);
+        setProcessingError(result.error || "An unknown error occurred");
+        
         toast({
           title: "Processing failed",
           description: result.error || "An unknown error occurred",
@@ -73,9 +83,12 @@ export function useAgentProcessing() {
       }
     } catch (error) {
       console.error("Agent processing error:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+      setProcessingError(errorMessage);
+      
       toast({
         title: "Processing error",
-        description: error instanceof Error ? error.message : "An unknown error occurred",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -88,6 +101,7 @@ export function useAgentProcessing() {
     setProcessingId(null);
     setProcessingResults(null);
     setProcessingComplete(false);
+    setProcessingError(null);
   };
   
   return {
@@ -95,6 +109,7 @@ export function useAgentProcessing() {
     isProcessing,
     processingComplete,
     processingResults,
+    processingError,
     processFiles,
     resetProcessing,
     agents: agentGraph.getAvailableAgents()

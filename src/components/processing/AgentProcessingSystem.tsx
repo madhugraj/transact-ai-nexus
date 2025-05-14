@@ -6,9 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { UploadedFile } from '@/types/fileUpload';
 import { ProcessingOptions } from '@/types/processing';
-import { FileText, Database, Layers, Sparkles, Settings, Brain } from 'lucide-react';
+import { FileText, Database, Layers, Sparkles, Settings, Brain, Eye, Table } from 'lucide-react';
+import DocumentPreview from '../ingestion/DocumentPreview';
+import ExtractedTablePreview from '../ingestion/ExtractedTablePreview';
 
 interface AgentProcessingSystemProps {
   files: UploadedFile[];
@@ -34,7 +37,9 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
   
   // Start processing with the agent system
   const handleStartProcessing = async () => {
+    console.log("Starting processing with files:", files);
     console.log("Starting processing with options:", options);
+    
     await processFiles(files, {
       ...options,
       useGemini: true  // Enable Gemini processing
@@ -42,6 +47,7 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
     
     // Notify parent component when processing is complete
     if (onComplete && processingResults) {
+      console.log("Processing complete, notifying parent with results:", processingResults);
       onComplete(processingResults);
     }
   };
@@ -56,6 +62,15 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
       case 'DisplayAgent': return <Sparkles className="h-5 w-5" />;
       default: return <Settings className="h-5 w-5" />;
     }
+  };
+
+  // Check if we have a file to preview
+  const hasFileToPreview = files.length > 0 && files[0].file !== undefined;
+  
+  // Get file URL for preview
+  const getFileUrl = () => {
+    if (!hasFileToPreview) return null;
+    return URL.createObjectURL(files[0].file!);
   };
 
   return (
@@ -120,10 +135,11 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
               </div>
             )}
             
-            {/* Results Summary */}
-            {processingComplete && processingResults && (
-              <div className="space-y-3">
+            {/* Document and Results Preview */}
+            {processingComplete && processingResults ? (
+              <div className="space-y-4">
                 <h3 className="text-sm font-medium">Processing Results</h3>
+                
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div className="p-3 border rounded-md bg-muted/10">
                     <div className="text-xs text-muted-foreground">Processing ID</div>
@@ -148,6 +164,52 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
                   </div>
                 </div>
                 
+                {/* Tabs for Document Preview and Extracted Data */}
+                <Tabs defaultValue="document" className="w-full mt-4">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="document" className="flex items-center gap-1">
+                      <Eye className="h-3.5 w-3.5" /> Document
+                    </TabsTrigger>
+                    <TabsTrigger value="extraction" className="flex items-center gap-1">
+                      <Table className="h-3.5 w-3.5" /> Extracted Data
+                    </TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="document" className="mt-4 border rounded-md p-4">
+                    {hasFileToPreview ? (
+                      <DocumentPreview fileUrl={getFileUrl()} fileName={files[0].file?.name} fileType={files[0].file?.type} />
+                    ) : (
+                      <div className="text-center p-6 text-muted-foreground">
+                        No document available for preview
+                      </div>
+                    )}
+                  </TabsContent>
+                  
+                  <TabsContent value="extraction" className="mt-4">
+                    {processingResults.extractedText ? (
+                      <div className="space-y-4">
+                        <div className="border rounded-md p-4 bg-muted/10">
+                          <h4 className="text-sm font-medium mb-2">Extracted Text</h4>
+                          <div className="text-sm max-h-60 overflow-y-auto whitespace-pre-wrap bg-muted/5 p-3 rounded">
+                            {processingResults.extractedText}
+                          </div>
+                        </div>
+                        
+                        <ExtractedTablePreview 
+                          initialData={{
+                            headers: ['Column 1', 'Column 2', 'Column 3'],
+                            rows: [['Data 1', 'Data 2', 'Data 3']]
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="text-center p-6 text-muted-foreground">
+                        No extraction data available
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
+                
                 {/* Insights from Gemini */}
                 {processingResults.insights && (
                   <div className="p-4 border rounded-md bg-blue-50/30 mt-4">
@@ -160,15 +222,18 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
                     </div>
                   </div>
                 )}
-                
-                {/* Extracted Text Sample */}
-                {processingResults.extractedText && (
-                  <div className="p-4 border rounded-md bg-muted/10 mt-2">
-                    <h4 className="text-sm font-medium mb-2">Extracted Text Sample</h4>
-                    <div className="text-sm max-h-40 overflow-y-auto whitespace-pre-wrap">
-                      {processingResults.extractedText.substring(0, 500)}
-                      {processingResults.extractedText.length > 500 ? '...' : ''}
-                    </div>
+              </div>
+            ) : (
+              // Preview section when no results yet
+              <div className="p-6 border rounded-md text-center">
+                {hasFileToPreview ? (
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium">Document Preview</h4>
+                    <DocumentPreview fileUrl={getFileUrl()} fileName={files[0].file?.name} fileType={files[0].file?.type} />
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground">
+                    Select files to preview and process
                   </div>
                 )}
               </div>
