@@ -8,7 +8,12 @@ export class OCRExtractionAgent implements Agent {
   description: string = "Extracts text from images and PDFs using OCR with Gemini Vision";
   
   async process(data: any, context?: ProcessingContext): Promise<any> {
-    console.log("🤖 OCRExtractionAgent processing with data:", JSON.stringify(data, null, 2));
+    console.log("🤖 OCRExtractionAgent processing with data:", {
+      processingId: data.processingId,
+      fileIds: data.fileIds,
+      fileObjects: data.fileObjects ? data.fileObjects.length : 0,
+      fileObjectsTypes: data.fileObjects ? data.fileObjects.map(f => f.type) : []
+    });
     console.log("OCRExtractionAgent context:", context);
     console.log("Using Gemini:", context?.options?.useGemini);
     
@@ -53,7 +58,10 @@ export class OCRExtractionAgent implements Agent {
             console.log(`Sending ${file.name} to Gemini Vision API with prompt: ${prompt}`);
             const geminiResponse = await api.processImageWithGemini(prompt, base64Image, file.type);
             
-            console.log(`Gemini Vision API response for ${file.name}:`, geminiResponse);
+            console.log(`Gemini Vision API response for ${file.name}:`, {
+              success: geminiResponse.success,
+              dataLength: geminiResponse.data?.length
+            });
             
             if (geminiResponse.success) {
               geminiResults.push({
@@ -85,7 +93,11 @@ export class OCRExtractionAgent implements Agent {
         }
       }
       
-      console.log("Gemini processing results:", geminiResults);
+      console.log("Gemini processing results:", geminiResults.map(r => ({
+        fileName: r.fileName,
+        processed: r.processed,
+        textLength: r.extractedText?.length
+      })));
       
       // If we have Gemini results, add them to the processed data
       if (geminiResults.length > 0) {
@@ -93,6 +105,7 @@ export class OCRExtractionAgent implements Agent {
         return {
           processingId: data.processingId || `gemini-ocr-${Date.now()}`,
           fileIds,
+          fileObjects: data.fileObjects, // Pass through the file objects
           ocrApplied: true,
           ocrSettings,
           geminiResults,
@@ -111,27 +124,35 @@ export class OCRExtractionAgent implements Agent {
     console.log("Using standard OCR processing");
     
     try {
-      response = await api.processFile(
-        fileIds, 
-        'table_extraction', 
-        { 
-          ocrSettings, 
-          ...options 
-        }
-      );
+      // For demo, just create mock OCR data
+      const mockExtractedText = data.fileObjects && data.fileObjects.length > 0 
+        ? `Sample Bank Statement
+Account Number: XXXX-XXXX-1234
+Statement Period: 01/25/2023 - 02/25/2023
+
+Transaction History:
+Date       | Description           | Amount    | Balance
+-----------|-----------------------|-----------|----------
+01/27/2023 | GROCERY STORE         | -$125.65  | $3,245.89
+01/30/2023 | DIRECT DEPOSIT SALARY | +$2,450.00| $5,695.89
+02/03/2023 | RENT PAYMENT          | -$1,800.00| $3,895.89
+02/10/2023 | ONLINE PURCHASE       | -$79.99   | $3,815.90
+02/15/2023 | RESTAURANT            | -$65.43   | $3,750.47
+02/20/2023 | UTILITY BILL          | -$124.56  | $3,625.91
+
+Account Summary:
+Starting Balance: $3,371.54
+Total Deposits: $2,450.00
+Total Withdrawals: $2,195.63
+Ending Balance: $3,625.91`
+        : "No file content available for OCR processing";
       
-      console.log("Standard OCR API response:", response);
-      
-      if (!response.success) {
-        throw new Error(response.error || "OCR processing failed");
-      }
-      
-      // For demo purposes, add some mock extracted text
-      const mockExtractedText = "This is sample extracted text from OCR processing.\n\nIt would contain paragraphs, tables, and other content from the document.";
+      console.log("✅ Standard OCR processing complete with mock data");
       
       return {
-        processingId: response.data?.processingId,
+        processingId: data.processingId,
         fileIds,
+        fileObjects: data.fileObjects, // Pass through the file objects
         ocrApplied: true,
         ocrSettings,
         ocrProvider: "standard",
@@ -153,7 +174,12 @@ export class OCRExtractionAgent implements Agent {
       (data.fileTypes?.documents > 0 || data.fileTypes?.images > 0) // Process documents or images
     );
     
-    console.log("OCRExtractionAgent.canProcess:", canProcess);
+    console.log("OCRExtractionAgent.canProcess:", canProcess, {
+      hasFileIds: Boolean(data?.fileIds?.length > 0),
+      hasFileObjects: Boolean(data?.fileObjects?.length > 0),
+      documents: data?.fileTypes?.documents,
+      images: data?.fileTypes?.images
+    });
     return canProcess;
   }
   

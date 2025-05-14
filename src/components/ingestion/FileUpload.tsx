@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useFileProcessing } from '@/hooks/useFileProcessing';
 import { FileProcessingDialog } from './dialog/FileProcessingDialog';
@@ -8,10 +8,13 @@ import DropZone from './DropZone';
 import FileActions from './FileActions';
 import PostProcessingWorkflow from './PostProcessingWorkflow';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAgentProcessing } from '@/hooks/useAgentProcessing';
+import { useToast } from '@/hooks/use-toast';
 
 const FileUpload = () => {
   const [showProcessingDialog, setShowProcessingDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
   
   const {
     files,
@@ -35,18 +38,59 @@ const FileUpload = () => {
     processingId
   } = useFileProcessing();
 
+  // Add agent processing system
+  const {
+    processFiles: processWithAgents,
+    processingResults,
+    processingComplete: agentsProcessingComplete,
+    resetProcessing: resetAgentProcessing
+  } = useAgentProcessing();
+
   // Open processing dialog for selected files
   const openProcessingDialog = (fileIds: string[]) => {
     selectFilesForProcessing(fileIds);
     setShowProcessingDialog(true);
   };
 
-  // Handle file processing with loading state
-  const handleProcessFiles = () => {
+  // Handle file processing with loading state and agent processing
+  const handleProcessFiles = async () => {
     setIsLoading(true);
-    processFiles();
     setShowProcessingDialog(false);
-    setTimeout(() => setIsLoading(false), 1000);
+    
+    console.log("Processing files with agents:", files.filter(file => selectedFileIds.includes(file.id)));
+    console.log("Current action:", currentAction);
+    console.log("Processing options:", processingOptions);
+
+    try {
+      // Use agent processing system instead of regular processing
+      const selectedFiles = files.filter(file => selectedFileIds.includes(file.id));
+      
+      // Log available files for debugging
+      console.log("Selected files for processing:", selectedFiles);
+      
+      // Process with agents
+      await processWithAgents(selectedFiles, {
+        ...processingOptions,
+        useGemini: true // Enable Gemini processing
+      });
+      
+      // Still call processFiles for backward compatibility
+      processFiles();
+      
+      toast({
+        title: "Processing complete",
+        description: "Your files have been processed successfully."
+      });
+    } catch (error) {
+      console.error("Error processing files:", error);
+      toast({
+        title: "Processing error",
+        description: error instanceof Error ? error.message : "An unknown error occurred during processing",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Find the processed file for the current processing
@@ -56,6 +100,13 @@ const FileUpload = () => {
     const selectedFile = files.find(file => selectedFileIds.includes(file.id));
     return selectedFile?.backendId;
   };
+
+  // Log processing results for debugging
+  useEffect(() => {
+    if (processingResults) {
+      console.log("Processing results updated:", processingResults);
+    }
+  }, [processingResults]);
 
   return (
     <div className="space-y-6">
@@ -67,13 +118,14 @@ const FileUpload = () => {
       </div>
       
       {/* Post-processing workflow */}
-      {processingComplete && (
+      {(processingComplete || agentsProcessingComplete) && (
         <PostProcessingWorkflow
           tableName={processingOptions.databaseOptions?.tableName}
           processingType={currentAction}
-          onClose={handleWorkflowComplete}
+          onClose={agentsProcessingComplete ? resetAgentProcessing : handleWorkflowComplete}
           processingId={processingId || undefined}
           fileId={getProcessedFileId()}
+          processingResults={processingResults}
         />
       )}
       
@@ -95,7 +147,7 @@ const FileUpload = () => {
           </CardContent>
         </Card>
       ) : (
-        files.length > 0 && !processingComplete && (
+        files.length > 0 && !processingComplete && !agentsProcessingComplete && (
           <Card className="shadow-sm hover:shadow-md transition-all duration-200">
             <CardContent className="p-6">
               {/* File actions */}

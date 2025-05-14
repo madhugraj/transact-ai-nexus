@@ -1,98 +1,95 @@
 
 import { Agent, ProcessingContext } from "./types";
-import { UploadedFile } from "@/types/fileUpload";
 
 export class DataInputAgent implements Agent {
   id: string = "DataInput";
   name: string = "Data Input Agent";
-  description: string = "Processes input files and prepares them for the agent pipeline";
+  description: string = "Loads and validates input files for processing";
   
   async process(data: any, context?: ProcessingContext): Promise<any> {
-    console.log("🤖 DataInputAgent starting processing");
+    console.log("🤖 DataInputAgent processing started");
     
-    // Extract files from input data (should be an array of UploadedFile objects)
-    const files = this.validateAndExtractFiles(data);
+    // Handle both array of files and direct file objects
+    const files = Array.isArray(data) ? data : [data];
     
-    if (files.length === 0) {
-      throw new Error("No valid files provided for processing");
-    }
+    console.log(`Processing ${files.length} files:`, files.map(f => 
+      f.file ? {name: f.file.name, type: f.file.type, size: f.file.size} : {id: f.id}
+    ));
     
-    // Count file types
+    // Count file types for downstream agents
     const fileTypes = this.countFileTypes(files);
+    console.log("File types count:", fileTypes);
     
-    // Get backend file IDs for processing
+    // Extract file IDs
     const fileIds = files
       .filter(file => file.backendId)
-      .map(file => file.backendId as string);
+      .map(file => file.backendId);
     
-    // Get actual File objects for direct processing with Gemini
+    // Store File objects for actual processing
     const fileObjects = files
-      .filter(file => file.file)
+      .filter(file => file.file instanceof File)
       .map(file => file.file);
+      
+    console.log(`Extracted ${fileIds.length} backend file IDs`);
+    console.log(`Extracted ${fileObjects.length} File objects for processing`);
     
-    console.log(`✅ DataInputAgent processed ${files.length} files (${fileTypes.documents} documents, ${fileTypes.data} data, ${fileTypes.images} images)`);
+    if (fileObjects.length === 0 && fileIds.length === 0) {
+      console.warn("No valid files found for processing");
+      throw new Error("No valid files found for processing");
+    }
+
+    // Create a unique processing ID
+    const processingId = `proc-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    console.log(`Created processing ID: ${processingId}`);
     
-    // Generate a unique processing ID
-    const processingId = `proc_${Date.now()}`;
+    console.log("✅ DataInputAgent completed processing");
     
+    // Return data for next agent in pipeline
     return {
       processingId,
       fileIds,
-      fileObjects,
+      fileObjects, // Pass the actual File objects for real processing
       fileTypes,
-      totalFiles: files.length
     };
   }
   
   canProcess(data: any): boolean {
-    // Can process if data is an array with at least one valid file
-    return Array.isArray(data) && data.length > 0;
+    // Can process any input data that contains files
+    const canProcess = data != null && (
+      (Array.isArray(data) && data.length > 0) ||
+      (data.file instanceof File) ||
+      (data.backendId != null)
+    );
+    console.log("DataInputAgent.canProcess:", canProcess);
+    return canProcess;
   }
   
-  private validateAndExtractFiles(data: any): UploadedFile[] {
-    if (!Array.isArray(data)) {
-      console.error("Data is not an array:", data);
-      return [];
-    }
-    
-    return data.filter(item => {
-      const isValid = item && 
-        typeof item === 'object' && 
-        'id' in item && 
-        ('file' in item || 'backendId' in item);
-      
-      if (!isValid) {
-        console.warn("Invalid file item:", item);
-      }
-      
-      return isValid;
-    });
-  }
-  
-  private countFileTypes(files: UploadedFile[]): { documents: number; data: number; images: number } {
-    const result = { documents: 0, data: 0, images: 0 };
+  private countFileTypes(files: any[]): { documents: number; data: number; images: number; other: number } {
+    const counts = { documents: 0, data: 0, images: 0, other: 0 };
     
     for (const file of files) {
-      if (!file.file) continue;
+      if (!file.file) {
+        counts.other++;
+        continue;
+      }
       
       const type = file.file.type;
       
-      if (type === 'application/pdf') {
-        result.documents++;
+      if (type === 'application/pdf' || 
+          type === 'application/msword' || 
+          type.includes('officedocument.wordprocessing')) {
+        counts.documents++;
+      } else if (type.includes('spreadsheet') || 
+                type === 'text/csv' || 
+                type === 'application/vnd.ms-excel') {
+        counts.data++;
       } else if (type.startsWith('image/')) {
-        result.images++;
-      } else if (
-        type === 'text/csv' || 
-        type === 'application/vnd.ms-excel' || 
-        type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      ) {
-        result.data++;
+        counts.images++;
       } else {
-        // Unknown file type, assume document
-        result.documents++;
+        counts.other++;
       }
     }
     
-    return result;
+    return counts;
   }
 }

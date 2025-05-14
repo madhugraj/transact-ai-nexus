@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ChevronRight, Table as TableIcon, Database, Download, Edit, Check } from 'lucide-react';
+import { ChevronRight, Table as TableIcon, Database, Download, Edit, Check, FileText } from 'lucide-react';
 import ExtractedTablePreview from './ExtractedTablePreview';
+import DocumentPreview from './DocumentPreview';
 import { useToast } from '@/hooks/use-toast';
 import * as api from '@/services/api';
 
@@ -15,6 +16,7 @@ interface TablePostProcessingWorkflowProps {
   tableName?: string;
   onClose: () => void;
   onViewInDatabase?: () => void;
+  processingResults?: any;
 }
 
 const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = ({ 
@@ -22,51 +24,109 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
   fileId,
   tableName = 'extracted_table',
   onClose,
-  onViewInDatabase
+  onViewInDatabase,
+  processingResults
 }) => {
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState<'preview' | 'validate' | 'complete'>('preview');
+  const [activeTab, setActiveTab] = useState('document');
   const [isEditing, setIsEditing] = useState(false);
   const [tableData, setTableData] = useState<api.TableData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [fileType, setFileType] = useState<string | null>(null);
+
+  console.log("TablePostProcessingWorkflow - processingResults:", processingResults);
+  console.log("TablePostProcessingWorkflow - fileId:", fileId);
+  console.log("TablePostProcessingWorkflow - processingId:", processingId);
+
+  // Load table data when component mounts if processingResults are available
+  useEffect(() => {
+    if (processingResults) {
+      console.log("Using processingResults for table data:", processingResults);
+      
+      // Extract table data from processing results
+      if (processingResults.tableData) {
+        setTableData({
+          headers: processingResults.tableData.headers,
+          rows: processingResults.tableData.rows,
+          metadata: processingResults.tableData.metadata || {
+            totalRows: processingResults.tableData.rows.length,
+            confidence: 0.95,
+            sourceFile: fileId || processingId || ""
+          }
+        });
+        setIsLoading(false);
+      } else if (processingResults.extractedTables && processingResults.extractedTables.length > 0) {
+        const firstTable = processingResults.extractedTables[0];
+        setTableData({
+          headers: firstTable.headers,
+          rows: firstTable.rows,
+          metadata: {
+            totalRows: firstTable.rows.length,
+            confidence: firstTable.confidence || 0.9,
+            sourceFile: fileId || processingId || ""
+          }
+        });
+        setIsLoading(false);
+      } else {
+        // No table data found in processing results
+        setIsLoading(false);
+        setError("No table data found in processing results");
+      }
+    } else if (fileId) {
+      // Fallback to API if no processing results but we have a fileId
+      loadTableData();
+    } else {
+      setIsLoading(false);
+      setError("No table data or file ID provided");
+    }
+  }, [processingResults, fileId]);
+
+  // Load file data for preview
+  useEffect(() => {
+    if (processingResults && processingResults.fileObjects && processingResults.fileObjects.length > 0) {
+      const file = processingResults.fileObjects[0];
+      setFileUrl(URL.createObjectURL(file));
+      setFileName(file.name);
+      setFileType(file.type);
+    }
+  }, [processingResults]);
 
   // Load table data when component mounts if fileId is provided
-  useEffect(() => {
-    const loadTableData = async () => {
-      if (!fileId) return;
+  const loadTableData = async () => {
+    if (!fileId) return;
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const response = await api.getTablePreview(fileId);
       
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        const response = await api.getTablePreview(fileId);
-        
-        if (!response.success) {
-          setError(response.error || 'Failed to load table data');
-          toast({
-            title: "Error loading table",
-            description: response.error,
-            variant: "destructive",
-          });
-        } else {
-          setTableData(response.data || null);
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-        setError(errorMessage);
+      if (!response.success) {
+        setError(response.error || 'Failed to load table data');
         toast({
           title: "Error loading table",
-          description: errorMessage,
+          description: response.error,
           variant: "destructive",
         });
-      } finally {
-        setIsLoading(false);
+      } else {
+        setTableData(response.data || null);
       }
-    };
-    
-    loadTableData();
-  }, [fileId, toast]);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      setError(errorMessage);
+      toast({
+        title: "Error loading table",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Handle export
   const handleExport = async (format: 'csv' | 'excel') => {
@@ -166,7 +226,7 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
           <TabsContent value="preview" className="mt-0">
             <div className="space-y-6">
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Table Preview</h3>
+                <h3 className="text-lg font-medium">Document & Table Preview</h3>
                 <Button 
                   onClick={() => setCurrentStep('validate')}
                   className="gap-1"
@@ -176,11 +236,33 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
                 </Button>
               </div>
               
-              <ExtractedTablePreview 
-                fileId={fileId}
-                initialData={tableData ? { headers: tableData.headers, rows: tableData.rows } : undefined}
-                isLoading={isLoading}
-              />
+              {/* Preview tabs */}
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="grid w-full grid-cols-2 mb-4">
+                  <TabsTrigger value="document" className="flex items-center gap-1">
+                    <FileText className="h-3.5 w-3.5" /> Document
+                  </TabsTrigger>
+                  <TabsTrigger value="table" className="flex items-center gap-1">
+                    <TableIcon className="h-3.5 w-3.5" /> Extracted Table
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="document" className="mt-0">
+                  <DocumentPreview 
+                    fileUrl={fileUrl} 
+                    fileName={fileName || undefined}
+                    fileType={fileType || undefined}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="table" className="mt-0">
+                  <ExtractedTablePreview 
+                    fileId={fileId}
+                    initialData={tableData ? { headers: tableData.headers, rows: tableData.rows } : undefined}
+                    isLoading={isLoading}
+                  />
+                </TabsContent>
+              </Tabs>
             </div>
           </TabsContent>
           

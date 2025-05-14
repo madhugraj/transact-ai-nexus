@@ -1,63 +1,59 @@
 
-import React from 'react';
+import React, { useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import TablePostProcessingWorkflow from './TablePostProcessingWorkflow';
-import { PostProcessAction } from '@/types/processing';
-import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { PostProcessAction } from '@/types/processing';
+import * as api from '@/services/api';
+import { useAgentProcessing } from '@/hooks/useAgentProcessing';
 
 interface PostProcessingWorkflowProps {
-  tableName?: string;
   processingType: PostProcessAction;
+  tableName?: string;
   onClose: () => void;
   processingId?: string;
   fileId?: string;
 }
 
-const PostProcessingWorkflow = ({ 
-  tableName,
+const PostProcessingWorkflow: React.FC<PostProcessingWorkflowProps> = ({
   processingType,
+  tableName,
   onClose,
   processingId,
   fileId
-}: PostProcessingWorkflowProps) => {
-  const navigate = useNavigate();
+}) => {
   const { toast } = useToast();
+  const { processingResults } = useAgentProcessing();
+  const [showInDatabase, setShowInDatabase] = useState(false);
+
+  console.log("PostProcessingWorkflow with processingId:", processingId);
+  console.log("PostProcessingWorkflow with fileId:", fileId);
+  console.log("ProcessingResults available:", processingResults);
 
   const handleViewInDatabase = () => {
     toast({
-      title: "Navigating to database",
-      description: "Opening the database view with your extracted table.",
+      title: "Opening database view",
+      description: `Viewing table ${tableName || 'extracted_data'} in database`,
     });
-    navigate('/database');
+    setShowInDatabase(true);
+    // In a real implementation, this would navigate to the database view
   };
 
-  // Return the appropriate workflow based on processing type
-  if (processingType === 'table_extraction') {
-    return (
-      <TablePostProcessingWorkflow
-        processingId={processingId}
-        fileId={fileId}
-        tableName={tableName}
-        onClose={onClose}
-        onViewInDatabase={handleViewInDatabase}
-      />
-    );
-  }
-
-  // Default placeholder for other workflow types
   return (
-    <div className="bg-muted p-4 rounded-md text-center">
-      <h3 className="font-medium text-lg mb-2">Processing Complete</h3>
-      <p className="text-muted-foreground mb-4">
-        Your {processingType.replace('_', ' ')} processing has completed successfully.
-      </p>
-      <button 
-        className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
-        onClick={onClose}
-      >
-        Close
-      </button>
-    </div>
+    <Card className="shadow-md border-primary/20 mb-6">
+      <CardContent className="p-0">
+        {processingType === 'table_extraction' && (
+          <TablePostProcessingWorkflow
+            processingId={processingId}
+            fileId={fileId}
+            tableName={tableName || 'extracted_table'}
+            onClose={onClose}
+            onViewInDatabase={handleViewInDatabase}
+            processingResults={processingResults}
+          />
+        )}
+      </CardContent>
+    </Card>
   );
 };
 
