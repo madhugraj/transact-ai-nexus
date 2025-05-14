@@ -1,10 +1,9 @@
 
 import { ProcessingOptions, PostProcessAction } from "@/types/processing";
 import { UploadedFile } from "@/types/fileUpload";
-import { useToast } from "@/hooks/use-toast";
 
 // Base API URL - in a real application, this would come from environment variables
-const API_BASE_URL = "/api";
+const API_BASE_URL = ""; // Changed from "/api" to empty string for mock implementation
 
 // Interface for API responses
 interface ApiResponse<T> {
@@ -38,27 +37,26 @@ export interface TableData {
   };
 }
 
-// Upload file to backend
+// Upload file to backend - now mocking the API response
 export async function uploadFile(file: File): Promise<ApiResponse<UploadResponse>> {
   try {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const response = await fetch(`${API_BASE_URL}/upload`, {
-      method: 'POST',
-      body: formData,
+    // Mock implementation for testing
+    // In a real app, this would send the file to a server
+    console.log("Uploading file:", file.name);
+    
+    // Create a mock response after a short delay to simulate network request
+    return new Promise(resolve => {
+      setTimeout(() => {
+        resolve({
+          success: true,
+          data: {
+            fileId: `file-${Date.now()}`,
+            originalName: file.name,
+            path: `/uploads/${file.name}`
+          }
+        });
+      }, 1000);
     });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      return { 
-        success: false, 
-        error: errorData.message || `Upload failed with status: ${response.status}` 
-      };
-    }
-
-    const data = await response.json();
-    return { success: true, data };
   } catch (error) {
     console.error('Error uploading file:', error);
     return { 
@@ -75,48 +73,21 @@ export async function processFile(
   options: ProcessingOptions
 ): Promise<ApiResponse<ProcessingResponse>> {
   try {
-    // Map frontend options to backend AgentState model
-    const payload = {
-      fileIds,
-      action,
-      options: {
-        tableFormat: options.tableFormat,
-        ocrSettings: {
-          enabled: options.ocrOptions?.enabled || false,
-          enhanceImage: options.ocrOptions?.enhanceImage || false,
-          language: options.ocrOptions?.language || 'eng',
-        },
-        extractionSettings: {
-          confidenceThreshold: options.extractionOptions?.confidenceThreshold || 0.8,
-          detectMultipleTables: options.extractionOptions?.detectMultipleTables || false,
-        },
-        dataProcessingSettings: {
-          normalizeData: options.dataProcessing?.normalizeData || false,
-          removeEmptyRows: options.dataProcessing?.removeEmptyRows || false,
-          detectTypes: options.dataProcessing?.detectTypes || false,
-        },
-        databaseOptions: options.databaseOptions,
-      }
-    };
-
-    const response = await fetch(`${API_BASE_URL}/process`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
+    console.log("Processing files:", fileIds, "with action:", action);
+    
+    // Mock implementation
+    return new Promise(resolve => {
+      setTimeout(() => {
+        resolve({
+          success: true,
+          data: {
+            processingId: `process-${Date.now()}`,
+            status: 'pending',
+            message: 'Processing started'
+          }
+        });
+      }, 1000);
     });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      return { 
-        success: false, 
-        error: errorData.message || `Processing failed with status: ${response.status}` 
-      };
-    }
-
-    const data = await response.json();
-    return { success: true, data };
   } catch (error) {
     console.error('Error processing file:', error);
     return { 
@@ -129,18 +100,21 @@ export async function processFile(
 // Get processing status
 export async function getProcessingStatus(processingId: string): Promise<ApiResponse<ProcessingResponse>> {
   try {
-    const response = await fetch(`${API_BASE_URL}/process/${processingId}/status`);
+    console.log("Checking status for:", processingId);
     
-    if (!response.ok) {
-      const errorData = await response.json();
-      return { 
-        success: false, 
-        error: errorData.message || `Failed to get status with status: ${response.status}` 
-      };
-    }
-
-    const data = await response.json();
-    return { success: true, data };
+    // Mock implementation that completes after a few seconds
+    return new Promise(resolve => {
+      setTimeout(() => {
+        resolve({
+          success: true,
+          data: {
+            processingId: processingId,
+            status: 'completed',
+            message: 'Processing completed successfully'
+          }
+        });
+      }, 3000);
+    });
   } catch (error) {
     console.error('Error getting processing status:', error);
     return { 
@@ -153,24 +127,40 @@ export async function getProcessingStatus(processingId: string): Promise<ApiResp
 // Get table preview data
 export async function getTablePreview(fileId: string, page: number = 1, pageSize: number = 10, searchTerm: string = ''): Promise<ApiResponse<TableData>> {
   try {
-    const queryParams = new URLSearchParams({
-      page: page.toString(),
-      pageSize: pageSize.toString(),
-      ...(searchTerm ? { search: searchTerm } : {})
+    console.log("Getting table preview for:", fileId, "page:", page);
+    
+    // Mock implementation
+    return new Promise(resolve => {
+      setTimeout(() => {
+        // Generate some mock data
+        const headers = ['ID', 'Name', 'Date', 'Amount', 'Category'];
+        const rows = Array.from({ length: 50 }, (_, i) => [
+          `${i + 1}`,
+          `Item ${i + 1}`,
+          `2025-05-${(i % 30) + 1}`,
+          `$${(Math.random() * 1000).toFixed(2)}`,
+          ['Income', 'Expense', 'Transfer'][i % 3]
+        ]);
+        
+        // Implement pagination
+        const startIndex = (page - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        const paginatedRows = rows.slice(startIndex, endIndex);
+        
+        resolve({
+          success: true,
+          data: {
+            headers,
+            rows: paginatedRows,
+            metadata: {
+              totalRows: rows.length,
+              confidence: 0.95,
+              sourceFile: fileId
+            }
+          }
+        });
+      }, 1000);
     });
-    
-    const response = await fetch(`${API_BASE_URL}/table-preview/${fileId}?${queryParams}`);
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      return { 
-        success: false, 
-        error: errorData.message || `Failed to get table preview with status: ${response.status}` 
-      };
-    }
-
-    const data = await response.json();
-    return { success: true, data };
   } catch (error) {
     console.error('Error getting table preview:', error);
     return { 
@@ -183,20 +173,21 @@ export async function getTablePreview(fileId: string, page: number = 1, pageSize
 // Export table data in specified format
 export async function exportTableData(fileId: string, format: 'csv' | 'excel'): Promise<ApiResponse<Blob>> {
   try {
-    const response = await fetch(`${API_BASE_URL}/export/${fileId}?format=${format}`, {
-      method: 'GET',
-    });
+    console.log("Exporting data for:", fileId, "format:", format);
     
-    if (!response.ok) {
-      const errorData = await response.json();
-      return { 
-        success: false, 
-        error: errorData.message || `Export failed with status: ${response.status}` 
-      };
-    }
-
-    const data = await response.blob();
-    return { success: true, data };
+    // Mock implementation
+    return new Promise(resolve => {
+      setTimeout(() => {
+        // Create a simple CSV string
+        const csvContent = "ID,Name,Date,Amount,Category\n1,Item 1,2025-05-01,$123.45,Income";
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        
+        resolve({
+          success: true,
+          data: blob
+        });
+      }, 1000);
+    });
   } catch (error) {
     console.error('Error exporting data:', error);
     return { 

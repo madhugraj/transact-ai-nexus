@@ -91,9 +91,10 @@ const DropZone = ({ onFilesSelected }: DropZoneProps) => {
               type="file"
               multiple
               className="hidden"
-              // Using attributes that will work with TypeScript
-              data-directory=""
-              {...{ webkitdirectory: true }} // Apply as a spread prop to avoid TS errors
+              // Fix for webkitdirectory attribute
+              // Using a proper string value instead of boolean
+              webkitdirectory="true"
+              directory="true"
               onChange={handleFileChange}
             />
           </div>
