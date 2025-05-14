@@ -1,19 +1,7 @@
 
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-
-// Defines file status used in the component
-type FileStatus = 'idle' | 'uploading' | 'success' | 'error';
-
-// Interface for the uploaded file with status and progress
-interface UploadedFile {
-  id: string;
-  file: File;
-  status: FileStatus;
-  progress: number;
-  error?: string;
-  processed?: boolean;
-}
+import { FileStatus, UploadedFile } from '@/types/fileUpload';
 
 export const useBulkFileUpload = () => {
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -48,7 +36,7 @@ export const useBulkFileUpload = () => {
   const uploadFile = (id: string) => {
     setFiles(files.map(file => {
       if (file.id === id) {
-        return { ...file, status: 'uploading', progress: 0 };
+        return { ...file, status: 'uploading' as FileStatus, progress: 0 };
       }
       return file;
     }));
@@ -62,7 +50,7 @@ export const useBulkFileUpload = () => {
             
             if (newProgress >= 100) {
               clearInterval(interval);
-              return { ...file, status: 'success', progress: 100 };
+              return { ...file, status: 'success' as FileStatus, progress: 100 };
             }
             
             return { ...file, progress: newProgress };

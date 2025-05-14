@@ -361,9 +361,10 @@ const FileUpload = () => {
               type="file"
               multiple
               className="hidden"
-              // Fix for the TypeScript error - using data attribute instead of webkitdirectory
               data-directory=""
-              directory=""
+              // Remove the directory attribute as it's not supported in standard HTML
+              // Use webkitdirectory which is more widely supported
+              webkitdirectory=""
               onChange={handleFileChange}
             />
           </div>
