@@ -1,58 +1,19 @@
-import { useState, useRef, useEffect, ChangeEvent } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { 
-  Check, 
-  File, 
-  FileImage, 
-  FileText, 
-  FileX, 
-  Upload, 
-  X, 
-  Table as TableIcon,
-  Database,
-  BarChart,
-  Sparkles,
-  AlertCircle,
-  Settings,
-  Layers,
-  ArrowRight
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+
+import { useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Progress } from '@/components/ui/progress';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Separator } from '@/components/ui/separator';
 import { 
   FileProcessingDialog, 
   ProcessingOptions, 
   PostProcessAction 
 } from './FileProcessingDialog';
 import { FileList } from './FileList';
-import { useBulkFileUpload } from '@/hooks/useBulkFileUpload';
-
-// Defines file status used in the component
-type FileStatus = 'idle' | 'uploading' | 'success' | 'error';
-
-// Interface for the uploaded file with status and progress
-interface UploadedFile {
-  id: string;
-  file: File;
-  status: FileStatus;
-  progress: number;
-  error?: string;
-  processed?: boolean;
-}
+import DropZone from './DropZone';
+import FileActions from './FileActions';
+import { UploadedFile } from '@/types/fileUpload';
 
 const FileUpload = () => {
   const [files, setFiles] = useState<UploadedFile[]>([]);
-  const [isDragOver, setIsDragOver] = useState(false);
   const [showProcessingDialog, setShowProcessingDialog] = useState(false);
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
   const [currentAction, setCurrentAction] = useState<PostProcessAction>('table_extraction');
@@ -76,30 +37,10 @@ const FileUpload = () => {
   });
   const { toast } = useToast();
   
-  // Handle file selection
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = e.target.files;
-    if (selectedFiles) {
-      addFiles(Array.from(selectedFiles));
-    }
-  };
-  
-  // Handle drag and drop
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    
-    if (e.dataTransfer.files) {
-      addFiles(Array.from(e.dataTransfer.files));
-    }
-  };
-  
   // Add files to the state
   const addFiles = (newFiles: File[]) => {
-    const validFiles = newFiles.filter(file => {
-      const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv'];
-      return validTypes.includes(file.type);
-    });
+    const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv'];
+    const validFiles = newFiles.filter(file => validTypes.includes(file.type));
     
     if (validFiles.length !== newFiles.length) {
       toast({
@@ -128,7 +69,7 @@ const FileUpload = () => {
   const uploadFile = (id: string) => {
     setFiles(files.map(file => {
       if (file.id === id) {
-        return { ...file, status: 'uploading' as FileStatus, progress: 0 };
+        return { ...file, status: 'uploading', progress: 0 };
       }
       return file;
     }));
@@ -142,7 +83,7 @@ const FileUpload = () => {
             
             if (newProgress >= 100) {
               clearInterval(interval);
-              return { ...file, status: 'success' as FileStatus, progress: 100 };
+              return { ...file, status: 'success', progress: 100 };
             }
             
             return { ...file, progress: newProgress };
@@ -307,95 +248,21 @@ const FileUpload = () => {
         </p>
       </div>
       
-      <div
-        className={cn(
-          "border-2 border-dashed rounded-lg p-8 text-center",
-          isDragOver ? "border-primary bg-primary/5" : "border-muted-foreground/25"
-        )}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setIsDragOver(true);
-        }}
-        onDragLeave={() => setIsDragOver(false)}
-        onDrop={handleDrop}
-      >
-        <div className="flex flex-col items-center">
-          <Upload size={48} className={cn(
-            "mb-4 text-muted-foreground",
-            isDragOver && "text-primary"
-          )} />
-          
-          <h3 className="text-lg font-medium mb-2">
-            Drop files here or click to upload
-          </h3>
-          <p className="text-muted-foreground mb-4">
-            PDF, JPG, PNG, Excel, and CSV files are supported
-          </p>
-          
-          <div className="space-x-2">
-            <Button 
-              variant="outline" 
-              onClick={() => document.getElementById('file-upload')?.click()}
-            >
-              <Upload size={16} className="mr-2" />
-              Select Files
-            </Button>
-            <Button 
-              variant="outline"
-              onClick={() => document.getElementById('folder-upload')?.click()}
-            >
-              <Layers size={16} className="mr-2" />
-              Select Folder
-            </Button>
-            <input
-              id="file-upload"
-              type="file"
-              multiple
-              className="hidden"
-              accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.csv"
-              onChange={handleFileChange}
-            />
-            <input
-              id="folder-upload"
-              type="file"
-              multiple
-              className="hidden"
-              data-directory=""
-              // Using webkitdirectory as a boolean attribute
-              webkitdirectory={true}
-              onChange={handleFileChange}
-            />
-          </div>
-        </div>
-      </div>
+      {/* File drop zone */}
+      <DropZone onFilesSelected={addFiles} />
       
       {files.length > 0 && (
         <Card>
           <CardContent className="p-6">
-            <div className="flex justify-between mb-4">
-              <h3 className="font-medium">Selected Files ({files.length})</h3>
-              <div className="flex gap-2">
-                {files.some(f => f.status === 'idle') && (
-                  <Button size="sm" onClick={uploadAllFiles}>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload All
-                  </Button>
-                )}
-                {getUnprocessedFiles().length > 0 && (
-                  <Button size="sm" variant="secondary" onClick={() => selectByType('data')}>
-                    <TableIcon className="mr-2 h-4 w-4" />
-                    Process Data Files
-                  </Button>
-                )}
-                {getUnprocessedFiles().length > 0 && (
-                  <Button size="sm" variant="secondary" onClick={() => selectByType('document')}>
-                    <FileText className="mr-2 h-4 w-4" />
-                    Process Documents
-                  </Button>
-                )}
-              </div>
-            </div>
+            {/* File actions */}
+            <FileActions
+              files={files}
+              uploadAllFiles={uploadAllFiles}
+              onProcessDocuments={() => selectByType('document')}
+              onProcessDataFiles={() => selectByType('data')}
+            />
             
+            {/* File list */}
             <FileList 
               files={files}
               onRemove={removeFile}
