@@ -15,6 +15,7 @@ export function useFileProcessingActions(
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const [processingComplete, setProcessingComplete] = useState(false);
+  const [processingResults, setProcessingResults] = useState<any>(null);
   const { toast } = useToast();
 
   // Process the selected files with the chosen action
@@ -51,6 +52,14 @@ export function useFileProcessingActions(
         return;
       }
       
+      // Save the actual file objects to pass along to other components
+      const fileObjects = selectedFiles.map(f => f.file);
+      setProcessingResults({
+        ...response.data,
+        fileObjects,
+        processingId: response.data?.processingId
+      });
+      
       // Save processed files to localStorage using our utility function
       saveProcessedFiles(selectedFiles, response.data?.processingId);
       
@@ -72,13 +81,40 @@ export function useFileProcessingActions(
     setProcessingComplete(false);
     setProcessingId(null);
     
+    const resultsToUse = results || processingResults;
+    
     // If we have table results, store them in localStorage using our utility function
-    if (results && results.tables) {
-      saveProcessedTables(
-        Array.isArray(results.tables) ? results.tables : [results.tables], 
-        processingId || undefined
-      );
+    if (resultsToUse) {
+      console.log("Processing results to save:", resultsToUse);
+      
+      if (resultsToUse.tables) {
+        console.log("Saving tables to localStorage:", resultsToUse.tables);
+        saveProcessedTables(
+          Array.isArray(resultsToUse.tables) ? resultsToUse.tables : [resultsToUse.tables], 
+          processingId || undefined
+        );
+      }
+      
+      // Save extracted tables if available
+      if (resultsToUse.extractedTables && resultsToUse.extractedTables.length > 0) {
+        console.log("Saving extracted tables to localStorage:", resultsToUse.extractedTables);
+        saveProcessedTables(resultsToUse.extractedTables, processingId || undefined);
+      }
+      
+      // Save table data directly if available
+      if (resultsToUse.tableData) {
+        console.log("Saving table data to localStorage:", resultsToUse.tableData);
+        const tableDataToSave = {
+          id: `table-data-${Date.now()}`,
+          title: 'Extracted Table Data',
+          name: 'Extracted Table Data',
+          ...resultsToUse.tableData,
+        };
+        saveProcessedTables([tableDataToSave], processingId || undefined);
+      }
     }
+    
+    setProcessingResults(null);
   };
 
   // Get the processed file ID for the current processing
@@ -97,6 +133,7 @@ export function useFileProcessingActions(
     setProcessingComplete,
     processFiles,
     handleWorkflowComplete,
-    getProcessedFileId
+    getProcessedFileId,
+    processingResults
   };
 }

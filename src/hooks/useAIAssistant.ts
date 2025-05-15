@@ -14,7 +14,7 @@ Analyze the output and the original intent to provide a clear explanation and pr
 Instructions:
 - Identify patterns, outliers, or anomalies using actual values from the data.
 - Explain what the result reveals in business terms.
-- Recommend 3–5 specific business actions. Be precise.
+- Recommend 3-5 specific business actions. Be precise.
 - Use professional, clear language.
 - Output plain text only. No markdown or code formatting.`;
 
@@ -33,32 +33,20 @@ export const useAIAssistant = () => {
   const [processedDocuments, setProcessedDocuments] = useState<Document[]>([]);
   const { toast } = useToast();
 
-  // Load processed documents from localStorage
+  // Load real processed documents from localStorage
   useEffect(() => {
     const fetchProcessedDocuments = () => {
       try {
         const docs = getProcessedDocuments();
-        
-        // If no documents found in localStorage, use mock data for demo
-        if (docs.length === 0) {
-          setProcessedDocuments([
-            { id: '1', name: 'Invoice_ABC_Corp_May2023.pdf', type: 'document', extractedAt: '2023-05-15 14:32' },
-            { id: '2', name: 'Quarterly_Sales_Report', type: 'table', extractedAt: '2023-05-14 10:15' },
-            { id: '3', name: 'Employee_Expenses_Q2', type: 'table', extractedAt: '2023-05-13 09:45' },
-            { id: '4', name: 'Statement_XYZ_April.pdf', type: 'document', extractedAt: '2023-05-12 16:20' },
-          ]);
-        } else {
-          setProcessedDocuments(docs);
-        }
+        console.log("Fetched processed documents:", docs);
+        setProcessedDocuments(docs);
       } catch (error) {
         console.error("Error fetching processed documents:", error);
-        // Fallback to mock data if error occurs
-        setProcessedDocuments([
-          { id: '1', name: 'Invoice_ABC_Corp_May2023.pdf', type: 'document', extractedAt: '2023-05-15 14:32' },
-          { id: '2', name: 'Quarterly_Sales_Report', type: 'table', extractedAt: '2023-05-14 10:15' },
-          { id: '3', name: 'Employee_Expenses_Q2', type: 'table', extractedAt: '2023-05-13 09:45' },
-          { id: '4', name: 'Statement_XYZ_April.pdf', type: 'document', extractedAt: '2023-05-12 16:20' },
-        ]);
+        toast({
+          title: "Error loading documents",
+          description: "Could not load processed documents",
+          variant: "destructive",
+        });
       }
     };
     
@@ -70,7 +58,7 @@ export const useAIAssistant = () => {
     return () => {
       window.removeEventListener('documentProcessed', fetchProcessedDocuments);
     };
-  }, []);
+  }, [toast]);
 
   const handleSendMessage = async () => {
     if (!message.trim()) return;
@@ -135,12 +123,8 @@ ${message}`;
         // Generate a default response if no document is selected or no data available
         if (selectedDocument) {
           responseContent = `I'd like to analyze "${doc?.name}" for you, but I don't have access to its data. Please try selecting another document or uploading a document with extractable data.`;
-        } else if (message.toLowerCase().includes('table') || message.toLowerCase().includes('extract')) {
-          responseContent = "I can help analyze your extracted tables. Please select a document from the dropdown above, and I'll provide insights about that specific data.";
-        } else if (message.toLowerCase().includes('how') && message.toLowerCase().includes('work')) {
-          responseContent = "I work by analyzing the documents and tables you've processed in the system. To get started, select a document from the dropdown above, then ask me specific questions about that data. I'll provide business insights and recommendations based on the patterns I find.";
         } else {
-          responseContent = "I'm your AI business analyst. To get the most out of me, please select a processed document from the dropdown above, then ask specific questions about that document. I'll provide data-driven insights and actionable business recommendations.";
+          responseContent = "Please select a document from the dropdown above to analyze. I need data to work with in order to provide insights. You can upload and process documents in the Documents section.";
         }
       }
 
@@ -206,4 +190,3 @@ ${message}`;
 };
 
 export default useAIAssistant;
-

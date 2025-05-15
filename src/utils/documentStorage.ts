@@ -27,6 +27,7 @@ export const saveProcessedFiles = (files: any[], processingId?: string) => {
     // Dispatch event to notify components that new documents are processed
     window.dispatchEvent(new CustomEvent('documentProcessed'));
     
+    console.log('Saved processed files to localStorage:', newProcessedFiles);
     return true;
   } catch (error) {
     console.error("Error saving processed files to localStorage:", error);
@@ -66,6 +67,7 @@ export const saveProcessedTables = (tables: any[], processingId?: string) => {
     // Dispatch event to notify components that new tables are processed
     window.dispatchEvent(new CustomEvent('documentProcessed'));
     
+    console.log('Saved processed tables to localStorage:', newProcessedTables);
     return true;
   } catch (error) {
     console.error("Error saving processed tables to localStorage:", error);
@@ -82,8 +84,18 @@ export const getProcessedDocuments = (): Document[] => {
     const processedTablesStr = localStorage.getItem('processedTables');
     const processedFilesStr = localStorage.getItem('processedFiles');
     
+    console.log('Raw localStorage data:', { 
+      processedTablesStr, 
+      processedFilesStr 
+    });
+    
     const tables = processedTablesStr ? JSON.parse(processedTablesStr) : [];
     const files = processedFilesStr ? JSON.parse(processedFilesStr) : [];
+    
+    console.log('Parsed localStorage data:', {
+      tables: tables.length > 0 ? `${tables.length} tables found` : 'No tables',
+      files: files.length > 0 ? `${files.length} files found` : 'No files'
+    });
     
     const docs: Document[] = [
       ...tables.map((table: any) => ({
@@ -100,6 +112,7 @@ export const getProcessedDocuments = (): Document[] => {
       }))
     ];
     
+    console.log('Returning processed documents:', docs);
     return docs;
   } catch (error) {
     console.error("Error getting processed documents:", error);
@@ -112,6 +125,8 @@ export const getProcessedDocuments = (): Document[] => {
  */
 export const getDocumentDataById = (documentId: string) => {
   try {
+    console.log('Getting document data for ID:', documentId);
+    
     const tablesStr = localStorage.getItem('processedTables');
     const filesStr = localStorage.getItem('processedFiles');
     
@@ -121,10 +136,12 @@ export const getDocumentDataById = (documentId: string) => {
     const selectedTable = tables.find((t: any) => t.id === documentId);
     const selectedFile = files.find((f: any) => f.id === documentId || f.backendId === documentId);
     
-    return selectedTable || selectedFile || null;
+    const result = selectedTable || selectedFile || null;
+    console.log('Found document data:', result);
+    
+    return result;
   } catch (error) {
     console.error("Error retrieving document data:", error);
     return null;
   }
 };
-

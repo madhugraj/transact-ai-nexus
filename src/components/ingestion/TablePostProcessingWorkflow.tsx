@@ -13,6 +13,7 @@ import { WorkflowSteps } from './workflow/WorkflowSteps';
 import { PreviewTab } from './workflow/PreviewTab';
 import { ValidateTab } from './workflow/ValidateTab';
 import { CompleteTab } from './workflow/CompleteTab';
+import { saveProcessedTables } from '@/utils/documentStorage';
 
 interface TablePostProcessingWorkflowProps {
   processingId?: string;
@@ -58,10 +59,22 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
       // Extract table data from processing results
       if (processingResults.tableData) {
         setTableData(processingResults.tableData);
+        
+        // Save the table data immediately to localStorage for AI Assistant
+        saveProcessedTables([{
+          id: `table-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          title: tableName || 'Extracted Table',
+          name: tableName || 'Extracted Table',
+          headers: processingResults.tableData.headers,
+          rows: processingResults.tableData.rows,
+          extractedAt: new Date().toISOString(),
+          processingId
+        }], processingId);
+        
         setIsLoading(false);
       } else if (processingResults.extractedTables && processingResults.extractedTables.length > 0) {
         const firstTable = processingResults.extractedTables[0];
-        setTableData({
+        const tableDataObj = {
           headers: firstTable.headers,
           rows: firstTable.rows,
           metadata: {
@@ -69,7 +82,12 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
             confidence: firstTable.confidence || 0.9,
             sourceFile: fileId || processingId || ""
           }
-        });
+        };
+        setTableData(tableDataObj);
+        
+        // Save the extracted tables immediately to localStorage for AI Assistant
+        saveProcessedTables(processingResults.extractedTables, processingId);
+        
         setIsLoading(false);
       }
       
@@ -88,7 +106,7 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
       setIsLoading(false);
       setError("No table data or file ID provided");
     }
-  }, [processingResults, fileId]);
+  }, [processingResults, fileId, processingId, tableName]);
 
   // Load table data from API if not provided in processing results
   const loadTableData = async () => {
@@ -109,6 +127,19 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
         });
       } else {
         setTableData(response.data || null);
+        
+        // Save received table data to localStorage for AI Assistant
+        if (response.data) {
+          saveProcessedTables([{
+            id: `table-api-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            title: tableName || 'API Extracted Table',
+            name: tableName || 'API Extracted Table',
+            headers: response.data.headers,
+            rows: response.data.rows,
+            extractedAt: new Date().toISOString(),
+            processingId
+          }], processingId);
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
@@ -125,17 +156,53 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
 
   // Handle export
   const handleExport = async (format: 'csv' | 'xlsx') => {
-    if (!fileId) {
+    if (!fileId && !tableData) {
       toast({
         title: "Export error",
-        description: "No file to export",
+        description: "No table data to export",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      const response = await api.exportTableData(fileId, format);
+      // If we have tableData but no fileId, we'll create a downloadable file directly
+      if (!fileId && tableData) {
+        // Create CSV content
+        let content = '';
+        if (format === 'csv') {
+          // Add headers
+          content += tableData.headers.map(h => `"${h}"`).join(',') + '\n';
+          
+          // Add rows
+          content += tableData.rows.map(row => 
+            row.map(cell => `"${cell}"`).join(',')
+          ).join('\n');
+          
+          const blob = new Blob([content], { type: 'text/csv' });
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.setAttribute('download', `${tableName}.${format}`);
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          
+          toast({
+            title: "Export successful",
+            description: `Table exported as ${format.toUpperCase()}`,
+          });
+        } else {
+          toast({
+            title: "Export not supported",
+            description: `Direct ${format.toUpperCase()} export not supported without fileId`,
+            variant: "destructive",
+          });
+        }
+        return;
+      }
+      
+      const response = await api.exportTableData(fileId!, format);
       
       if (!response.success) {
         toast({
