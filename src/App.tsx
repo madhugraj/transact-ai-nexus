@@ -30,7 +30,6 @@ function App() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/email-connector" element={<EmailConnector />} />
         <Route path="/sap-data" element={<SapData />} />
-        <Route path="/index" element={<Index />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
 
