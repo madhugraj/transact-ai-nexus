@@ -94,13 +94,15 @@ export const processImageWithGemini = async (
 };
 
 /**
- * Extract tables from an image using Gemini Vision
+ * Extract tables from an image using Gemini Vision with custom prompt
  */
 export const extractTablesFromImageWithGemini = async (
   base64Image: string,
-  mimeType: string
+  mimeType: string,
+  customPrompt?: string
 ): Promise<ApiResponse<any>> => {
-  const tableExtractionPrompt = `
+  // Use custom prompt if provided, otherwise use default
+  const tableExtractionPrompt = customPrompt || `
 You're an OCR assistant. Read this scanned document image and extract clean, structured text.
 You are also an expert in extracting tables from scanned images.
 If the image has Checks, Mention that it is a check image and extract the values accordingly.
@@ -127,7 +129,7 @@ Instructions:
 }
 \`\`\``;
 
-  console.log("Extracting tables from image using specialized prompt");
+  console.log("Extracting tables from image using prompt:", tableExtractionPrompt.substring(0, 100) + "...");
   
   const response = await processImageWithGemini(tableExtractionPrompt, base64Image, mimeType);
   

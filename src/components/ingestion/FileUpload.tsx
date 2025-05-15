@@ -69,17 +69,51 @@ const FileUpload = () => {
       // Log available files for debugging
       console.log("Selected files for processing:", selectedFiles);
       
-      // For table extraction, use the specialized table extraction function directly
+      // For table extraction, use the specialized table extraction function with the dynamic prompt
       if (currentAction === 'table_extraction' && selectedFiles.length > 0) {
-        console.log("Using specialized table extraction for files");
+        console.log("Using specialized table extraction for files with dynamic prompt");
         
         const results = [];
         let tableData = null;
         
+        // Get the custom prompt if specified or use default
+        const tableExtractionPrompt = processingOptions.ocrSettings?.customPrompt || 
+        `You're an OCR assistant. Read this scanned document image and extract clean, structured text.
+        You are also an expert in extracting tables from scanned images.
+        If the image has Checks, Mention that it is a check image and extract the values accordingly.
+        - Give appropriate title for the image according to the type of image.
+        Instructions:
+        - Extract all clear tabular structures from the image.
+        - Extract all possible tabular structures with data from the image
+        - Extract the Headings of the table {extracted heading}
+        - Avoid any logos or text not part of a structured table.
+        - Output JSON only in the format:
+
+        \`\`\`json
+        {
+          "tables": [
+            {
+              "title": "extracted heading",
+              "headers": ["Column A", "Column B"],
+              "rows": [
+                ["value1", "value2"],
+                ...
+              ]
+            }
+          ]
+        }
+        \`\`\``;
+        
+        console.log("Using table extraction prompt:", tableExtractionPrompt);
+        
         for (const file of selectedFiles) {
           if (file.file && (file.file.type.startsWith('image/') || file.file.type === 'application/pdf')) {
+            console.log(`Processing ${file.file.name} for table extraction`);
+            
             const base64Image = await fileToBase64(file.file);
-            const tableResponse = await extractTablesFromImageWithGemini(base64Image, file.file.type);
+            const tableResponse = await extractTablesFromImageWithGemini(base64Image, file.file.type, tableExtractionPrompt);
+            
+            console.log(`Table extraction response for ${file.file.name}:`, tableResponse);
             
             if (tableResponse.success && tableResponse.data) {
               results.push({
@@ -97,6 +131,8 @@ const FileUpload = () => {
                     sourceFile: file.file.name
                   }
                 };
+                
+                console.log("Extracted table data:", tableData);
               }
             } else {
               results.push({
@@ -104,11 +140,13 @@ const FileUpload = () => {
                 error: tableResponse.error || "Failed to extract tables",
                 success: false
               });
+              
+              console.error(`Failed to extract tables from ${file.file.name}:`, tableResponse.error);
             }
           }
         }
         
-        if (results.length > 0 && tableData) {
+        if (results.length > 0) {
           setIsLoading(false);
           
           // Set processing results
@@ -120,8 +158,12 @@ const FileUpload = () => {
               rows: tableData.rows,
               title: tableData.metadata.title
             }] : [],
-            results
+            results,
+            extractionComplete: true,
+            processingComplete: true
           };
+          
+          console.log("Setting processing results:", processedResults);
           
           await processWithAgents(selectedFiles, {
             ...processingOptions,
@@ -131,7 +173,7 @@ const FileUpload = () => {
           
           toast({
             title: "Table extraction complete",
-            description: `Successfully extracted tables from ${selectedFiles.length} file(s)`
+            description: `Successfully processed ${selectedFiles.length} file(s)`
           });
           
           return;
