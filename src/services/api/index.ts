@@ -7,10 +7,12 @@ export * from './dataService';
 
 // Export tableService with explicit naming to avoid conflicts
 export { 
-  getTablePreview as getTablePreview,
-  exportTableData as exportTableData,
-  TableData as TableData 
+  getTablePreview,
+  exportTableData
 } from './tableService';
+
+// Re-export types using 'export type' syntax for isolatedModules compatibility
+export type { TableData } from './tableService';
 
 // Types
 export * from './types';
