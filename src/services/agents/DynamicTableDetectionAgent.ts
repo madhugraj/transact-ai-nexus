@@ -23,7 +23,7 @@ export class DynamicTableDetectionAgent implements Agent {
     console.log("File objects available:", fileObjects.length);
     
     // Get custom prompt if available in processing options
-    const customPrompt = context?.options?.ocrSettings?.customPrompt;
+    const customPrompt = context?.options?.ocrSettings?.customPrompt || '';
     console.log("Custom table extraction prompt available:", Boolean(customPrompt));
     
     // Use the tables extracted by previous agents if available
@@ -70,7 +70,11 @@ export class DynamicTableDetectionAgent implements Agent {
             const base64Image = await api.fileToBase64(file);
             
             // Use the specialized table extraction function with custom prompt if available
-            const tableResponse = await api.extractTablesFromImageWithGemini(base64Image, file.type, customPrompt);
+            const tableResponse = await api.extractTablesFromImageWithGemini(
+              base64Image, 
+              file.type, 
+              customPrompt
+            );
             
             if (tableResponse.success && tableResponse.data) {
               console.log("Table extraction successful:", tableResponse.data);

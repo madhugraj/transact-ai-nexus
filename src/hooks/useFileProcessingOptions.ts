@@ -29,6 +29,37 @@ export function useFileProcessingOptions() {
       confidenceThreshold: 0.8,
       retainFormatting: false,
       detectMultipleTables: false
+    },
+    ocrSettings: {
+      enabled: false,
+      enhanceResolution: true,
+      language: 'eng',
+      promptId: 'default',
+      customPrompt: `You're an OCR assistant. Read this scanned document image and extract clean, structured text.
+You are also an expert in extracting tables from scanned images.
+If the image has Checks, Mention that it is a check image and extract the values accordingly.
+- Give appropriate title for the image according to the type of image.
+Instructions:
+- Extract all clear tabular structures from the image.
+- Extract all possible tabular structures with data from the image
+- Extract the Headings of the table {extracted heading}
+- Avoid any logos or text not part of a structured table.
+- Output JSON only in the format:
+
+\`\`\`json
+{
+  "tables": [
+    {
+      "title": "extracted heading",
+      "headers": ["Column A", "Column B"],
+      "rows": [
+        ["value1", "value2"],
+        ...
+      ]
+    }
+  ]
+}
+\`\`\``
     }
   });
   
@@ -54,6 +85,10 @@ export function useFileProcessingOptions() {
       ...prevOptions,
       ocrOptions: {
         ...prevOptions.ocrOptions,
+        enabled
+      },
+      ocrSettings: {
+        ...prevOptions.ocrSettings,
         enabled
       }
     }));

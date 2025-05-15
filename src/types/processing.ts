@@ -37,4 +37,12 @@ export interface ProcessingOptions {
     retainFormatting?: boolean;
     detectMultipleTables?: boolean;
   };
+  // Add ocrSettings for table extraction and custom prompts
+  ocrSettings?: {
+    enabled?: boolean;
+    enhanceResolution?: boolean;
+    language?: string;
+    promptId?: string;
+    customPrompt?: string;
+  };
 }

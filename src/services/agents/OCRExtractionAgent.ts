@@ -27,6 +27,7 @@ export class OCRExtractionAgent implements Agent {
       enhanceResolution: true,
       language: "eng",
       useGemini: Boolean(context?.options?.useGemini),
+      customPrompt: options?.ocrSettings?.customPrompt,
       ...options?.ocrSettings
     };
     
@@ -52,7 +53,8 @@ export class OCRExtractionAgent implements Agent {
             const base64Image = await api.fileToBase64(file);
             console.log(`Converted ${file.name} to base64, length: ${base64Image.length}`);
             
-            const prompt = `
+            // Use custom prompt if available
+            const prompt = ocrSettings.customPrompt || `
 You're an OCR assistant. Read this scanned document image and extract clean, structured text.
 You are also an expert in extracting tables from scanned images.
 If the image has Checks, Mention that it is a check image and extract the values accordingly.
