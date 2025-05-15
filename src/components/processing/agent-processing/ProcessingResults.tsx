@@ -90,7 +90,10 @@ export const ProcessingResults = ({
               {tablesData.map((tableData: any, index: number) => (
                 <div key={index} className="border rounded p-2">
                   <ExtractedTablePreview
-                    tableData={tableData}
+                    initialData={{
+                      headers: tableData.headers,
+                      rows: tableData.rows
+                    }}
                     displayFormat={displayFormat}
                   />
                 </div>

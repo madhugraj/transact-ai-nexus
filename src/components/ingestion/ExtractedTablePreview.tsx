@@ -17,13 +17,15 @@ interface ExtractedTablePreviewProps {
   initialData?: TableData;
   isLoading?: boolean;
   onEdit?: () => void;
+  displayFormat?: 'table' | 'json';
 }
 
 const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
   fileId,
   initialData,
   isLoading = false,
-  onEdit
+  onEdit,
+  displayFormat = 'table'
 }) => {
   const [tableData, setTableData] = useState<TableData | null>(initialData || null);
   const [loading, setLoading] = useState(isLoading);
@@ -36,7 +38,8 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
       headers: initialData.headers,
       rowCount: initialData.rows?.length
     } : null,
-    isLoading
+    isLoading,
+    displayFormat
   });
 
   // Load table data from API if not provided as initialData
@@ -144,7 +147,44 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
     rowCount: tableData.rows.length
   });
   
-  // Render table data
+  // Render JSON view if displayFormat is 'json'
+  if (displayFormat === 'json') {
+    const jsonData = {
+      headers: tableData.headers,
+      rows: tableData.rows
+    };
+    
+    return (
+      <Card className="border-muted/40">
+        <CardContent className="p-4">
+          <pre className="bg-gray-50 p-4 rounded-md overflow-x-auto text-xs">
+            {JSON.stringify(jsonData, null, 2)}
+          </pre>
+          
+          <div className="p-4 flex justify-end space-x-2 border-t mt-4">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onEdit}
+              disabled={!onEdit}
+            >
+              <Edit className="h-4 w-4 mr-1" /> Edit Data
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => fileId && api.exportTableData(fileId, 'csv')}
+              disabled={!fileId}
+            >
+              <Download className="h-4 w-4 mr-1" /> Export CSV
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  // Render table data (default)
   return (
     <Card className="border-muted/40">
       <CardContent className="p-0">
