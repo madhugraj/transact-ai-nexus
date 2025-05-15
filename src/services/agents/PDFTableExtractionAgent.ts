@@ -1,4 +1,6 @@
+
 import { Agent, ProcessingContext } from "./types";
+import * as api from '@/services/api';
 
 export class PDFTableExtractionAgent implements Agent {
   id: string = "PDFTableExtraction";
@@ -32,29 +34,155 @@ export class PDFTableExtractionAgent implements Agent {
       };
     }
     
-    // In a real implementation, we would process each PDF file
-    // For now, just return mock data
-    const extractedTables = [{
-      tableId: "pdf-table-1",
-      source: pdfFiles[0].name,
-      title: "Financial Summary",
-      headers: ["Date", "Description", "Amount", "Balance"],
-      rows: [
-        ["2023-04-01", "Opening Balance", "$0.00", "$5,000.00"],
-        ["2023-04-15", "Salary Deposit", "$3,500.00", "$8,500.00"],
-        ["2023-04-22", "Rent Payment", "-$1,200.00", "$7,300.00"],
-        ["2023-04-30", "Closing Balance", "$0.00", "$7,300.00"]
-      ],
-      confidence: 0.95
-    }];
+    // Process PDF files to extract tables
+    const extractedTables = [];
+    
+    for (const pdfFile of pdfFiles) {
+      try {
+        console.log(`Processing PDF: ${pdfFile.name}`);
+        
+        // Use the extracted text content if available
+        const extractedText = data.extractedTextContent || "";
+        
+        if (extractedText) {
+          console.log("Using extracted text to identify tables in PDF");
+          
+          // Use Gemini to identify and extract tables from the text
+          const tablePrompt = "Identify any tables in this text and format them with proper column headers and rows. Maintain the original structure.";
+          
+          // Convert PDF to base64 for Gemini processing if needed
+          const base64Data = await api.fileToBase64(pdfFile);
+          const response = await api.processImageWithGemini(tablePrompt, base64Data, pdfFile.type);
+          
+          if (response.success && response.data) {
+            console.log("Successfully extracted table content from PDF using Gemini");
+            
+            // Parse the table data from the text response
+            const tableData = await this.parseTableFromText(response.data);
+            
+            if (tableData) {
+              extractedTables.push({
+                tableId: `pdf-table-${extractedTables.length + 1}`,
+                source: pdfFile.name,
+                title: `Table from ${pdfFile.name}`,
+                headers: tableData.headers,
+                rows: tableData.rows,
+                confidence: 0.9
+              });
+            }
+          } else {
+            console.error("Failed to extract table from PDF:", response.error);
+          }
+        } else {
+          console.log("No extracted text available, sending PDF directly to Gemini");
+          
+          // Direct PDF processing with Gemini Vision
+          const tablePrompt = "Extract all tables from this document. Format each table with proper column headers and rows.";
+          
+          const base64Data = await api.fileToBase64(pdfFile);
+          const response = await api.processImageWithGemini(tablePrompt, base64Data, pdfFile.type);
+          
+          if (response.success && response.data) {
+            console.log("Successfully extracted table content from PDF using direct Gemini Vision");
+            
+            // Parse the table data from the text response
+            const tableData = await this.parseTableFromText(response.data);
+            
+            if (tableData) {
+              extractedTables.push({
+                tableId: `pdf-table-${extractedTables.length + 1}`,
+                source: pdfFile.name,
+                title: `Table from ${pdfFile.name}`,
+                headers: tableData.headers,
+                rows: tableData.rows,
+                confidence: 0.85
+              });
+            }
+          } else {
+            console.error("Failed to extract table from PDF using direct method:", response.error);
+          }
+        }
+      } catch (error) {
+        console.error(`Error processing PDF file ${pdfFile.name}:`, error);
+      }
+    }
+    
+    console.log(`Extracted ${extractedTables.length} tables from PDF files`);
     
     return {
       ...data,
       fileObjects, // Preserve file objects for document preview
-      pdfTablesExtracted: true,
+      pdfTablesExtracted: extractedTables.length > 0,
       extractedTables: [...(data.extractedTables || []), ...extractedTables],
       processedBy: 'PDFTableExtractionAgent'
     };
+  }
+  
+  private async parseTableFromText(text: string): Promise<{ headers: string[], rows: string[][] } | null> {
+    try {
+      // Use Gemini to parse text into a structured table
+      const parsePrompt = `
+Parse the following text into a structured table. 
+Extract header row and data rows. 
+Return ONLY a JSON object with this format:
+{
+  "headers": ["Header1", "Header2", ...],
+  "rows": [
+    ["row1col1", "row1col2", ...],
+    ["row2col1", "row2col2", ...],
+    ...
+  ]
+}
+
+Here's the text to parse:
+${text}`;
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: parsePrompt }] }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 4096
+            }
+          })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      
+      // Extract JSON from the response
+      const jsonMatch = resultText.match(/\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}/);
+      if (!jsonMatch) {
+        console.error("No valid JSON found in response");
+        return null;
+      }
+      
+      const tableData = JSON.parse(jsonMatch[0]);
+      
+      if (!tableData.headers || !tableData.rows || !Array.isArray(tableData.headers) || !Array.isArray(tableData.rows)) {
+        console.error("Invalid table structure in response");
+        return null;
+      }
+      
+      return {
+        headers: tableData.headers,
+        rows: tableData.rows
+      };
+    } catch (error) {
+      console.error("Error parsing table from text:", error);
+      return null;
+    }
   }
   
   canProcess(data: any): boolean {

@@ -9,11 +9,9 @@ export * from './geminiService';  // Export all Gemini service functions
 // Export tableService with explicit naming to avoid conflicts
 export { 
   getTablePreview,
-  exportTableData
+  exportTableData,
+  type TableData   // Correctly export TableData type
 } from './tableService';
 
-// Re-export types using 'export type' syntax for isolatedModules compatibility
-export type { TableData } from './tableService';
-
-// Types
+// Re-export types
 export * from './types';

@@ -103,7 +103,7 @@ export class DynamicTableDetectionAgent implements Agent {
         });
         
         if (insightsResponse.success && insightsResponse.data) {
-          // Try to detect table structure from the text using a structured approach
+          // Try to detect table structure from the text
           const tableStructure = await this.extractTableFromText(extractedText);
           
           if (tableStructure && tableStructure.headers.length > 0) {
@@ -154,6 +154,50 @@ export class DynamicTableDetectionAgent implements Agent {
       }
     }
     
+    // If we have files but no extracted text, try to extract tables directly
+    if (fileObjects.length > 0 && useGemini && !extractedText) {
+      console.log("No extracted text available, trying direct table extraction from files");
+      
+      for (const file of fileObjects) {
+        try {
+          if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+            console.log(`Attempting direct table extraction from ${file.name}`);
+            
+            const base64Image = await api.fileToBase64(file);
+            const prompt = "Extract any tables from this document and format them properly with headers and rows.";
+            
+            const geminiResponse = await api.processImageWithGemini(prompt, base64Image, file.type);
+            
+            if (geminiResponse.success && geminiResponse.data) {
+              const tableStructure = await this.extractTableFromText(geminiResponse.data);
+              
+              if (tableStructure && tableStructure.headers.length > 0) {
+                console.log("Successfully extracted table directly from file");
+                
+                return {
+                  ...data,
+                  fileObjects,
+                  dynamicTableDetection: true,
+                  tableData: tableStructure,
+                  extractedTables: [{
+                    tableId: `table-direct-extracted-${file.name}`,
+                    headers: tableStructure.headers,
+                    rows: tableStructure.rows,
+                    confidence: 0.8
+                  }],
+                  tableCount: 1,
+                  extractionComplete: true,
+                  processedBy: 'DynamicTableDetectionAgent'
+                };
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`Error during direct table extraction from ${file.name}:`, error);
+        }
+      }
+    }
+    
     // If all other attempts failed, let the user know
     console.log("No tables detected through any method");
     
@@ -190,7 +234,7 @@ OUTPUT FORMAT:
 
       // Call the Gemini API directly to extract tables
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -198,8 +242,6 @@ OUTPUT FORMAT:
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
               temperature: 0.1,
-              topP: 0.95,
-              topK: 40,
               maxOutputTokens: 4096
             }
           })
@@ -243,13 +285,15 @@ OUTPUT FORMAT:
   canProcess(data: any): boolean {
     const canProcess = data && 
       (data.extractedTables || data.tableData || data.extractedTextContent || 
-       (data.geminiResults && data.geminiResults.length > 0));
+       (data.geminiResults && data.geminiResults.length > 0) ||
+       (data.fileObjects && data.fileObjects.length > 0));
       
     console.log("DynamicTableDetectionAgent.canProcess:", canProcess, {
       hasExtractedTables: Boolean(data?.extractedTables),
       hasTableData: Boolean(data?.tableData),
       hasExtractedText: Boolean(data?.extractedTextContent),
-      hasGeminiResults: Boolean(data?.geminiResults && data?.geminiResults.length > 0)
+      hasGeminiResults: Boolean(data?.geminiResults && data?.geminiResults.length > 0),
+      hasFileObjects: Boolean(data?.fileObjects && data?.fileObjects.length > 0)
     });
     return canProcess;
   }

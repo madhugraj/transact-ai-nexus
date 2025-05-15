@@ -26,30 +26,68 @@ export const processImageWithGemini = async (
   base64Image: string,
   mimeType: string
 ): Promise<ApiResponse<string>> => {
-  console.log(`Processing image with Gemini, prompt: ${prompt}, image length: ${base64Image.length}`);
+  console.log(`Processing image with Gemini API, prompt: ${prompt}, image length: ${base64Image.length}`);
+  
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: prompt },
+                {
+                  inline_data: {
+                    mime_type: mimeType,
+                    data: base64Image
+                  }
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 4096
+          }
+        })
+      }
+    );
 
-  // For development, return mock results
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const mockResult = 
-      `Bank Statement
-      Account Number: XXXX-XXXX-1234
-      Statement Period: 01/25/2023 - 02/25/2023
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Gemini API error:", errorText);
+      return {
+        success: false,
+        error: `Gemini API error: ${response.status} ${errorText}`
+      };
+    }
 
-      Transaction History:
-      Date       | Description           | Amount    | Balance
-      -----------|-----------------------|-----------|----------
-      01/27/2023 | GROCERY STORE         | -$125.65  | $3,245.89
-      01/30/2023 | DIRECT DEPOSIT SALARY | +$2,450.00| $5,695.89
-      02/03/2023 | RENT PAYMENT          | -$1,800.00| $3,895.89
-      02/10/2023 | ONLINE PURCHASE       | -$79.99   | $3,815.90`;
-      
-      resolve({
-        success: true,
-        data: mockResult
-      });
-    }, 1500);
-  });
+    const data = await response.json();
+    const extractedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!extractedText) {
+      return {
+        success: false,
+        error: "No text extracted from the image"
+      };
+    }
+    
+    return {
+      success: true,
+      data: extractedText
+    };
+  } catch (error) {
+    console.error("Error processing image with Gemini:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
 };
 
 /**
@@ -65,22 +103,100 @@ export const generateInsightsWithGemini = async (
 }>> => {
   console.log(`Generating insights with Gemini, text length: ${text.length}`);
   
-  // For development, return mock insights
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { 
+                  text: `${prompt}
+
+Here is the text to analyze:
+${text}
+
+Format your response as a structured JSON with these fields:
+1. "summary": A concise summary of the document
+2. "keyPoints": An array of key points as strings
+3. "insights": A paragraph with insights about the financial information`
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 4096
+          }
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Gemini API error:", errorText);
+      return {
+        success: false,
+        error: `Gemini API error: ${response.status} ${errorText}`
+      };
+    }
+
+    const data = await response.json();
+    const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!resultText) {
+      return {
+        success: false,
+        error: "No insights generated from the text"
+      };
+    }
+    
+    // Extract JSON from the response text
+    const jsonMatch = resultText.match(/\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}/);
+    
+    if (!jsonMatch) {
+      // If no JSON found, create a structured response from the text
+      return {
         success: true,
         data: {
-          summary: "This is a bank statement showing transactions from January to February 2023 with a starting balance of $3,371.54 and ending balance of $3,625.91.",
-          keyPoints: [
-            "The account had one major deposit of $2,450.00 from a salary payment",
-            "The largest expense was rent at $1,800.00",
-            "There were 6 transactions total in this statement period",
-            "The overall balance increased by $254.37"
-          ],
-          insights: "The statement shows a healthy financial pattern with income exceeding expenses. The major expense (rent) represents approximately 73% of the monthly income."
+          summary: "Analysis of the document",
+          keyPoints: resultText.split('\n').filter(line => line.trim().startsWith('- ')).map(line => line.trim().substring(2)),
+          insights: resultText
         }
-      });
-    }, 1000);
-  });
+      };
+    }
+    
+    try {
+      const parsedData = JSON.parse(jsonMatch[0]);
+      return {
+        success: true,
+        data: {
+          summary: parsedData.summary || "Analysis of the document",
+          keyPoints: parsedData.keyPoints || [],
+          insights: parsedData.insights || resultText
+        }
+      };
+    } catch (parseError) {
+      console.error("Error parsing Gemini response as JSON:", parseError);
+      return {
+        success: true,
+        data: {
+          summary: "Analysis of the document",
+          keyPoints: resultText.split('\n').filter(line => line.trim().startsWith('- ')).map(line => line.trim().substring(2)),
+          insights: resultText
+        }
+      };
+    }
+  } catch (error) {
+    console.error("Error generating insights with Gemini:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
 };
