@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -260,28 +261,6 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
       status: currentStep === 'complete' ? 'active' as const : 'pending' as const 
     }
   ];
-
-  // Ensure the extracted table is saved when the component unmounts
-  useEffect(() => {
-    return () => {
-      if (tableData && tableData.headers && tableData.rows) {
-        console.log("Saving table data on unmount:", {
-          headers: tableData.headers,
-          rowCount: tableData.rows.length
-        });
-        
-        saveProcessedTables([{
-          id: `table-unmount-${Date.now()}`,
-          title: tableName || 'Extracted Table',
-          name: tableName || 'Extracted Table',
-          headers: tableData.headers,
-          rows: tableData.rows,
-          extractedAt: new Date().toISOString(),
-          processingId
-        }], processingId);
-      }
-    };
-  }, [tableData, tableName, processingId]);
 
   return (
     <Card className="shadow-lg border-primary/20">

@@ -8,54 +8,27 @@ export const useWorkflowNavigation = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // A timestamp to track the absolute last navigation time
-  const getLastNavigationTime = (): number => {
-    const localStorageTime = parseInt(localStorage.getItem('lastNavigationTime') || '0');
-    const sessionStorageTime = parseInt(sessionStorage.getItem('lastNavigationTime') || '0');
-    
-    // Return the most recent time from either storage
-    return Math.max(localStorageTime, sessionStorageTime);
-  };
-
   const navigateToStep = (step: ProcessingStep, data?: any) => {
-    // Get current time
+    // Add a check to prevent rapid navigation
+    const lastNavigationTime = parseInt(sessionStorage.getItem('lastNavigationTime') || '0');
     const currentTime = Date.now();
-    const lastNavigationTime = getLastNavigationTime();
     
-    // Very conservative throttling - 8 seconds between navigations
-    // This prevents the rate limit error by being well below the browser limit
-    if (currentTime - lastNavigationTime < 8000) {
-      console.warn('Navigation throttled to prevent browser rate limiting:', {
-        timeSinceLastNav: currentTime - lastNavigationTime,
-        currentTime,
-        lastNavigationTime,
-        attemptedDestination: step
-      });
-      
-      // Still show toast notifications even when navigation is throttled
-      if (data?.tableName) {
-        toast({
-          title: "Data ready for database",
-          description: `Data is ready to be synced to ${data.tableName}`,
-        });
-      }
-      
-      return; // Skip this navigation
+    if (currentTime - lastNavigationTime < 1000) {
+      console.warn('Navigation throttled to prevent history.replaceState() limit');
+      return; // Skip this navigation to prevent rate limiting
     }
     
-    // Store the navigation time in both storages to ensure consistency
-    const newNavigationTime = Date.now();
-    localStorage.setItem('lastNavigationTime', newNavigationTime.toString());
-    sessionStorage.setItem('lastNavigationTime', newNavigationTime.toString());
+    // Update the last navigation time
+    sessionStorage.setItem('lastNavigationTime', currentTime.toString());
     
-    // Handle different navigation destinations
     switch (step) {
       case 'upload':
-        safeNavigate('/documents?tab=upload');
+        navigate('/documents?tab=upload');
         break;
       case 'database':
-        safeNavigate('/database');
+        navigate('/database');
         if (data?.tableName) {
+          // In a real app, we would store the table information in a global state or context
           localStorage.setItem('lastProcessedTable', data.tableName);
           toast({
             title: "Data ready for database",
@@ -64,44 +37,19 @@ export const useWorkflowNavigation = () => {
         }
         break;
       case 'dashboard':
-        safeNavigate('/dashboard');
+        navigate('/dashboard');
         toast({
           title: "Analysis complete",
           description: "Your processed data is now available in the dashboard",
         });
         break;
       case 'assistant':
-        safeNavigate('/assistant');
+        navigate('/assistant');
         toast({
           title: "Ready for AI assistance",
           description: "Ask questions about your processed data",
         });
         break;
-    }
-  };
-  
-  // Use a safer navigation method with error handling and fallback
-  const safeNavigate = (path: string) => {
-    try {
-      // Use a timeout to space out navigation attempts
-      setTimeout(() => {
-        try {
-          navigate(path, { replace: true });
-        } catch (error) {
-          console.error('Navigation failed with error:', error);
-          
-          // Last resort fallback - direct location change
-          try {
-            window.location.href = path;
-          } catch (fallbackError) {
-            console.error('Even fallback navigation failed:', fallbackError);
-          }
-        }
-      }, 100);
-    } catch (outerError) {
-      console.error('Navigation setup failed:', outerError);
-      // Ultimate fallback
-      window.location.href = path;
     }
   };
 

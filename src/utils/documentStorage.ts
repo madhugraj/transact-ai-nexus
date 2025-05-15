@@ -17,25 +17,17 @@ export const saveProcessedFiles = (files: any[], processingId?: string) => {
     // Add newly processed files with timestamp
     const newProcessedFiles = files.map(file => ({
       ...file,
-      id: file.id || file.backendId || `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name: file.name || (file.file && file.file.name) || 'Processed Document',
       extractedAt: new Date().toISOString(),
       processingId
     }));
     
     // Update localStorage with combined array
-    const combinedFiles = [...processedFiles, ...newProcessedFiles];
-    localStorage.setItem('processedFiles', JSON.stringify(combinedFiles));
-    
-    console.log('Saved processed files to localStorage:', {
-      newCount: newProcessedFiles.length,
-      totalCount: combinedFiles.length,
-      sample: combinedFiles.slice(0, 2)
-    });
+    localStorage.setItem('processedFiles', JSON.stringify([...processedFiles, ...newProcessedFiles]));
     
     // Dispatch event to notify components that new documents are processed
     window.dispatchEvent(new CustomEvent('documentProcessed'));
     
+    console.log('Saved processed files to localStorage:', newProcessedFiles);
     return true;
   } catch (error) {
     console.error("Error saving processed files to localStorage:", error);
@@ -69,20 +61,13 @@ export const saveProcessedTables = (tables: any[], processingId?: string) => {
           processingId
         }];
     
-    const combinedTables = [...processedTables, ...newProcessedTables];
-    
     // Update localStorage with combined array
-    localStorage.setItem('processedTables', JSON.stringify(combinedTables));
-    
-    console.log('Saved processed tables to localStorage:', {
-      newCount: newProcessedTables.length,
-      totalCount: combinedTables.length,
-      sample: newProcessedTables.slice(0, 1)
-    });
+    localStorage.setItem('processedTables', JSON.stringify([...processedTables, ...newProcessedTables]));
     
     // Dispatch event to notify components that new tables are processed
     window.dispatchEvent(new CustomEvent('documentProcessed'));
     
+    console.log('Saved processed tables to localStorage:', newProcessedTables);
     return true;
   } catch (error) {
     console.error("Error saving processed tables to localStorage:", error);
@@ -148,29 +133,15 @@ export const getDocumentDataById = (documentId: string) => {
     const tables = tablesStr ? JSON.parse(tablesStr) : [];
     const files = filesStr ? JSON.parse(filesStr) : [];
     
-    console.log('Found data in localStorage:', {
-      tables: tables.length,
-      files: files.length
-    });
-    
     const selectedTable = tables.find((t: any) => t.id === documentId);
     const selectedFile = files.find((f: any) => f.id === documentId || f.backendId === documentId);
     
     const result = selectedTable || selectedFile || null;
-    console.log('Found document data:', result ? 'Document found' : 'Document not found');
+    console.log('Found document data:', result);
     
     return result;
   } catch (error) {
     console.error("Error retrieving document data:", error);
     return null;
   }
-};
-
-/**
- * Clear all processed documents (helper function for debugging)
- */
-export const clearProcessedDocuments = () => {
-  localStorage.removeItem('processedTables');
-  localStorage.removeItem('processedFiles');
-  console.log('Cleared all processed documents from localStorage');
 };

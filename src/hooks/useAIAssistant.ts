@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Message } from '@/components/assistant/MessageList';
 import { Document } from '@/components/assistant/DocumentSelector';
-import { getProcessedDocuments, getDocumentDataById, saveProcessedTables } from '@/utils/documentStorage';
+import { getProcessedDocuments, getDocumentDataById } from '@/utils/documentStorage';
 import { generateInsightsWithGemini } from '@/services/api/gemini/insightGenerator';
 
 // Business analyst prompt template
@@ -59,43 +59,6 @@ export const useAIAssistant = () => {
       window.removeEventListener('documentProcessed', fetchProcessedDocuments);
     };
   }, [toast]);
-
-  // Add a sample table for testing when no real data is available
-  const addSampleTable = () => {
-    try {
-      const sampleTable = {
-        id: `sample-table-${Date.now()}`,
-        title: "Sample Sales Data",
-        name: "Sample Sales Data",
-        headers: ["Product", "Region", "Sales", "Quarter", "Growth"],
-        rows: [
-          ["Laptops", "North", "45000", "Q1", "15%"],
-          ["Phones", "East", "36000", "Q1", "8%"],
-          ["Tablets", "West", "28000", "Q1", "-3%"],
-          ["Accessories", "South", "12500", "Q1", "22%"],
-          ["Laptops", "North", "48000", "Q2", "12%"],
-          ["Phones", "East", "42000", "Q2", "16%"],
-          ["Tablets", "West", "26000", "Q2", "-7%"],
-          ["Accessories", "South", "15000", "Q2", "20%"],
-        ],
-        extractedAt: new Date().toISOString()
-      };
-      
-      saveProcessedTables([sampleTable]);
-      
-      toast({
-        title: "Sample table added",
-        description: "A sample table has been added for testing",
-      });
-    } catch (error) {
-      console.error("Error adding sample table:", error);
-      toast({
-        title: "Error adding sample table",
-        description: "Could not add sample table",
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleSendMessage = async () => {
     if (!message.trim()) return;
@@ -161,7 +124,7 @@ ${message}`;
         if (selectedDocument) {
           responseContent = `I'd like to analyze "${doc?.name}" for you, but I don't have access to its data. Please try selecting another document or uploading a document with extractable data.`;
         } else {
-          responseContent = "Please select a document from the dropdown above to analyze. I need data to work with in order to provide insights. You can upload and process documents in the Documents section, or click 'Add Sample Table' for a demo.";
+          responseContent = "Please select a document from the dropdown above to analyze. I need data to work with in order to provide insights. You can upload and process documents in the Documents section.";
         }
       }
 
@@ -222,8 +185,7 @@ ${message}`;
     selectedDocument,
     processedDocuments,
     handleSendMessage,
-    handleDocumentChange,
-    addSampleTable
+    handleDocumentChange
   };
 };
 

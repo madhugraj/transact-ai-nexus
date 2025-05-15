@@ -5,9 +5,6 @@ import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import DocumentSelector from './DocumentSelector';
 import useAIAssistant from '@/hooks/useAIAssistant';
-import { Button } from '@/components/ui/button';
-import { Table } from 'lucide-react';
-import { saveProcessedTables, clearProcessedDocuments } from '@/utils/documentStorage';
 
 const AIAssistant: React.FC = () => {
   const {
@@ -17,8 +14,7 @@ const AIAssistant: React.FC = () => {
     isProcessing,
     processedDocuments,
     handleSendMessage,
-    handleDocumentChange,
-    addSampleTable
+    handleDocumentChange
   } = useAIAssistant();
 
   return (
@@ -27,26 +23,6 @@ const AIAssistant: React.FC = () => {
         <CardTitle className="text-lg flex items-center justify-between">
           <div className="flex items-center">
             Document AI Assistant
-            
-            {/* Debug actions for testing */}
-            <div className="ml-4 flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="text-xs"
-                onClick={addSampleTable}
-              >
-                <Table className="h-3.5 w-3.5 mr-1" /> Add Sample Table
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="text-xs"
-                onClick={() => clearProcessedDocuments()}
-              >
-                Clear Cache
-              </Button>
-            </div>
           </div>
           <DocumentSelector 
             documents={processedDocuments} 
