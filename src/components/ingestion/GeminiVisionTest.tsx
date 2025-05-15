@@ -93,6 +93,7 @@ const GeminiVisionTest: React.FC = () => {
         });
       }
     } catch (error) {
+      console.error("Processing error:", error);
       toast({
         title: "Processing error",
         description: error instanceof Error ? error.message : "Unknown error",

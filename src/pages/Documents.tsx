@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Brain } from "lucide-react";
 
 const Documents = () => {
-  const [activeTab, setActiveTab] = useState<string>("processing");
+  const [activeTab, setActiveTab] = useState<string>("gemini");
   
   return (
     <AppLayout>
