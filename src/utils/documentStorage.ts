@@ -18,7 +18,8 @@ export const saveProcessedFiles = (files: any[], processingId?: string) => {
     const newProcessedFiles = files.map(file => ({
       ...file,
       extractedAt: new Date().toISOString(),
-      processingId
+      processingId,
+      id: file.id || file.backendId || `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     }));
     
     // Update localStorage with combined array
@@ -40,6 +41,13 @@ export const saveProcessedFiles = (files: any[], processingId?: string) => {
  */
 export const saveProcessedTables = (tables: any[], processingId?: string) => {
   try {
+    if (!tables || tables.length === 0) {
+      console.log("No tables provided to save");
+      return false;
+    }
+    
+    console.log("Saving tables to localStorage:", tables);
+    
     // Get existing processed tables or initialize empty array
     const existingTables = localStorage.getItem('processedTables');
     const processedTables = existingTables ? JSON.parse(existingTables) : [];
@@ -50,6 +58,7 @@ export const saveProcessedTables = (tables: any[], processingId?: string) => {
           ...table,
           id: table.id || `table-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           name: table.name || table.title || 'Extracted Table',
+          type: 'table', // Ensure type is set for document selector
           extractedAt: new Date().toISOString(),
           processingId
         }))
@@ -57,6 +66,7 @@ export const saveProcessedTables = (tables: any[], processingId?: string) => {
           ...(tables as any),
           id: (tables as any).id || `table-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           name: (tables as any).name || (tables as any).title || 'Extracted Table',
+          type: 'table', // Ensure type is set for document selector
           extractedAt: new Date().toISOString(),
           processingId
         }];
@@ -84,27 +94,30 @@ export const getProcessedDocuments = (): Document[] => {
     const processedTablesStr = localStorage.getItem('processedTables');
     const processedFilesStr = localStorage.getItem('processedFiles');
     
-    console.log('Raw localStorage data:', { 
-      processedTablesStr, 
-      processedFilesStr 
+    console.log('Raw localStorage data for documents:', { 
+      processedTablesStr: processedTablesStr ? `${processedTablesStr.substring(0, 100)}...` : 'null', 
+      processedFilesStr: processedFilesStr ? `${processedFilesStr.substring(0, 100)}...` : 'null'
     });
     
     const tables = processedTablesStr ? JSON.parse(processedTablesStr) : [];
     const files = processedFilesStr ? JSON.parse(processedFilesStr) : [];
     
     console.log('Parsed localStorage data:', {
-      tables: tables.length > 0 ? `${tables.length} tables found` : 'No tables',
-      files: files.length > 0 ? `${files.length} files found` : 'No files'
+      tablesCount: tables.length,
+      filesCount: files.length,
+      tablesSample: tables.length > 0 ? tables[0].name : 'No tables',
+      filesSample: files.length > 0 ? files[0].name : 'No files'
     });
     
+    // Create properly formatted Document objects for the selector
     const docs: Document[] = [
-      ...tables.map((table: any) => ({
+      ...tables.filter((table: any) => table !== null).map((table: any) => ({
         id: table.id || `table-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         name: table.name || table.title || 'Extracted Table',
-        type: 'table',
+        type: table.type || 'table',
         extractedAt: table.extractedAt || new Date().toISOString()
       })),
-      ...files.map((file: any) => ({
+      ...files.filter((file: any) => file !== null).map((file: any) => ({
         id: file.id || file.backendId || `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         name: file.name || (file.file && file.file.name) || 'Processed Document',
         type: file.file && file.file.type && file.file.type.includes('image') ? 'image' : 'document',
@@ -137,7 +150,7 @@ export const getDocumentDataById = (documentId: string) => {
     const selectedFile = files.find((f: any) => f.id === documentId || f.backendId === documentId);
     
     const result = selectedTable || selectedFile || null;
-    console.log('Found document data:', result);
+    console.log('Found document data:', result ? 'Document found' : 'Document not found');
     
     return result;
   } catch (error) {

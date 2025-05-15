@@ -37,9 +37,16 @@ export const useAIAssistant = () => {
   useEffect(() => {
     const fetchProcessedDocuments = () => {
       try {
+        console.log("Fetching processed documents...");
         const docs = getProcessedDocuments();
-        console.log("Fetched processed documents:", docs);
+        console.log(`Fetched ${docs.length} processed documents`);
         setProcessedDocuments(docs);
+        
+        if (docs.length === 0) {
+          console.log("No documents found. Checking localStorage directly:");
+          console.log("processedTables:", localStorage.getItem('processedTables'));
+          console.log("processedFiles:", localStorage.getItem('processedFiles'));
+        }
       } catch (error) {
         console.error("Error fetching processed documents:", error);
         toast({
@@ -50,13 +57,23 @@ export const useAIAssistant = () => {
       }
     };
     
+    // Fetch immediately on mount
     fetchProcessedDocuments();
     
-    // Set up event listener for document processing
-    window.addEventListener('documentProcessed', fetchProcessedDocuments);
+    // Set up event listener for document processing events
+    const handleDocumentProcessed = () => {
+      console.log("Document processed event received, refreshing documents list");
+      fetchProcessedDocuments();
+    };
+    
+    window.addEventListener('documentProcessed', handleDocumentProcessed);
+    
+    // Poll every few seconds to make sure we catch any updates
+    const intervalId = setInterval(fetchProcessedDocuments, 5000);
     
     return () => {
-      window.removeEventListener('documentProcessed', fetchProcessedDocuments);
+      window.removeEventListener('documentProcessed', handleDocumentProcessed);
+      clearInterval(intervalId);
     };
   }, [toast]);
 
@@ -115,7 +132,7 @@ ${message}`;
         const response = await generateInsightsWithGemini(tableContext, analysisPrompt);
         
         if (response.success && response.data) {
-          responseContent = response.data.insights || response.data.summary;
+          responseContent = response.data.insights || response.data.summary || "I've analyzed the data but don't have specific insights to share.";
         } else {
           responseContent = `I couldn't analyze this data due to an error: ${response.error || 'Unknown error'}`;
         }

@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DocumentPreview from '../../ingestion/DocumentPreview';
 import ExtractedTablePreview from '../../ingestion/ExtractedTablePreview';
 import GeminiInsightsPanel from '../GeminiInsightsPanel';
+import { saveProcessedTables } from '@/utils/documentStorage';
 
 interface ProcessingResultsProps {
   processingResults: any;
@@ -31,28 +32,49 @@ export const ProcessingResults = ({
   // Store tables in localStorage for AI Assistant
   if (tablesData.length > 0) {
     try {
-      // Get existing processed tables or initialize empty array
-      const existingTables = localStorage.getItem('processedTables');
-      const processedTables = existingTables ? JSON.parse(existingTables) : [];
+      console.log("Saving extracted tables to localStorage:", tablesData);
+      saveProcessedTables(tablesData, processingResults?.processingId);
       
-      // Add newly processed tables with timestamp if they don't exist
-      const newProcessedTables = tablesData
-        .filter((table: any) => !table.id) // Only add tables that don't have IDs yet
-        .map((table: any) => ({
-          ...table,
-          id: `table-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          name: table.name || 'Extracted Table',
-          extractedAt: new Date().toISOString()
-        }));
-      
-      // Update localStorage with combined array if we have new tables
-      if (newProcessedTables.length > 0) {
-        localStorage.setItem('processedTables', JSON.stringify([...processedTables, ...newProcessedTables]));
-        // Dispatch event to notify components that new tables are processed
-        window.dispatchEvent(new CustomEvent('documentProcessed'));
-      }
+      // Dispatch event to notify components that new tables are processed
+      window.dispatchEvent(new CustomEvent('documentProcessed'));
     } catch (error) {
       console.error("Error saving processed tables to localStorage:", error);
+    }
+  }
+  
+  // Check for tableData in processingResults and save if available
+  if (processingResults?.tableData) {
+    try {
+      console.log("Saving table data to localStorage:", processingResults.tableData);
+      const tableDataToSave = {
+        id: `table-data-${Date.now()}`,
+        title: 'Extracted Table Data',
+        name: 'Extracted Table Data',
+        headers: processingResults.tableData.headers,
+        rows: processingResults.tableData.rows,
+        type: 'table',
+        extractedAt: new Date().toISOString()
+      };
+      
+      saveProcessedTables([tableDataToSave], processingResults?.processingId);
+      
+      // Dispatch event to notify components that new tables are processed
+      window.dispatchEvent(new CustomEvent('documentProcessed'));
+    } catch (error) {
+      console.error("Error saving table data to localStorage:", error);
+    }
+  }
+  
+  // Check for extractedTables in processingResults and save if available
+  if (processingResults?.extractedTables && processingResults.extractedTables.length > 0) {
+    try {
+      console.log("Saving extracted tables array to localStorage:", processingResults.extractedTables);
+      saveProcessedTables(processingResults.extractedTables, processingResults?.processingId);
+      
+      // Dispatch event to notify components that new tables are processed
+      window.dispatchEvent(new CustomEvent('documentProcessed'));
+    } catch (error) {
+      console.error("Error saving extracted tables array to localStorage:", error);
     }
   }
   
@@ -98,6 +120,38 @@ export const ProcessingResults = ({
                   />
                 </div>
               ))}
+            </div>
+          ) : processingResults?.tableData ? (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-medium">Extracted Table Data</h3>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant={displayFormat === 'table' ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setDisplayFormat('table')}
+                  >
+                    Table View
+                  </Button>
+                  <Button
+                    variant={displayFormat === 'json' ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setDisplayFormat('json')}
+                  >
+                    JSON View
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="border rounded p-2">
+                <ExtractedTablePreview
+                  initialData={{
+                    headers: processingResults.tableData.headers,
+                    rows: processingResults.tableData.rows
+                  }}
+                  displayFormat={displayFormat}
+                />
+              </div>
             </div>
           ) : (
             <div className="text-center p-6">
