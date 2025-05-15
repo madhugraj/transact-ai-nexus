@@ -22,15 +22,6 @@ const GeminiVisionTest: React.FC = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      // Only allow image files
-      if (!file.type.startsWith('image/')) {
-        toast({
-          title: "Invalid file type",
-          description: "Please select an image file",
-          variant: "destructive",
-        });
-        return;
-      }
       setSelectedFile(file);
     }
   };
@@ -73,31 +64,8 @@ const GeminiVisionTest: React.FC = () => {
         selectedFile.type
       );
 
-      // Try to extract tables from the image
-      const tableExtractPrompt = `
-You are an expert in extracting tables from scanned images.
-Instructions:
-- Extract all clear tabular structures from the image.
-- Output JSON only in the format:
-\`\`\`json
-{
-  "tables": [
-    {
-      "title": "optional title",
-      "headers": ["Column A", "Column B"],
-      "rows": [
-        ["value1", "value2"],
-        ...
-      ]
-    }
-  ]
-}
-\`\`\``;
-
-      // Use the processImageWithGemini function as a fallback since extractTablesFromImageWithGemini 
-      // might not be available yet in the build
-      const tableResponse = await api.processImageWithGemini(
-        tableExtractPrompt,
+      // Try to extract tables from the image using our specialized function
+      const tableResponse = await api.extractTablesFromImageWithGemini(
         base64Image,
         selectedFile.type
       );
@@ -109,18 +77,8 @@ Instructions:
         setResult(response.data || '');
         
         if (tableResponse.success && tableResponse.data) {
-          try {
-            // Try to parse table data from the response
-            const jsonMatch = tableResponse.data.match(/\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}/);
-            if (jsonMatch) {
-              const parsedData = JSON.parse(jsonMatch[0]);
-              if (parsedData.tables && Array.isArray(parsedData.tables)) {
-                setTableData(parsedData);
-              }
-            }
-          } catch (parseError) {
-            console.error("Failed to parse table data:", parseError);
-          }
+          console.log("Table extraction successful:", tableResponse.data);
+          setTableData(tableResponse.data);
         }
         
         toast({
@@ -165,7 +123,7 @@ Instructions:
                 id="image-upload"
                 type="file"
                 className="hidden"
-                accept="image/*"
+                accept="image/*,application/pdf"
                 onChange={handleFileChange}
                 disabled={isProcessing}
               />
@@ -176,12 +134,12 @@ Instructions:
                 disabled={isProcessing}
               >
                 <ImageIcon className="h-4 w-4 mr-2" />
-                Select Image
+                Select Image/PDF
               </Button>
             </div>
             {selectedFile && (
               <p className="text-xs text-muted-foreground">
-                Selected: {selectedFile.name}
+                Selected: {selectedFile.name} ({selectedFile.type})
               </p>
             )}
           </div>

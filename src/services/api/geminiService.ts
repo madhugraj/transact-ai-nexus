@@ -26,7 +26,7 @@ export const processImageWithGemini = async (
   base64Image: string,
   mimeType: string
 ): Promise<ApiResponse<string>> => {
-  console.log(`Processing image with Gemini API, prompt: ${prompt}, image length: ${base64Image.length}`);
+  console.log(`Processing image with Gemini API, prompt length: ${prompt.length}, image length: ${base64Image.length}`);
   
   try {
     const response = await fetch(
@@ -70,6 +70,8 @@ export const processImageWithGemini = async (
     const data = await response.json();
     const extractedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
     
+    console.log("Gemini Vision API response:", extractedText ? extractedText.substring(0, 100) + "..." : "No text extracted");
+    
     if (!extractedText) {
       return {
         success: false,
@@ -86,6 +88,76 @@ export const processImageWithGemini = async (
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
+};
+
+/**
+ * Extract tables from an image using Gemini Vision
+ */
+export const extractTablesFromImageWithGemini = async (
+  base64Image: string,
+  mimeType: string
+): Promise<ApiResponse<any>> => {
+  const tableExtractionPrompt = `
+You are an expert in extracting tables from scanned images.
+If the image has Checks, Mention that it is a check image and extract the values accordingly.
+- Give appropriate title for the image according to the type of image.
+Instructions:
+- Extract all clear tabular structures from the image.
+- Extract all possible tabular structures with data from the image
+- Avoid any logos or text not part of a structured table.
+- Output JSON only in the format:
+
+\`\`\`json
+{
+  "tables": [
+    {
+      "title": "optional title",
+      "headers": ["Column A", "Column B"],
+      "rows": [
+        ["value1", "value2"],
+        ...
+      ]
+    }
+  ]
+}
+\`\`\``;
+
+  console.log("Extracting tables from image using specialized prompt");
+  
+  const response = await processImageWithGemini(tableExtractionPrompt, base64Image, mimeType);
+  
+  if (!response.success) {
+    return response;
+  }
+  
+  // Try to extract JSON from the response
+  try {
+    const jsonMatch = response.data.match(/```json\s*(\{[\s\S]*?\})\s*```/) || 
+                     response.data.match(/\{[\s\S]*"tables"[\s\S]*\}/);
+                     
+    if (jsonMatch) {
+      const jsonStr = jsonMatch[1] || jsonMatch[0];
+      const parsedData = JSON.parse(jsonStr);
+      console.log("Successfully extracted table data:", parsedData);
+      return {
+        success: true,
+        data: parsedData
+      };
+    } else {
+      console.error("Could not find JSON in response:", response.data);
+      return {
+        success: false,
+        error: "Could not extract table JSON from response"
+      };
+    }
+  } catch (error) {
+    console.error("Error parsing JSON from Gemini response:", error);
+    console.error("Raw response:", response.data);
+    return {
+      success: false,
+      error: "Failed to parse table data from Gemini response"
     };
   }
 };
