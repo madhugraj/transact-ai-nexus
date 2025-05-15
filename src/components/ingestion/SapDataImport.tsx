@@ -1,601 +1,319 @@
 
-import { useState } from 'react';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
-import { 
-  Database, 
-  Upload, 
-  FileSpreadsheet, 
-  Filter, 
-  TableProperties, 
-  BarChart3,
-  Check,
-  AlertCircle
-} from 'lucide-react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Progress } from "@/components/ui/progress";
-import { Separator } from '@/components/ui/separator';
-import { ChartContainer } from "@/components/ui/chart";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-} from 'recharts';
+import { useToast } from '@/hooks/use-toast';
+import { DatabaseIcon, UploadCloud, Table, ArrowRight, Loader2 } from 'lucide-react';
 
-// Define the data structure matching the SAP data
-interface SapRecord {
-  material: string;
-  materialDescription: string;
-  movementType: string;
-  quantity: number;
-  order: string;
-  storageLocation: string;
-  businessUnit: string;
-  docDate: string;
-  entryDate: string;
-  user: string;
-  purchaseOrder: string;
-  docHeaderText: string;
-  materialDoc: string;
-  vendor: string;
-  amountInLC: string;
-  reference: string;
-  postingDate: string;
-  plant: string;
-  movementTypeText: string;
-  name1: string;
-  status: 'complete' | 'partial';
-  item: string;
-}
-
-// Sample data based on the provided SAP dump
-const sampleData: SapRecord[] = [
-  {
-    material: '2010509',
-    materialDescription: 'D4_3_VALVE - 81839',
-    movementType: '101',
-    quantity: 7,
-    order: '',
-    storageLocation: '1003',
-    businessUnit: 'NOS',
-    docDate: '21.01.2025',
-    entryDate: '31.01.2025',
-    user: 'MMEU6',
-    purchaseOrder: '4500433199',
-    docHeaderText: '169346',
-    materialDoc: '5000467503',
-    vendor: '100807',
-    amountInLC: '65,416.68',
-    reference: '2425409253@10080',
-    postingDate: '31.01.2025',
-    plant: '1000',
-    movementTypeText: 'GR goods receipt',
-    name1: 'Bull Plant I',
-    status: 'partial',
-    item: '1',
-  },
-  {
-    material: '2010509',
-    materialDescription: 'D4_3_VALVE - 81839',
-    movementType: '101',
-    quantity: 15,
-    order: '',
-    storageLocation: '1003',
-    businessUnit: 'NOS',
-    docDate: '21.01.2025',
-    entryDate: '31.01.2025',
-    user: 'MMEU6',
-    purchaseOrder: '4500445236',
-    docHeaderText: '169346',
-    materialDoc: '5000467503',
-    vendor: '100807',
-    amountInLC: '1,40,178.60',
-    reference: '2425409253@10080',
-    postingDate: '31.01.2025',
-    plant: '1000',
-    movementTypeText: 'GR goods receipt',
-    name1: 'Bull Plant I',
-    status: 'complete',
-    item: '3',
-  },
-  {
-    material: '2010524',
-    materialDescription: 'SD5_3_VALVE_WITH_HPCO - 102300873',
-    movementType: '101',
-    quantity: 20,
-    order: '',
-    storageLocation: '1003',
-    businessUnit: 'NOS',
-    docDate: '21.01.2025',
-    entryDate: '31.01.2025',
-    user: 'MMEU6',
-    purchaseOrder: '4500443847',
-    docHeaderText: '169346',
-    materialDoc: '5000467503',
-    vendor: '100807',
-    amountInLC: '77,234.40',
-    reference: '2425409253@10080',
-    postingDate: '31.01.2025',
-    plant: '1000',
-    movementTypeText: 'GR goods receipt',
-    name1: 'Bull Plant I',
-    status: 'partial',
-    item: '2',
-  },
-  {
-    material: '7002031',
-    materialDescription: 'H-EXT LDR MS PIPE LINE 7 ASSY',
-    movementType: '101',
-    quantity: 6,
-    order: '11890255',
-    storageLocation: '1003',
-    businessUnit: 'NOS',
-    docDate: '31.01.2025',
-    entryDate: '31.01.2025',
-    user: 'ABAP',
-    purchaseOrder: '',
-    docHeaderText: '',
-    materialDoc: '4917354326',
-    vendor: '',
-    amountInLC: '2,571.42',
-    reference: '',
-    postingDate: '31.01.2025',
-    plant: '1000',
-    movementTypeText: 'GR for order',
-    name1: 'Bull Plant I',
-    status: 'complete',
-    item: '1',
-  },
-  {
-    material: '7002568',
-    materialDescription: 'Ø63 CYLINDER HEAD ASSLY',
-    movementType: '101',
-    quantity: 1,
-    order: '11887972',
-    storageLocation: '1003',
-    businessUnit: 'NOS',
-    docDate: '31.01.2025',
-    entryDate: '31.01.2025',
-    user: 'ABAP',
-    purchaseOrder: '',
-    docHeaderText: '',
-    materialDoc: '4917354308',
-    vendor: '',
-    amountInLC: '522.09',
-    reference: '',
-    postingDate: '31.01.2025',
-    plant: '1000',
-    movementTypeText: 'GR for order',
-    name1: 'Bull Plant I',
-    status: 'partial',
-    item: '1',
-  },
-];
-
-// Dashboard chart data
-const chartData = [
-  { name: 'Complete GR', value: 2, fill: '#4ade80' },
-  { name: 'Partial GR', value: 3, fill: '#f97316' },
-];
-
-const materialChartData = [
-  { name: '2010509', complete: 1, partial: 1 },
-  { name: '2010524', complete: 0, partial: 1 },
-  { name: '7002031', complete: 1, partial: 0 },
-  { name: '7002568', complete: 0, partial: 1 },
-];
-
-const SapDataImport = () => {
-  const [data, setData] = useState<SapRecord[]>(sampleData);
-  const [isImporting, setIsImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState(0);
-  const [filterMaterial, setFilterMaterial] = useState('');
-  const [filterPO, setFilterPO] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
+const SapDataImport: React.FC = () => {
+  const [connectionTab, setConnectionTab] = useState("direct");
+  const [server, setServer] = useState('');
+  const [port, setPort] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [clientId, setClientId] = useState('');
+  const [sapSystem, setSapSystem] = useState('');
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [sapTables, setSapTables] = useState<Array<{id: string, name: string, description: string}>>([]);
+  const [selectedTable, setSelectedTable] = useState<string>('');
   const { toast } = useToast();
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    
-    // Start the import progress simulation
-    setIsImporting(true);
-    setImportProgress(0);
-    
-    // Simulate file processing
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 10;
-      setImportProgress(progress);
+  // Mock data for demonstration purposes
+  const mockTables = [
+    { id: '1', name: 'MATDOC', description: 'Material Document Table' },
+    { id: '2', name: 'MAKT', description: 'Material Descriptions' },
+    { id: '3', name: 'MARA', description: 'General Material Data' },
+    { id: '4', name: 'BKPF', description: 'Accounting Document Header' },
+    { id: '5', name: 'MKPF', description: 'Material Document Header' }
+  ];
+
+  const handleConnect = () => {
+    if (connectionTab === 'direct' && (!server || !port || !username || !password || !clientId || !sapSystem)) {
+      toast({
+        title: "Missing information",
+        description: "Please fill in all required fields for SAP connection",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsConnecting(true);
+
+    // Simulate connection process
+    setTimeout(() => {
+      setIsConnecting(false);
+      setIsConnected(true);
+      setSapTables(mockTables);
+      toast({
+        title: "Connection successful",
+        description: "Successfully connected to SAP system"
+      });
+    }, 2000);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
       
-      if (progress >= 100) {
-        clearInterval(interval);
-        setIsImporting(false);
-        toast({
-          title: "Import Complete",
-          description: "SAP data has been successfully imported",
-        });
+      // When file is selected in file mode, simulate immediate "connection"
+      if (connectionTab === 'file') {
+        setIsConnected(true);
+        setSapTables(mockTables);
       }
-    }, 300);
+    }
   };
 
-  // Filter the data based on user selections
-  const filteredData = data.filter(record => {
-    const materialMatch = filterMaterial ? record.material.includes(filterMaterial) || 
-                                          record.materialDescription.toLowerCase().includes(filterMaterial.toLowerCase()) : true;
-    const poMatch = filterPO ? record.purchaseOrder.includes(filterPO) : true;
-    const statusMatch = filterStatus === 'all' ? true : record.status === filterStatus;
-    
-    return materialMatch && poMatch && statusMatch;
-  });
+  const handleImportTable = () => {
+    if (!selectedTable && connectionTab === 'direct') {
+      toast({
+        title: "No table selected",
+        description: "Please select a table to import",
+        variant: "destructive"
+      });
+      return;
+    }
 
-  // Group data for charts
-  const getPartialGRCount = () => {
-    return data.filter(record => record.status === 'partial').length;
-  };
-  
-  const getCompleteGRCount = () => {
-    return data.filter(record => record.status === 'complete').length;
+    setIsConnecting(true);
+
+    // Simulate import process
+    setTimeout(() => {
+      setIsConnecting(false);
+      toast({
+        title: "Data imported successfully",
+        description: connectionTab === 'direct' 
+          ? `SAP table ${selectedTable} has been imported` 
+          : `File ${selectedFile?.name} has been processed`
+      });
+    }, 2500);
   };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold mb-2">SAP Data Connector</h1>
-        <p className="text-muted-foreground">
-          Import and analyze SAP material movement data for invoice reconciliation and GR tracking
-        </p>
-      </div>
-
-      <Tabs defaultValue="import" className="w-full">
-        <TabsList>
-          <TabsTrigger value="import">Data Import</TabsTrigger>
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="transactions">Transactions</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="import">
-          <Card>
-            <CardHeader>
-              <CardTitle>Import SAP Data</CardTitle>
-              <CardDescription>
-                Upload SAP export files to start analyzing your material movements and GR status
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="source-type">Data Source</Label>
-                    <Select defaultValue="excel">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select data source" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="excel">Excel/CSV</SelectItem>
-                        <SelectItem value="api">SAP API</SelectItem>
-                        <SelectItem value="hana">SAP HANA Direct</SelectItem>
-                        <SelectItem value="odata">OData Service</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="import-type">Import Type</Label>
-                    <Select defaultValue="material">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select import type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="material">Material Document</SelectItem>
-                        <SelectItem value="po">Purchase Order</SelectItem>
-                        <SelectItem value="grn">Goods Receipt</SelectItem>
-                        <SelectItem value="invoice">Invoice Verification</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl">SAP Connection</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs 
+            value={connectionTab} 
+            onValueChange={setConnectionTab} 
+            className="w-full"
+          >
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="direct">Direct Connection</TabsTrigger>
+              <TabsTrigger value="file">File Upload</TabsTrigger>
+            </TabsList>
+            
+            {/* Direct Connection Tab */}
+            <TabsContent value="direct" className="mt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="server">Server/Host</Label>
+                  <Input 
+                    id="server" 
+                    placeholder="sap.example.com" 
+                    value={server}
+                    onChange={(e) => setServer(e.target.value)}
+                    disabled={isConnected}
+                  />
                 </div>
-
-                <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center">
-                  <div className="flex flex-col items-center space-y-4">
-                    <div className="p-3 bg-primary/10 rounded-full">
-                      <FileSpreadsheet className="h-8 w-8 text-primary" />
-                    </div>
-                    <div className="text-center space-y-1">
-                      <h3 className="font-medium">Upload SAP Export File</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Drag and drop or click to browse
-                      </p>
-                    </div>
-                    <Input 
-                      id="file-upload" 
-                      type="file" 
-                      className="hidden" 
-                      accept=".xlsx,.xls,.csv"
-                      onChange={handleFileUpload}
-                    />
-                    <label htmlFor="file-upload">
-                      <Button asChild>
-                        <span>
-                          <Upload className="mr-2 h-4 w-4" />
-                          Select File
-                        </span>
-                      </Button>
-                    </label>
-                    <p className="text-xs text-muted-foreground">
-                      Supported formats: Excel, CSV (max 10MB)
+                <div className="space-y-2">
+                  <Label htmlFor="port">Port</Label>
+                  <Input 
+                    id="port" 
+                    placeholder="3200" 
+                    value={port}
+                    onChange={(e) => setPort(e.target.value)}
+                    disabled={isConnected}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="username">Username</Label>
+                  <Input 
+                    id="username" 
+                    placeholder="SAP_USER" 
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    disabled={isConnected}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input 
+                    id="password" 
+                    type="password" 
+                    placeholder="•••••••••" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isConnected}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="clientId">Client ID</Label>
+                  <Input 
+                    id="clientId" 
+                    placeholder="100" 
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                    disabled={isConnected}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sapSystem">SAP System</Label>
+                  <Input 
+                    id="sapSystem" 
+                    placeholder="PRD" 
+                    value={sapSystem}
+                    onChange={(e) => setSapSystem(e.target.value)}
+                    disabled={isConnected}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+            
+            {/* File Upload Tab */}
+            <TabsContent value="file" className="mt-6">
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                <div className="flex flex-col items-center justify-center space-y-3">
+                  <UploadCloud className="h-10 w-10 text-gray-400" />
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-medium">Upload SAP Data File</h3>
+                    <p className="text-sm text-gray-500">
+                      Drag and drop your SAP data export file or click to browse
                     </p>
                   </div>
-                </div>
-
-                {isImporting && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Importing data...</span>
-                      <span>{importProgress}%</span>
+                  <Button 
+                    variant="outline"
+                    onClick={() => document.getElementById("sap-file-upload")?.click()}
+                    disabled={isConnecting}
+                  >
+                    Browse Files
+                  </Button>
+                  <input
+                    id="sap-file-upload"
+                    type="file"
+                    className="hidden"
+                    accept=".xlsx,.csv,.txt,.xls"
+                    onChange={handleFileChange}
+                    disabled={isConnecting}
+                  />
+                  {selectedFile && (
+                    <div className="mt-4 text-sm bg-gray-100 p-2 rounded-md">
+                      Selected: <span className="font-semibold">{selectedFile.name}</span>
                     </div>
-                    <Progress value={importProgress} />
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+        <CardFooter>
+          {isConnected ? (
+            <Button 
+              variant="outline" 
+              onClick={() => setIsConnected(false)}
+              className="w-full"
+              disabled={isConnecting}
+            >
+              Disconnect
+            </Button>
+          ) : (
+            <Button 
+              onClick={handleConnect}
+              disabled={isConnecting || (connectionTab === 'file' && !selectedFile)} 
+              className="w-full"
+            >
+              {isConnecting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Connecting...
+                </>
+              ) : (
+                <>
+                  <DatabaseIcon className="mr-2 h-4 w-4" /> Connect to SAP
+                </>
+              )}
+            </Button>
+          )}
+        </CardFooter>
+      </Card>
+
+      {/* SAP Tables Section - Only shown when connected */}
+      {isConnected && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl">
+              {connectionTab === 'direct' ? 'Available SAP Tables' : 'Process SAP Data File'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {connectionTab === 'direct' ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="table-select">Select Table</Label>
+                  <Select value={selectedTable} onValueChange={setSelectedTable}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a table" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sapTables.map(table => (
+                        <SelectItem key={table.id} value={table.name}>
+                          {table.name} - {table.description}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {selectedTable && (
+                  <div className="p-4 bg-gray-50 rounded-md">
+                    <h4 className="font-medium mb-2 flex items-center">
+                      <Table className="h-4 w-4 mr-2" /> Table Details
+                    </h4>
+                    <p className="text-sm text-gray-500">
+                      {sapTables.find(t => t.name === selectedTable)?.description}
+                    </p>
                   </div>
                 )}
-
-                <div className="bg-muted/50 rounded-lg p-4">
-                  <h4 className="font-medium mb-2">Import Settings</h4>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Auto-detect field mappings</span>
-                      <input type="checkbox" defaultChecked />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Update existing records</span>
-                      <input type="checkbox" defaultChecked />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Validate data during import</span>
-                      <input type="checkbox" defaultChecked />
-                    </div>
-                  </div>
-                </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="dashboard">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>GR Status Overview</CardTitle>
-                <CardDescription>
-                  Summary of complete vs. partial goods receipts
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-80">
-                  <ChartContainer config={{
-                    complete: { label: "Complete GR", color: "#4ade80" },
-                    partial: { label: "Partial GR", color: "#f97316" },
-                  }}>
-                    <BarChart
-                      width={400}
-                      height={300}
-                      data={chartData}
-                      margin={{
-                        top: 5,
-                        right: 30,
-                        left: 20,
-                        bottom: 5,
-                      }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="value" name="Count" fill="var(--color-complete, #4ade80)" />
-                    </BarChart>
-                  </ChartContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Material-wise GR Status</CardTitle>
-                <CardDescription>
-                  Breakdown of complete and partial GRs by material
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-80">
-                  <ChartContainer config={{
-                    complete: { label: "Complete", color: "#4ade80" },
-                    partial: { label: "Partial", color: "#f97316" },
-                  }}>
-                    <BarChart
-                      width={400}
-                      height={300}
-                      data={materialChartData}
-                      margin={{
-                        top: 5,
-                        right: 30,
-                        left: 20,
-                        bottom: 5,
-                      }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="complete" name="Complete" fill="var(--color-complete, #4ade80)" />
-                      <Bar dataKey="partial" name="Partial" fill="var(--color-partial, #f97316)" />
-                    </BarChart>
-                  </ChartContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle>Key Metrics</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="bg-muted/50 p-4 rounded-lg">
-                    <div className="text-sm text-muted-foreground mb-1">Total Material Documents</div>
-                    <div className="text-2xl font-semibold">{data.length}</div>
-                  </div>
-                  <div className="bg-muted/50 p-4 rounded-lg">
-                    <div className="text-sm text-muted-foreground mb-1">Partial GRNs</div>
-                    <div className="text-2xl font-semibold text-orange-500">{getPartialGRCount()}</div>
-                  </div>
-                  <div className="bg-muted/50 p-4 rounded-lg">
-                    <div className="text-sm text-muted-foreground mb-1">Complete GRNs</div>
-                    <div className="text-2xl font-semibold text-green-500">{getCompleteGRCount()}</div>
+            ) : (
+              selectedFile && (
+                <div className="p-4 bg-gray-50 rounded-md">
+                  <h4 className="font-medium mb-2">File Details</h4>
+                  <div className="text-sm space-y-2">
+                    <p>Name: <span className="font-medium">{selectedFile.name}</span></p>
+                    <p>Size: <span className="font-medium">{(selectedFile.size / 1024).toFixed(2)} KB</span></p>
+                    <p>Type: <span className="font-medium">{selectedFile.type || 'Unknown'}</span></p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="transactions">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Material Movement Transactions</CardTitle>
-                  <CardDescription>
-                    Detailed view of goods movement with status indicators
-                  </CardDescription>
-                </div>
-                <Button variant="outline" size="sm" className="gap-1">
-                  <TableProperties className="h-4 w-4" />
-                  Export
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex flex-wrap gap-2">
-                  <div className="flex-1 min-w-[200px]">
-                    <Label htmlFor="filter-material" className="mb-2 block">Material Filter</Label>
-                    <div className="flex">
-                      <Input
-                        id="filter-material"
-                        placeholder="Material or description"
-                        value={filterMaterial}
-                        onChange={(e) => setFilterMaterial(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-[200px]">
-                    <Label htmlFor="filter-po" className="mb-2 block">Purchase Order</Label>
-                    <Input
-                      id="filter-po"
-                      placeholder="PO number"
-                      value={filterPO}
-                      onChange={(e) => setFilterPO(e.target.value)}
-                    />
-                  </div>
-                  <div className="w-[150px]">
-                    <Label htmlFor="filter-status" className="mb-2 block">GR Status</Label>
-                    <Select 
-                      value={filterStatus} 
-                      onValueChange={setFilterStatus}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="complete">Complete</SelectItem>
-                        <SelectItem value="partial">Partial</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex items-end">
-                    <Button variant="outline" size="icon">
-                      <Filter className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Material</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Qty</TableHead>
-                        <TableHead>PO</TableHead>
-                        <TableHead>Document</TableHead>
-                        <TableHead>Plant</TableHead>
-                        <TableHead className="text-right">Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredData.map((record, index) => (
-                        <TableRow key={index}>
-                          <TableCell className="font-medium">{record.material}</TableCell>
-                          <TableCell>{record.materialDescription}</TableCell>
-                          <TableCell>{record.quantity} {record.businessUnit}</TableCell>
-                          <TableCell>{record.purchaseOrder || "-"}</TableCell>
-                          <TableCell>{record.materialDoc}</TableCell>
-                          <TableCell>{record.plant}</TableCell>
-                          <TableCell className="text-right">
-                            {record.status === 'complete' ? (
-                              <Badge className="bg-green-100 text-green-800 hover:bg-green-200">
-                                <Check className="h-3 w-3 mr-1" />
-                                Complete
-                              </Badge>
-                            ) : (
-                              <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-200">
-                                <AlertCircle className="h-3 w-3 mr-1" />
-                                Partial
-                              </Badge>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              )
+            )}
+          </CardContent>
+          <CardFooter>
+            <Button 
+              onClick={handleImportTable} 
+              disabled={isConnecting || (connectionTab === 'direct' && !selectedTable)} 
+              className="w-full"
+            >
+              {isConnecting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...
+                </>
+              ) : (
+                <>
+                  <ArrowRight className="mr-2 h-4 w-4" /> 
+                  {connectionTab === 'direct' ? 'Import Selected Table' : 'Process SAP File'}
+                </>
+              )}
+            </Button>
+          </CardFooter>
+        </Card>
+      )}
     </div>
   );
 };

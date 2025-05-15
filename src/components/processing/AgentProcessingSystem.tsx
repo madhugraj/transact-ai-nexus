@@ -133,7 +133,7 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
                 {isProcessing ? (
                   <div className="text-center space-y-4">
                     <Loader className="h-8 w-8 animate-spin mx-auto text-blue-500" />
-                    <p className="text-muted-foreground">Processing document with Gemini AI...</p>
+                    <p className="text-muted-foreground">Processing the document...</p>
                     <p className="text-xs text-muted-foreground">This may take a few moments depending on the document size.</p>
                   </div>
                 ) : (

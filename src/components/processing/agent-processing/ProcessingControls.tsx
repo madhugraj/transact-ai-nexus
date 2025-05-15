@@ -43,7 +43,7 @@ export const ProcessingControls: React.FC<ProcessingControlsProps> = ({
                 Processing...
               </>
             ) : (
-              "Start Processing with Gemini"
+              "Start Processing with AI"
             )}
           </Button>
         </>

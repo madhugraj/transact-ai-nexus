@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { FileJson, FileText, Table as TableIcon, Upload } from 'lucide-react';
+import { FileJson, FileText, Table as TableIcon, Upload, Loader } from 'lucide-react';
 import * as api from '@/services/api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import DocumentPreview from './DocumentPreview';
@@ -233,7 +233,7 @@ const TableExtraction: React.FC = () => {
               {isProcessing && (
                 <div className="space-y-2 mt-4">
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Processing with Gemini AI</span>
+                    <span>Processing the document...</span>
                     <span>{progress}%</span>
                   </div>
                   <Progress value={progress} className="h-2" />

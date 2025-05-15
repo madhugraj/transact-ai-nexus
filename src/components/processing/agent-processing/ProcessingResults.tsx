@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Eye, Table, Sparkles, FileJson, Loader } from 'lucide-react';
+import { Eye, Table as TableIcon, Sparkles, FileJson, Loader } from 'lucide-react';
 import DocumentPreview from '../../ingestion/DocumentPreview';
 import ExtractedTablePreview from '../../ingestion/ExtractedTablePreview';
 import { UploadedFile } from '@/types/fileUpload';
@@ -98,7 +98,7 @@ export const ProcessingResults: React.FC<ProcessingResultsProps> = ({
             <Eye className="h-3.5 w-3.5" /> Document
           </TabsTrigger>
           <TabsTrigger value="extraction" className="flex items-center gap-1">
-            <Table className="h-3.5 w-3.5" /> Tables
+            <TableIcon className="h-3.5 w-3.5" /> Tables
           </TabsTrigger>
           <TabsTrigger value="json" className="flex items-center gap-1">
             <FileJson className="h-3.5 w-3.5" /> JSON

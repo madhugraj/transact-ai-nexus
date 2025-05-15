@@ -1,763 +1,245 @@
-import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { 
-  Mail, 
-  MailCheck, 
-  MailX, 
-  RefreshCw, 
-  Settings,
-  AlertCircle,
-  Clock,
-  Sliders,
-  Filter,
-  Bell,
-  FileText,
-  Database
-} from 'lucide-react';
+import { MailCheck, Loader2, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter
-} from "@/components/ui/dialog";
-import { Separator } from '@/components/ui/separator';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useWorkflowNavigation } from '@/hooks/useWorkflowNavigation';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
-const EmailConnector = () => {
-  const [connected, setConnected] = useState(false);
-  const [connecting, setConnecting] = useState(false);
+const EmailConnector: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [autoTagging, setAutoTagging] = useState(true);
-  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
-  const [syncFrequency, setSyncFrequency] = useState('15');
-  const [retentionDays, setRetentionDays] = useState('30');
-  const [folderToSync, setFolderToSync] = useState('INBOX');
-  const [syncAttachmentsOnly, setSyncAttachmentsOnly] = useState(true);
-  const [showFilters, setShowFilters] = useState(false);
-  const [showDbSyncDialog, setShowDbSyncDialog] = useState(false);
-  // New advanced filter states
-  const [subjectFilter, setSubjectFilter] = useState('');
-  const [senderFilter, setSenderFilter] = useState('');
-  const [dateRangeStart, setDateRangeStart] = useState('');
-  const [dateRangeEnd, setDateRangeEnd] = useState('');
-  const [contentFilter, setContentFilter] = useState('');
-  const [attachmentTypes, setAttachmentTypes] = useState(['pdf', 'xls', 'xlsx', 'doc', 'docx']);
-  const [minAttachmentSize, setMinAttachmentSize] = useState('0');
-  const [maxAttachmentSize, setMaxAttachmentSize] = useState('10');
-  // Notification settings
-  const [enableNotifications, setEnableNotifications] = useState(true);
-  const [notifyOnError, setNotifyOnError] = useState(true);
-  const [notifyOnNewEmail, setNotifyOnNewEmail] = useState(true);
-  // OCR and processing settings
-  const [enableOcr, setEnableOcr] = useState(true);
-  const [confidenceThreshold, setConfidenceThreshold] = useState('75');
-  const [syncing, setSyncing] = useState(false);
-  
+  const [server, setServer] = useState('');
+  const [port, setPort] = useState('993');
+  const [ssl, setSsl] = useState(true);
+  const [folderPath, setFolderPath] = useState('INBOX');
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [emails, setEmails] = useState<Array<{id: string, subject: string, date: string, hasAttachments: boolean}>>([]);
   const { toast } = useToast();
-  const { navigateToStep } = useWorkflowNavigation();
-  
-  const handleConnect = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!email || !password) {
+
+  // Mock data for demonstration
+  const mockEmails = [
+    {id: '1', subject: 'Monthly Invoice - June 2024', date: '2024-06-10', hasAttachments: true},
+    {id: '2', subject: 'Expense Report Q2', date: '2024-06-08', hasAttachments: true},
+    {id: '3', subject: 'Payment Confirmation #1234', date: '2024-06-05', hasAttachments: false},
+    {id: '4', subject: 'Financial Statement - May 2024', date: '2024-06-01', hasAttachments: true},
+  ];
+
+  const handleConnect = () => {
+    if (!email || !password || !server) {
       toast({
-        title: "Error",
-        description: "Please enter both email and password",
+        title: "Missing information",
+        description: "Please fill in all required fields",
         variant: "destructive",
       });
       return;
     }
-    
-    setConnecting(true);
-    
-    // Simulate API connection
+
+    setIsConnecting(true);
+
+    // Simulate connection process
     setTimeout(() => {
-      setConnected(true);
-      setConnecting(false);
+      setIsConnecting(false);
+      setIsConnected(true);
+      setEmails(mockEmails);
       toast({
-        title: "Success",
-        description: "Email account connected successfully",
+        title: "Connection successful",
+        description: "Successfully connected to email server",
+      });
+    }, 2000);
+  };
+
+  const handleRefresh = () => {
+    setIsConnecting(true);
+    
+    // Simulate refresh
+    setTimeout(() => {
+      setIsConnecting(false);
+      toast({
+        title: "Emails refreshed",
+        description: "Email list has been updated",
       });
     }, 1500);
   };
-  
-  const handleDisconnect = () => {
-    setConnected(false);
-    setEmail('');
-    setPassword('');
-    toast({
-      title: "Disconnected",
-      description: "Email account has been disconnected",
-    });
-  };
 
-  const saveAdvancedSettings = () => {
+  const handleImportEmail = (id: string) => {
     toast({
-      title: "Settings Saved",
-      description: "Advanced settings have been updated",
+      title: "Email imported",
+      description: `Email and attachments have been imported`,
     });
-    setShowAdvancedSettings(false);
-  };
-  
-  const saveFilters = () => {
-    toast({
-      title: "Filters Saved",
-      description: "Email filters have been updated",
-    });
-    setShowFilters(false);
-  };
-
-  const handleAttachmentTypeToggle = (type: string) => {
-    setAttachmentTypes(prev => 
-      prev.includes(type) 
-        ? prev.filter(t => t !== type)
-        : [...prev, type]
-    );
-  };
-
-  const handleDbSync = () => {
-    setSyncing(true);
-    
-    // Simulate sync process
-    setTimeout(() => {
-      setSyncing(false);
-      setShowDbSyncDialog(false);
-      toast({
-        title: "Sync Complete",
-        description: "Email data has been synchronized with the database",
-      });
-      
-      // Navigate to database page
-      setTimeout(() => {
-        navigateToStep('database', { tableName: 'email_documents' });
-      }, 500);
-    }, 2000);
   };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold mb-2">Email Connector</h1>
-        <p className="text-muted-foreground">
-          Connect your email account to automatically ingest invoices, receipts, and other financial documents.
+      <div className="flex flex-col mb-6">
+        <h1 className="text-3xl font-semibold">Email Connector</h1>
+        <p className="text-muted-foreground mt-1">
+          Connect to your email to import documents and data
         </p>
       </div>
-      
-      <Tabs defaultValue="gmail" className="w-full">
-        <TabsList className="bg-muted/30">
-          <TabsTrigger value="gmail" className="data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary">Gmail</TabsTrigger>
-          <TabsTrigger value="outlook" className="data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary">Outlook</TabsTrigger>
-          <TabsTrigger value="imap" className="data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary">IMAP/SMTP</TabsTrigger>
-        </TabsList>
-        
-        <div className="pt-6">
-          <Card className="shadow-sm hover:shadow-md transition-all duration-200">
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle>Gmail Connection</CardTitle>
-                  <CardDescription>
-                    Connect to your Gmail account to start ingestion
-                  </CardDescription>
-                </div>
-                {connected && (
-                  <Badge variant="outline" className="bg-status-approved/20 text-status-approved">
-                    <MailCheck size={14} className="mr-1" />
-                    Connected
-                  </Badge>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl">Email Server Connection</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email Address</Label>
+              <Input 
+                id="email" 
+                type="email" 
+                placeholder="your.email@example.com" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isConnected}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input 
+                id="password" 
+                type="password" 
+                placeholder="•••••••••" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isConnected}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="server">IMAP Server</Label>
+              <Input 
+                id="server" 
+                placeholder="imap.example.com" 
+                value={server}
+                onChange={(e) => setServer(e.target.value)}
+                disabled={isConnected}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="port">Port</Label>
+              <Input 
+                id="port" 
+                placeholder="993" 
+                value={port}
+                onChange={(e) => setPort(e.target.value)}
+                disabled={isConnected}
+              />
+            </div>
+            <div className="flex items-center space-x-2 mt-4">
+              <Checkbox 
+                id="ssl" 
+                checked={ssl} 
+                onCheckedChange={() => setSsl(!ssl)}
+                disabled={isConnected}
+              />
+              <label 
+                htmlFor="ssl" 
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Use SSL
+              </label>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="folderPath">Folder Path</Label>
+              <Input 
+                id="folderPath" 
+                placeholder="INBOX" 
+                value={folderPath}
+                onChange={(e) => setFolderPath(e.target.value)}
+                disabled={isConnected}
+              />
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter className="flex justify-between">
+          {isConnected ? (
+            <div className="flex space-x-4 w-full">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsConnected(false)}
+                className="flex-1"
+              >
+                Disconnect
+              </Button>
+              <Button 
+                onClick={handleRefresh} 
+                disabled={isConnecting}
+                className="flex-1"
+              >
+                {isConnecting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Refreshing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4" /> Refresh Emails
+                  </>
                 )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {!connected ? (
-                <form onSubmit={handleConnect} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      placeholder="your.email@gmail.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password or App Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="••••••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      For Gmail, use an App Password. <a href="https://support.google.com/accounts/answer/185833" target="_blank" className="text-primary hover:underline">Learn more</a>
-                    </p>
-                  </div>
-                  <Button type="submit" disabled={connecting}>
-                    {connecting ? (
-                      <>
-                        <RefreshCw size={16} className="mr-2 animate-spin" />
-                        Connecting...
-                      </>
-                    ) : (
-                      <>
-                        <Mail size={16} className="mr-2" />
-                        Connect Email
-                      </>
-                    )}
-                  </Button>
-                </form>
+              </Button>
+            </div>
+          ) : (
+            <Button 
+              onClick={handleConnect} 
+              disabled={isConnecting} 
+              className="w-full"
+            >
+              {isConnecting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Connecting...
+                </>
               ) : (
-                <div className="space-y-6">
-                  <div className="rounded-lg bg-secondary/30 p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Mail className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="font-medium">{email}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Last sync: 5 minutes ago
-                          </p>
-                        </div>
-                      </div>
-                      <Button variant="outline" size="icon" className="hover:bg-primary/10">
-                        <RefreshCw size={16} />
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <h3 className="font-medium">Settings</h3>
-                    
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label htmlFor="auto-tagging">Auto-tagging documents</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Automatically classify incoming emails as invoices, receipts, etc.
-                          </p>
-                        </div>
-                        <Switch
-                          id="auto-tagging"
-                          checked={autoTagging}
-                          onCheckedChange={setAutoTagging}
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label className="mb-2 block">Document types to ingest</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="flex items-center space-x-2">
-                            <Checkbox id="invoices" defaultChecked />
-                            <label
-                              htmlFor="invoices"
-                              className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                              Invoices
-                            </label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox id="receipts" defaultChecked />
-                            <label
-                              htmlFor="receipts"
-                              className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                              Receipts
-                            </label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox id="purchase-orders" defaultChecked />
-                            <label
-                              htmlFor="purchase-orders"
-                              className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                              Purchase Orders
-                            </label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox id="payment-advice" defaultChecked />
-                            <label
-                              htmlFor="payment-advice"
-                              className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                              Payment Advice
-                            </label>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-wrap gap-2 pt-4">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" className="hover:bg-blue-50/60 transition-colors">
-                            <Sliders size={16} className="mr-2" />
-                            Advanced Settings
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[500px]">
-                          <DialogHeader>
-                            <DialogTitle>Advanced Email Settings</DialogTitle>
-                            <DialogDescription>
-                              Configure advanced options for email synchronization.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                              <div className="flex items-center">
-                                <Clock size={16} className="mr-2 text-muted-foreground" />
-                                <Label htmlFor="sync-frequency">Synchronization Frequency (minutes)</Label>
-                              </div>
-                              <Input
-                                id="sync-frequency"
-                                type="number"
-                                value={syncFrequency}
-                                onChange={(e) => setSyncFrequency(e.target.value)}
-                                min="5"
-                                max="1440"
-                              />
-                              <p className="text-xs text-muted-foreground">
-                                How often to check for new emails (minimum 5 minutes)
-                              </p>
-                            </div>
-                            
-                            <Separator />
-                            
-                            <div className="space-y-2">
-                              <div className="flex items-center">
-                                <Mail size={16} className="mr-2 text-muted-foreground" />
-                                <Label htmlFor="folder">Folder to Synchronize</Label>
-                              </div>
-                              <Input
-                                id="folder"
-                                value={folderToSync}
-                                onChange={(e) => setFolderToSync(e.target.value)}
-                              />
-                              <p className="text-xs text-muted-foreground">
-                                Which email folder to scan for documents (default: INBOX)
-                              </p>
-                            </div>
-                            
-                            <Separator />
-                            
-                            <div className="space-y-2">
-                              <div className="flex items-center">
-                                <AlertCircle size={16} className="mr-2 text-muted-foreground" />
-                                <Label htmlFor="retention">Data Retention (days)</Label>
-                              </div>
-                              <Input
-                                id="retention"
-                                type="number"
-                                value={retentionDays}
-                                onChange={(e) => setRetentionDays(e.target.value)}
-                                min="1"
-                              />
-                              <p className="text-xs text-muted-foreground">
-                                How long to keep processed emails in the system
-                              </p>
-                            </div>
-                            
-                            <Separator />
-                            
-                            <div className="space-y-2">
-                              <div className="flex items-center">
-                                <Bell size={16} className="mr-2 text-muted-foreground" />
-                                <Label htmlFor="notifications">Notification Settings</Label>
-                              </div>
-                              <div className="pl-6 space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <label htmlFor="enable-notifications" className="text-sm">Enable notifications</label>
-                                  <Switch 
-                                    id="enable-notifications" 
-                                    checked={enableNotifications}
-                                    onCheckedChange={setEnableNotifications}
-                                  />
-                                </div>
-                                <div className="flex items-center justify-between">
-                                  <label htmlFor="notify-error" className="text-sm">Notify on errors</label>
-                                  <Switch 
-                                    id="notify-error" 
-                                    checked={notifyOnError}
-                                    onCheckedChange={setNotifyOnError}
-                                    disabled={!enableNotifications}
-                                  />
-                                </div>
-                                <div className="flex items-center justify-between">
-                                  <label htmlFor="notify-new" className="text-sm">Notify on new documents</label>
-                                  <Switch 
-                                    id="notify-new" 
-                                    checked={notifyOnNewEmail}
-                                    onCheckedChange={setNotifyOnNewEmail}
-                                    disabled={!enableNotifications}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <Separator />
-                            
-                            <div className="space-y-2">
-                              <div className="flex items-center">
-                                <FileText size={16} className="mr-2 text-muted-foreground" />
-                                <Label htmlFor="ocr">OCR Settings</Label>
-                              </div>
-                              <div className="pl-6 space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <label htmlFor="enable-ocr" className="text-sm">Enable OCR</label>
-                                  <Switch 
-                                    id="enable-ocr" 
-                                    checked={enableOcr}
-                                    onCheckedChange={setEnableOcr}
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <label htmlFor="confidence" className="text-sm">Minimum confidence threshold (%)</label>
-                                  <Input
-                                    id="confidence"
-                                    type="number"
-                                    value={confidenceThreshold}
-                                    onChange={(e) => setConfidenceThreshold(e.target.value)}
-                                    min="1"
-                                    max="100"
-                                    disabled={!enableOcr}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <Separator />
-                            
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id="attachments-only"
-                                checked={syncAttachmentsOnly}
-                                onCheckedChange={(checked) => setSyncAttachmentsOnly(checked as boolean)}
-                              />
-                              <label
-                                htmlFor="attachments-only"
-                                className="text-sm leading-none"
-                              >
-                                Only process emails with attachments
-                              </label>
-                            </div>
-                          </div>
-                          <div className="flex justify-end space-x-2">
-                            <Button variant="outline" onClick={() => setShowAdvancedSettings(false)}>
-                              Cancel
-                            </Button>
-                            <Button onClick={saveAdvancedSettings}>
-                              Save Settings
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                      
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" className="hover:bg-amber-50/60 transition-colors">
-                            <Filter size={16} className="mr-2" />
-                            Email Filters
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[500px]">
-                          <DialogHeader>
-                            <DialogTitle>Email Filtering Rules</DialogTitle>
-                            <DialogDescription>
-                              Set up rules to filter which emails get processed.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="subject-filter">Subject Contains</Label>
-                              <Input
-                                id="subject-filter"
-                                placeholder="invoice, receipt, order"
-                                value={subjectFilter}
-                                onChange={(e) => setSubjectFilter(e.target.value)}
-                              />
-                              <p className="text-xs text-muted-foreground">
-                                Comma-separated keywords in email subject
-                              </p>
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <Label htmlFor="sender-filter">Sender Filter</Label>
-                              <Input
-                                id="sender-filter"
-                                placeholder="@company.com, supplier@example.com"
-                                value={senderFilter}
-                                onChange={(e) => setSenderFilter(e.target.value)}
-                              />
-                              <p className="text-xs text-muted-foreground">
-                                Filter by sender domain or specific email addresses
-                              </p>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-2">
-                                <Label htmlFor="date-from">Date From</Label>
-                                <Input
-                                  id="date-from"
-                                  type="date"
-                                  value={dateRangeStart}
-                                  onChange={(e) => setDateRangeStart(e.target.value)}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="date-to">Date To</Label>
-                                <Input
-                                  id="date-to"
-                                  type="date"
-                                  value={dateRangeEnd}
-                                  onChange={(e) => setDateRangeEnd(e.target.value)}
-                                />
-                              </div>
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <Label htmlFor="content-filter">Content Contains</Label>
-                              <Input
-                                id="content-filter"
-                                placeholder="payment, purchase"
-                                value={contentFilter}
-                                onChange={(e) => setContentFilter(e.target.value)}
-                              />
-                              <p className="text-xs text-muted-foreground">
-                                Keywords in email body
-                              </p>
-                            </div>
-                            
-                            <Separator />
-                            
-                            <div className="space-y-2">
-                              <Label>Attachment Types</Label>
-                              <div className="grid grid-cols-3 gap-2">
-                                {['pdf', 'xls', 'xlsx', 'doc', 'docx', 'csv', 'jpg', 'png', 'txt'].map(type => (
-                                  <div key={type} className="flex items-center space-x-2">
-                                    <Checkbox 
-                                      id={`type-${type}`} 
-                                      checked={attachmentTypes.includes(type)}
-                                      onCheckedChange={() => handleAttachmentTypeToggle(type)}
-                                    />
-                                    <label
-                                      htmlFor={`type-${type}`}
-                                      className="text-sm leading-none"
-                                    >
-                                      .{type}
-                                    </label>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-2">
-                                <Label htmlFor="min-size">Min Size (MB)</Label>
-                                <Input
-                                  id="min-size"
-                                  type="number"
-                                  value={minAttachmentSize}
-                                  onChange={(e) => setMinAttachmentSize(e.target.value)}
-                                  min="0"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="max-size">Max Size (MB)</Label>
-                                <Input
-                                  id="max-size"
-                                  type="number"
-                                  value={maxAttachmentSize}
-                                  onChange={(e) => setMaxAttachmentSize(e.target.value)}
-                                  min="0"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex justify-end space-x-2">
-                            <Button variant="outline" onClick={() => setShowFilters(false)}>
-                              Cancel
-                            </Button>
-                            <Button onClick={saveFilters}>
-                              Save Filters
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                      
-                      {/* New DB Sync Dialog */}
-                      <Dialog open={showDbSyncDialog} onOpenChange={setShowDbSyncDialog}>
-                        <DialogTrigger asChild>
-                          <Button 
-                            variant="outline" 
-                            className="hover:bg-green-50/60 transition-colors"
-                          >
-                            <Database size={16} className="mr-2" />
-                            Database Sync
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Database Synchronization</DialogTitle>
-                            <DialogDescription>
-                              Configure how email data syncs with your database
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="db-type">Database Type</Label>
-                              <Select defaultValue="postgresql">
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select database type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="postgresql">PostgreSQL</SelectItem>
-                                  <SelectItem value="mongodb">MongoDB</SelectItem>
-                                  <SelectItem value="saphana">SAP HANA</SelectItem>
-                                  <SelectItem value="oracle">Oracle</SelectItem>
-                                  <SelectItem value="mysql">MySQL</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <Label htmlFor="sync-method">Sync Method</Label>
-                              <Select defaultValue="incremental">
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select sync method" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="incremental">Incremental</SelectItem>
-                                  <SelectItem value="full">Full Sync</SelectItem>
-                                  <SelectItem value="manual">Manual Only</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <Label htmlFor="target-table">Target Table</Label>
-                              <Input 
-                                id="target-table" 
-                                placeholder="email_documents" 
-                                defaultValue="email_documents"
-                              />
-                            </div>
-                            
-                            <div className="flex items-center space-x-2">
-                              <Checkbox id="db-logging" defaultChecked />
-                              <label
-                                htmlFor="db-logging"
-                                className="text-sm leading-none"
-                              >
-                                Enable detailed sync logging
-                              </label>
-                            </div>
-                          </div>
-                          <DialogFooter>
-                            <Button variant="outline" onClick={() => setShowDbSyncDialog(false)}>
-                              Cancel
-                            </Button>
-                            <Button 
-                              onClick={handleDbSync}
-                              disabled={syncing}
-                              className="relative"
-                            >
-                              {syncing ? (
-                                <>
-                                  <RefreshCw size={16} className="mr-2 animate-spin" />
-                                  Syncing...
-                                </>
-                              ) : (
-                                <>
-                                  <Database size={16} className="mr-2" />
-                                  Sync Now
-                                </>
-                              )}
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                      
-                      <div className="ml-auto">
-                        <Button variant="destructive" onClick={handleDisconnect}>
-                          <MailX size={16} className="mr-2" />
-                          Disconnect
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <>
+                  <MailCheck className="mr-2 h-4 w-4" /> Connect to Email
+                </>
               )}
-            </CardContent>
-          </Card>
-        </div>
-      </Tabs>
-      
-      <div className="pt-4">
-        <Card className={cn(
-          "border-dashed shadow-sm",
-          connected ? "bg-muted/20" : ""
-        )}>
+            </Button>
+          )}
+        </CardFooter>
+      </Card>
+
+      {/* Email list */}
+      {isConnected && (
+        <Card>
           <CardHeader>
-            <CardTitle>Recent Email Activity</CardTitle>
+            <CardTitle className="text-xl">Available Emails</CardTitle>
           </CardHeader>
           <CardContent>
-            {connected ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between py-2 border-b">
-                  <div>
-                    <p className="font-medium">invoice_may2023.pdf</p>
-                    <p className="text-sm text-muted-foreground">From: vendor@example.com</p>
+            {emails.length > 0 ? (
+              <div className="divide-y">
+                {emails.map((email) => (
+                  <div key={email.id} className="py-4 flex justify-between items-center">
+                    <div className="space-y-1">
+                      <p className="font-medium">{email.subject}</p>
+                      <div className="flex space-x-4 text-sm text-muted-foreground">
+                        <span>Date: {email.date}</span>
+                        {email.hasAttachments && (
+                          <span className="text-blue-500">Has attachments</span>
+                        )}
+                      </div>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleImportEmail(email.id)}
+                    >
+                      Import
+                    </Button>
                   </div>
-                  <Badge>Invoice</Badge>
-                </div>
-                <div className="flex items-center justify-between py-2 border-b">
-                  <div>
-                    <p className="font-medium">receipt_office_supplies.pdf</p>
-                    <p className="text-sm text-muted-foreground">From: sales@officemart.com</p>
-                  </div>
-                  <Badge>Receipt</Badge>
-                </div>
-                <div className="flex items-center justify-between py-2">
-                  <div>
-                    <p className="font-medium">po_tech_equipment.xlsx</p>
-                    <p className="text-sm text-muted-foreground">From: orders@techsupplier.com</p>
-                  </div>
-                  <Badge>Purchase Order</Badge>
-                </div>
+                ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Mail className="mx-auto h-10 w-10 mb-3 text-muted-foreground/70" />
-                <p>Connect your email to see recent activity</p>
-              </div>
+              <Alert>
+                <AlertDescription>No emails found matching your criteria.</AlertDescription>
+              </Alert>
             )}
           </CardContent>
         </Card>
-      </div>
+      )}
     </div>
   );
 };
