@@ -52,7 +52,15 @@ export class OCRExtractionAgent implements Agent {
             const base64Image = await api.fileToBase64(file);
             console.log(`Converted ${file.name} to base64, length: ${base64Image.length}`);
             
-            const prompt = "Extract all text content from this image, maintaining the original formatting as much as possible. If there are tables, please format them properly. If there are multiple columns, preserve the column structure.";
+            const prompt = `
+You're an OCR assistant. Read this scanned document image and extract clean, structured text.
+You are also an expert in extracting tables from scanned images.
+If the image has Checks, Mention that it is a check image and extract the values accordingly.
+Extract all clear tabular structures from the image.
+Extract all possible tabular structures with data from the image
+Extract the Headings of the table.
+Avoid any logos or text not part of a structured document.
+Maintain original formatting as much as possible.`;
             
             console.log(`Sending ${file.name} to Gemini Vision API with prompt: ${prompt}`);
             const geminiResponse = await api.processImageWithGemini(prompt, base64Image, file.type);

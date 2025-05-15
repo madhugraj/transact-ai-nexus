@@ -161,13 +161,14 @@ export class DynamicTableDetectionAgent implements Agent {
     try {
       // Use Gemini to extract table structure from text
       const prompt = `
-Extract table data from the following text. If there's a table structure, format it as a JSON object with 'headers' array and 'rows' array of arrays. 
-If no clear table is found, respond with { "found": false }.
+You're an OCR assistant. Read this text and extract clean, structured tabular data.
+You are an expert in extracting tables from text content.
+Instructions:
+- Extract all clear tabular structures from the text.
+- Extract the Headings of the table
+- Output JSON only in the format:
 
-TEXT:
-${text}
-
-OUTPUT FORMAT:
+\`\`\`json
 {
   "found": true,
   "headers": ["Column1", "Column2", ...],
@@ -176,7 +177,11 @@ OUTPUT FORMAT:
     ["row2col1", "row2col2", ...],
     ...
   ]
-}`;
+}
+\`\`\`
+
+TEXT:
+${text}`;
 
       // Call the Gemini API directly to extract tables - updated to use gemini-1.5-flash
       const response = await fetch(

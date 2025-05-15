@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,10 +6,45 @@ import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { Brain, Image as ImageIcon, FileText, Table as TableIcon } from 'lucide-react';
 import * as api from '@/services/api';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const GeminiVisionTest: React.FC = () => {
+const TableExtraction: React.FC = () => {
+  // Default OCR prompt template
+  const defaultPrompt = `You're an OCR assistant. Read this scanned document image and extract clean, structured text.
+You are also an expert in extracting tables from scanned images.
+If the image has Checks, Mention that it is a check image and extract the values accordingly.
+- Give appropriate title for the image according to the type of image.
+Instructions:
+- Extract all clear tabular structures from the image.
+- Extract all possible tabular structures with data from the image
+- Extract the Headings of the table {extracted heading}
+- Avoid any logos or text not part of a structured table.
+- Output JSON only in the format:
+
+\`\`\`json
+{
+  "tables": [
+    {
+      "title": "extracted heading",
+      "headers": ["Column A", "Column B"],
+      "rows": [
+        ["value1", "value2"],
+        ...
+      ]
+    }
+  ]
+}
+\`\`\``;
+
+  // Predefined prompt templates
+  const promptTemplates = {
+    tableExtraction: defaultPrompt,
+    simpleOcr: "Extract all text from this image and maintain the formatting.",
+    formExtraction: "Extract form fields and their values from this document in a structured format."
+  };
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [prompt, setPrompt] = useState<string>('Analyze this image and extract all text and data.');
+  const [prompt, setPrompt] = useState<string>(defaultPrompt);
   const [result, setResult] = useState<string>('');
   const [tableData, setTableData] = useState<{
     tables: { title?: string; headers: string[]; rows: string[][]; }[];
@@ -23,6 +57,23 @@ const GeminiVisionTest: React.FC = () => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setSelectedFile(file);
+    }
+  };
+
+  const handlePromptTemplateChange = (value: string) => {
+    switch(value) {
+      case 'tableExtraction':
+        setPrompt(promptTemplates.tableExtraction);
+        break;
+      case 'simpleOcr':
+        setPrompt(promptTemplates.simpleOcr);
+        break;
+      case 'formExtraction':
+        setPrompt(promptTemplates.formExtraction);
+        break;
+      case 'custom':
+        // Keep current prompt for custom
+        break;
     }
   };
 
@@ -83,7 +134,7 @@ const GeminiVisionTest: React.FC = () => {
         
         toast({
           title: "Image processed successfully",
-          description: "Gemini Vision has analyzed your image",
+          description: "Table extraction complete",
         });
       } else {
         toast({
@@ -108,8 +159,8 @@ const GeminiVisionTest: React.FC = () => {
     <Card className="mt-6">
       <CardHeader>
         <CardTitle className="flex items-center">
-          <Brain className="h-5 w-5 mr-2 text-blue-500" />
-          Gemini Vision Test
+          <TableIcon className="h-5 w-5 mr-2 text-blue-500" />
+          Table Extraction
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -145,17 +196,35 @@ const GeminiVisionTest: React.FC = () => {
             )}
           </div>
 
+          {/* Prompt Templates */}
+          <div className="space-y-1.5">
+            <label htmlFor="promptTemplate" className="text-sm font-medium">
+              Prompt Template
+            </label>
+            <Select onValueChange={handlePromptTemplateChange} defaultValue="tableExtraction">
+              <SelectTrigger>
+                <SelectValue placeholder="Select a prompt template" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tableExtraction">Table Extraction</SelectItem>
+                <SelectItem value="simpleOcr">Simple OCR</SelectItem>
+                <SelectItem value="formExtraction">Form Extraction</SelectItem>
+                <SelectItem value="custom">Custom Prompt</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Prompt */}
           <div className="space-y-1.5">
             <label htmlFor="prompt" className="text-sm font-medium">
-              Prompt for Gemini
+              Prompt for Table Extraction
             </label>
             <Textarea
               id="prompt"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               className="min-h-24"
-              placeholder="Enter instructions for Gemini Vision"
+              placeholder="Enter instructions for table extraction"
               disabled={isProcessing}
             />
           </div>
@@ -166,7 +235,7 @@ const GeminiVisionTest: React.FC = () => {
             onClick={processImage}
             disabled={!selectedFile || isProcessing}
           >
-            {isProcessing ? "Processing..." : "Process with Gemini Vision"}
+            {isProcessing ? "Processing..." : "Extract Tables"}
           </Button>
 
           {/* Progress */}
@@ -224,7 +293,7 @@ const GeminiVisionTest: React.FC = () => {
             <div className="mt-4 space-y-2">
               <h3 className="text-sm font-medium flex items-center">
                 <FileText className="h-4 w-4 mr-1" />
-                Gemini Vision Results
+                Extracted Text
               </h3>
               <div className="p-3 border rounded-md bg-muted/10 whitespace-pre-line text-sm">
                 {result}
@@ -237,4 +306,4 @@ const GeminiVisionTest: React.FC = () => {
   );
 };
 
-export default GeminiVisionTest;
+export default TableExtraction;

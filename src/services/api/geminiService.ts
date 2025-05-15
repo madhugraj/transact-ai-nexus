@@ -101,12 +101,14 @@ export const extractTablesFromImageWithGemini = async (
   mimeType: string
 ): Promise<ApiResponse<any>> => {
   const tableExtractionPrompt = `
-You are an expert in extracting tables from scanned images.
+You're an OCR assistant. Read this scanned document image and extract clean, structured text.
+You are also an expert in extracting tables from scanned images.
 If the image has Checks, Mention that it is a check image and extract the values accordingly.
 - Give appropriate title for the image according to the type of image.
 Instructions:
 - Extract all clear tabular structures from the image.
 - Extract all possible tabular structures with data from the image
+- Extract the Headings of the table {extracted heading}
 - Avoid any logos or text not part of a structured table.
 - Output JSON only in the format:
 
@@ -114,7 +116,7 @@ Instructions:
 {
   "tables": [
     {
-      "title": "optional title",
+      "title": "extracted heading",
       "headers": ["Column A", "Column B"],
       "rows": [
         ["value1", "value2"],

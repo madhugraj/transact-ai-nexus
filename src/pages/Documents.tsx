@@ -3,12 +3,12 @@ import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card } from "@/components/ui/card";
 import ProcessingTab from "@/components/processing/ProcessingTab";
-import GeminiVisionTest from "@/components/ingestion/GeminiVisionTest";
+import TableExtraction from "@/components/ingestion/GeminiVisionTest";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Brain } from "lucide-react";
+import { Table } from "lucide-react";
 
 const Documents = () => {
-  const [activeTab, setActiveTab] = useState<string>("gemini");
+  const [activeTab, setActiveTab] = useState<string>("tableExtraction");
   
   return (
     <AppLayout>
@@ -23,8 +23,8 @@ const Documents = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="processing">Agent Processing</TabsTrigger>
-            <TabsTrigger value="gemini" className="flex items-center gap-1">
-              <Brain className="h-3.5 w-3.5" /> Gemini Vision Test
+            <TabsTrigger value="tableExtraction" className="flex items-center gap-1">
+              <Table className="h-3.5 w-3.5" /> Table Extraction
             </TabsTrigger>
           </TabsList>
           
@@ -34,8 +34,8 @@ const Documents = () => {
             </Card>
           </TabsContent>
           
-          <TabsContent value="gemini" className="mt-4">
-            <GeminiVisionTest />
+          <TabsContent value="tableExtraction" className="mt-4">
+            <TableExtraction />
           </TabsContent>
         </Tabs>
       </div>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useFileProcessing } from '@/hooks/useFileProcessing';
@@ -9,6 +10,7 @@ import PostProcessingWorkflow from './PostProcessingWorkflow';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAgentProcessing } from '@/hooks/useAgentProcessing';
 import { useToast } from '@/hooks/use-toast';
+import { fileToBase64, extractTablesFromImageWithGemini } from '@/services/api';
 
 const FileUpload = () => {
   const [showProcessingDialog, setShowProcessingDialog] = useState(false);
@@ -67,7 +69,76 @@ const FileUpload = () => {
       // Log available files for debugging
       console.log("Selected files for processing:", selectedFiles);
       
-      // Process with agents
+      // For table extraction, use the specialized table extraction function directly
+      if (currentAction === 'table_extraction' && selectedFiles.length > 0) {
+        console.log("Using specialized table extraction for files");
+        
+        const results = [];
+        let tableData = null;
+        
+        for (const file of selectedFiles) {
+          if (file.file && (file.file.type.startsWith('image/') || file.file.type === 'application/pdf')) {
+            const base64Image = await fileToBase64(file.file);
+            const tableResponse = await extractTablesFromImageWithGemini(base64Image, file.file.type);
+            
+            if (tableResponse.success && tableResponse.data) {
+              results.push({
+                fileName: file.file.name,
+                extractedTables: tableResponse.data.tables,
+                success: true
+              });
+              
+              if (tableResponse.data.tables && tableResponse.data.tables.length > 0) {
+                tableData = {
+                  headers: tableResponse.data.tables[0].headers,
+                  rows: tableResponse.data.tables[0].rows,
+                  metadata: {
+                    title: tableResponse.data.tables[0].title || `Table from ${file.file.name}`,
+                    sourceFile: file.file.name
+                  }
+                };
+              }
+            } else {
+              results.push({
+                fileName: file.file.name,
+                error: tableResponse.error || "Failed to extract tables",
+                success: false
+              });
+            }
+          }
+        }
+        
+        if (results.length > 0 && tableData) {
+          setIsLoading(false);
+          
+          // Set processing results
+          const processedResults = {
+            fileObjects: selectedFiles.map(f => f.file),
+            tableData,
+            extractedTables: tableData ? [{ 
+              headers: tableData.headers, 
+              rows: tableData.rows,
+              title: tableData.metadata.title
+            }] : [],
+            results
+          };
+          
+          await processWithAgents(selectedFiles, {
+            ...processingOptions,
+            useGemini: true,
+            extractedResults: processedResults
+          });
+          
+          toast({
+            title: "Table extraction complete",
+            description: `Successfully extracted tables from ${selectedFiles.length} file(s)`
+          });
+          
+          return;
+        }
+      }
+      
+      // Process with agents for other actions
       await processWithAgents(selectedFiles, {
         ...processingOptions,
         useGemini: true // Enable Gemini processing
