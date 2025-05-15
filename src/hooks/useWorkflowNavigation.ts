@@ -1,3 +1,4 @@
+
 import { useNavigate } from "react-router-dom";
 import { useToast } from "./use-toast";
 
@@ -8,7 +9,6 @@ export const useWorkflowNavigation = () => {
   const { toast } = useToast();
 
   // A timestamp to track the absolute last navigation time
-  // This ensures we're keeping track of navigation regardless of component mounts/unmounts
   const getLastNavigationTime = (): number => {
     const localStorageTime = parseInt(localStorage.getItem('lastNavigationTime') || '0');
     const sessionStorageTime = parseInt(sessionStorage.getItem('lastNavigationTime') || '0');
@@ -22,9 +22,9 @@ export const useWorkflowNavigation = () => {
     const currentTime = Date.now();
     const lastNavigationTime = getLastNavigationTime();
     
-    // Very conservative throttling - 5 seconds between navigations
-    // This is excessive but will absolutely prevent the rate limit error
-    if (currentTime - lastNavigationTime < 5000) {
+    // Very conservative throttling - 8 seconds between navigations
+    // This prevents the rate limit error by being well below the browser limit
+    if (currentTime - lastNavigationTime < 8000) {
       console.warn('Navigation throttled to prevent browser rate limiting:', {
         timeSinceLastNav: currentTime - lastNavigationTime,
         currentTime,
@@ -80,20 +80,28 @@ export const useWorkflowNavigation = () => {
     }
   };
   
-  // Use a safer navigation method that will fall back if needed
+  // Use a safer navigation method with error handling and fallback
   const safeNavigate = (path: string) => {
     try {
-      // Use replace to avoid building up history stack
-      navigate(path, { replace: true });
-    } catch (error) {
-      console.error('Navigation failed with error:', error);
-      
-      // Last resort fallback - direct location change
-      try {
-        window.location.replace(path);
-      } catch (fallbackError) {
-        console.error('Even fallback navigation failed:', fallbackError);
-      }
+      // Use a timeout to space out navigation attempts
+      setTimeout(() => {
+        try {
+          navigate(path, { replace: true });
+        } catch (error) {
+          console.error('Navigation failed with error:', error);
+          
+          // Last resort fallback - direct location change
+          try {
+            window.location.href = path;
+          } catch (fallbackError) {
+            console.error('Even fallback navigation failed:', fallbackError);
+          }
+        }
+      }, 100);
+    } catch (outerError) {
+      console.error('Navigation setup failed:', outerError);
+      // Ultimate fallback
+      window.location.href = path;
     }
   };
 
