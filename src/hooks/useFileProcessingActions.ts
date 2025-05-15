@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { UploadedFile } from '@/types/fileUpload';
 import { ProcessingOptions, PostProcessAction } from '@/types/processing';
 import * as api from '@/services/api';
+import { saveProcessedFiles, saveProcessedTables } from '@/utils/documentStorage';
 
 export function useFileProcessingActions(
   files: UploadedFile[],
@@ -50,27 +51,8 @@ export function useFileProcessingActions(
         return;
       }
       
-      // Save processed files to localStorage for AI Assistant
-      try {
-        // Get existing processed files or initialize empty array
-        const existingFiles = localStorage.getItem('processedFiles');
-        const processedFiles = existingFiles ? JSON.parse(existingFiles) : [];
-        
-        // Add newly processed files with timestamp
-        const newProcessedFiles = selectedFiles.map(file => ({
-          ...file,
-          extractedAt: new Date().toISOString(),
-          processingId: response.data?.processingId
-        }));
-        
-        // Update localStorage with combined array
-        localStorage.setItem('processedFiles', JSON.stringify([...processedFiles, ...newProcessedFiles]));
-        
-        // Dispatch event to notify components that new documents are processed
-        window.dispatchEvent(new CustomEvent('documentProcessed'));
-      } catch (error) {
-        console.error("Error saving processed files to localStorage:", error);
-      }
+      // Save processed files to localStorage using our utility function
+      saveProcessedFiles(selectedFiles, response.data?.processingId);
       
       // Start polling for status
       setProcessingId(response.data!.processingId);
@@ -90,35 +72,12 @@ export function useFileProcessingActions(
     setProcessingComplete(false);
     setProcessingId(null);
     
-    // If we have table results, store them in localStorage for AI Assistant
+    // If we have table results, store them in localStorage using our utility function
     if (results && results.tables) {
-      try {
-        // Get existing processed tables or initialize empty array
-        const existingTables = localStorage.getItem('processedTables');
-        const processedTables = existingTables ? JSON.parse(existingTables) : [];
-        
-        // Add newly processed tables with timestamp
-        const newProcessedTables = Array.isArray(results.tables) 
-          ? results.tables.map((table: any) => ({
-              ...table,
-              extractedAt: new Date().toISOString(),
-              processingId
-            }))
-          : [{
-              ...results.tables,
-              id: `table-${Date.now()}`,
-              extractedAt: new Date().toISOString(),
-              processingId
-            }];
-        
-        // Update localStorage with combined array
-        localStorage.setItem('processedTables', JSON.stringify([...processedTables, ...newProcessedTables]));
-        
-        // Dispatch event to notify components that new tables are processed
-        window.dispatchEvent(new CustomEvent('documentProcessed'));
-      } catch (error) {
-        console.error("Error saving processed tables to localStorage:", error);
-      }
+      saveProcessedTables(
+        Array.isArray(results.tables) ? results.tables : [results.tables], 
+        processingId || undefined
+      );
     }
   };
 

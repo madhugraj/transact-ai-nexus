@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAgentProcessing } from '@/hooks/useAgentProcessing';
 import { useToast } from '@/hooks/use-toast';
 import { fileToBase64, extractTablesFromImageWithGemini, DEFAULT_TABLE_EXTRACTION_PROMPT } from '@/services/api';
+import FileUploadActions from './FileUploadActions';
 
 const FileUpload = () => {
   const [showProcessingDialog, setShowProcessingDialog] = useState(false);
@@ -46,12 +47,6 @@ const FileUpload = () => {
     processingComplete: agentsProcessingComplete,
     resetProcessing: resetAgentProcessing
   } = useAgentProcessing();
-
-  // Open processing dialog for selected files
-  const openProcessingDialog = (fileIds: string[]) => {
-    selectFilesForProcessing(fileIds);
-    setShowProcessingDialog(true);
-  };
 
   // Handle file processing with loading state and agent processing
   const handleProcessFiles = async () => {
@@ -261,7 +256,20 @@ const FileUpload = () => {
                 files={files}
                 onRemove={removeFile}
                 onUpload={uploadFile}
-                onProcess={(id) => openProcessingDialog([id])}
+                onProcess={(id) => {
+                  selectFilesForProcessing([id]);
+                  setShowProcessingDialog(true);
+                }}
+              />
+              
+              {/* Additional file upload actions */}
+              <FileUploadActions
+                files={files}
+                isLoading={isLoading}
+                handleProcessFiles={handleProcessFiles}
+                selectFilesForProcessing={selectFilesForProcessing}
+                selectByType={selectByType}
+                setShowProcessingDialog={setShowProcessingDialog}
               />
             </CardContent>
           </Card>
