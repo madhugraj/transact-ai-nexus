@@ -4,13 +4,26 @@ import { useToast } from '@/hooks/use-toast';
 import { Message } from '@/components/assistant/MessageList';
 import { Document } from '@/components/assistant/DocumentSelector';
 import { getProcessedDocuments, getDocumentDataById } from '@/utils/documentStorage';
+import { generateInsightsWithGemini } from '@/services/api/gemini/insightGenerator';
+
+// Business analyst prompt template
+const BUSINESS_ANALYST_PROMPT = `You are a business data analyst. Given the table data and user query, find the answer from the provided table only.
+
+Analyze the output and the original intent to provide a clear explanation and prescriptive business insights.
+
+Instructions:
+- Identify patterns, outliers, or anomalies using actual values from the data.
+- Explain what the result reveals in business terms.
+- Recommend 3–5 specific business actions. Be precise.
+- Use professional, clear language.
+- Output plain text only. No markdown or code formatting.`;
 
 export const useAIAssistant = () => {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: 'Hello! I am your AI assistant. I can help you analyze documents and tables that have been processed in the system. How can I help you today?',
+      content: 'Hello! I am your AI business analyst assistant. I can help you analyze documents and tables that have been processed in the system. Ask me specific questions about your data, and I'll provide insights and business recommendations.',
       sender: 'assistant',
       timestamp: new Date()
     }
@@ -59,7 +72,7 @@ export const useAIAssistant = () => {
     };
   }, []);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!message.trim()) return;
 
     // Add user message
@@ -74,45 +87,60 @@ export const useAIAssistant = () => {
     setIsProcessing(true);
     setMessage('');
 
-    // Simulate AI processing
-    setTimeout(() => {
+    // Get document data if available
+    const documentData = selectedDocument ? getDocumentDataById(selectedDocument) : null;
+    const doc = processedDocuments.find(d => d.id === selectedDocument);
+
+    try {
       let responseContent = '';
       
-      // Get document data if possible
-      const documentData = selectedDocument ? getDocumentDataById(selectedDocument) : null;
-
-      // Generate different responses based on document selection and query
-      if (selectedDocument) {
-        const doc = processedDocuments.find(d => d.id === selectedDocument);
+      // If we have a selected document and data, use Gemini API
+      if (selectedDocument && documentData) {
+        console.log("Processing with Gemini using document data:", documentData);
         
-        if (documentData) {
-          // Use actual data if available
-          if (message.toLowerCase().includes('total') || message.toLowerCase().includes('sum')) {
-            responseContent = `Based on the ${doc?.type} "${doc?.name}", I've analyzed the data and found several numeric values. If you're looking for a specific total, please clarify which column or field you're interested in.`;
-          } else if (message.toLowerCase().includes('date') || message.toLowerCase().includes('when')) {
-            responseContent = `The ${doc?.type} "${doc?.name}" was processed on ${doc?.extractedAt || new Date().toLocaleString()}. For specific dates within the document, please ask about a particular field.`;
-          } else {
-            responseContent = `I've analyzed the ${doc?.type} "${doc?.name}" and found ${documentData.data ? documentData.data.length + ' records' : 'the following information'}. You can ask specific questions about the content, such as totals, dates, or specific entries.`;
-          }
+        // Prepare context for Gemini
+        let tableContext = '';
+        
+        if (documentData.headers && documentData.rows) {
+          // Format table data as readable text
+          const headers = documentData.headers.join(' | ');
+          const rows = documentData.rows.map(row => row.join(' | ')).join('\n');
+          tableContext = `Table: ${documentData.name || doc?.name || 'Unknown'}\n\nHeaders: ${headers}\n\nData:\n${rows}`;
+        } else if (documentData.data && Array.isArray(documentData.data)) {
+          // Handle alternative data structure
+          tableContext = JSON.stringify(documentData.data, null, 2);
+        } else if (typeof documentData === 'object') {
+          // Handle any other structure
+          tableContext = JSON.stringify(documentData, null, 2);
+        }
+        
+        // Prepare prompt with context and user query
+        const analysisPrompt = `${BUSINESS_ANALYST_PROMPT}
+        
+Table data:
+${tableContext}
+
+User query:
+${message}`;
+        
+        // Call Gemini API
+        const response = await generateInsightsWithGemini(tableContext, analysisPrompt);
+        
+        if (response.success && response.data) {
+          responseContent = response.data.insights || response.data.summary;
         } else {
-          // Use generic responses if no data is available
-          if (message.toLowerCase().includes('total') || message.toLowerCase().includes('sum')) {
-            responseContent = `Based on the ${doc?.type} "${doc?.name}", the total amount is $12,450.75.`;
-          } else if (message.toLowerCase().includes('date') || message.toLowerCase().includes('when')) {
-            responseContent = `The ${doc?.type} "${doc?.name}" is dated May 15, 2023.`;
-          } else if (message.toLowerCase().includes('who') || message.toLowerCase().includes('vendor')) {
-            responseContent = `The vendor mentioned in ${doc?.name} is ABC Corporation.`;
-          } else {
-            responseContent = `I've analyzed the ${doc?.type} "${doc?.name}" and found the following information: This is an invoice for IT services rendered in April 2023, with a total of $12,450.75, due by June 15, 2023.`;
-          }
+          responseContent = `I couldn't analyze this data due to an error: ${response.error || 'Unknown error'}`;
         }
       } else {
-        if (message.toLowerCase().includes('table') || message.toLowerCase().includes('extract')) {
+        // Generate a default response if no document is selected or no data available
+        if (selectedDocument) {
+          responseContent = `I'd like to analyze "${doc?.name}" for you, but I don't have access to its data. Please try selecting another document or uploading a document with extractable data.`;
+        } else if (message.toLowerCase().includes('table') || message.toLowerCase().includes('extract')) {
           responseContent = "I can help analyze your extracted tables. Please select a document from the dropdown above, and I'll provide insights about that specific data.";
         } else if (message.toLowerCase().includes('how') && message.toLowerCase().includes('work')) {
-          responseContent = "I work by analyzing the documents and tables you've processed in the system. To get started, select a document from the dropdown above, then ask me specific questions about that data.";
+          responseContent = "I work by analyzing the documents and tables you've processed in the system. To get started, select a document from the dropdown above, then ask me specific questions about that data. I'll provide business insights and recommendations based on the patterns I find.";
         } else {
-          responseContent = "I'm your AI assistant for document analysis. To get the most out of me, please select a processed document from the dropdown above, then ask specific questions about that document.";
+          responseContent = "I'm your AI business analyst. To get the most out of me, please select a processed document from the dropdown above, then ask specific questions about that document. I'll provide data-driven insights and actionable business recommendations.";
         }
       }
 
@@ -125,8 +153,27 @@ export const useAIAssistant = () => {
       };
 
       setMessages(prev => [...prev, aiMessage]);
+    } catch (error) {
+      console.error("Error processing message:", error);
+      
+      // Add error message
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: "I'm sorry, I encountered an error while analyzing your data. Please try again with a different query or document.",
+        sender: 'assistant',
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+      
+      toast({
+        title: "Error processing query",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive"
+      });
+    } finally {
       setIsProcessing(false);
-    }, 1500);
+    }
   };
 
   const handleDocumentChange = (value: string) => {
@@ -137,7 +184,7 @@ export const useAIAssistant = () => {
     if (doc) {
       const aiMessage: Message = {
         id: Date.now().toString(),
-        content: `I've loaded "${doc.name}". What would you like to know about this ${doc.type}?`,
+        content: `I've loaded "${doc.name}". What would you like to know about this ${doc.type}? I can provide business insights and recommendations based on this data.`,
         sender: 'assistant',
         timestamp: new Date()
       };

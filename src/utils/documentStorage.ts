@@ -53,9 +53,9 @@ export const saveProcessedTables = (tables: any[], processingId?: string) => {
           processingId
         }))
       : [{
-          ...tables,
-          id: tables.id || `table-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          name: tables.name || tables.title || 'Extracted Table',
+          ...(tables as any),
+          id: (tables as any).id || `table-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          name: (tables as any).name || (tables as any).title || 'Extracted Table',
           extractedAt: new Date().toISOString(),
           processingId
         }];
@@ -127,3 +127,4 @@ export const getDocumentDataById = (documentId: string) => {
     return null;
   }
 };
+
