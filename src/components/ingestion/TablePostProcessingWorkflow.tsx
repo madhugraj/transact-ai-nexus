@@ -178,9 +178,21 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
 
   // Get steps for the current workflow
   const getSteps = () => [
-    { id: 'preview', label: 'Preview', status: currentStep === 'preview' ? 'active' : (currentStep === 'validate' || currentStep === 'complete' ? 'complete' : 'pending') },
-    { id: 'validate', label: 'Validate', status: currentStep === 'validate' ? 'active' : (currentStep === 'complete' ? 'complete' : 'pending') },
-    { id: 'complete', label: 'Complete', status: currentStep === 'complete' ? 'active' : 'pending' }
+    { 
+      id: 'preview', 
+      label: 'Preview', 
+      status: currentStep === 'preview' ? 'active' as const : (currentStep === 'validate' || currentStep === 'complete' ? 'complete' as const : 'pending' as const) 
+    },
+    { 
+      id: 'validate', 
+      label: 'Validate', 
+      status: currentStep === 'validate' ? 'active' as const : (currentStep === 'complete' ? 'complete' as const : 'pending' as const) 
+    },
+    { 
+      id: 'complete', 
+      label: 'Complete', 
+      status: currentStep === 'complete' ? 'active' as const : 'pending' as const 
+    }
   ];
 
   return (
