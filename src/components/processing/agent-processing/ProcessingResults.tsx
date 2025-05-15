@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Brain, Eye, Table, Sparkles } from 'lucide-react';
+import { Eye, Table, Sparkles, FileJson } from 'lucide-react';
 import DocumentPreview from '../../ingestion/DocumentPreview';
 import ExtractedTablePreview from '../../ingestion/ExtractedTablePreview';
 import { UploadedFile } from '@/types/fileUpload';
@@ -20,9 +20,30 @@ export const ProcessingResults: React.FC<ProcessingResultsProps> = ({
   getFileUrl,
   files
 }) => {
+  // State to track the active tab
+  const [activeTab, setActiveTab] = useState('document');
+  
   // Check if we have table data to display
   const hasTableData = processingResults?.tableData || 
                      (processingResults?.extractedTables && processingResults.extractedTables.length > 0);
+                     
+  // Get raw JSON for display
+  const getRawJsonForDisplay = () => {
+    if (!processingResults) return null;
+    
+    // Try to get table data first
+    if (processingResults.tableData) {
+      return JSON.stringify(processingResults.tableData, null, 2);
+    }
+    
+    // Then try extracted tables
+    if (processingResults.extractedTables && processingResults.extractedTables.length > 0) {
+      return JSON.stringify({ tables: processingResults.extractedTables }, null, 2);
+    }
+    
+    // If no structured data, return entire results as JSON
+    return JSON.stringify(processingResults, null, 2);
+  };
 
   return (
     <div className="space-y-4">
@@ -31,13 +52,16 @@ export const ProcessingResults: React.FC<ProcessingResultsProps> = ({
       <ProcessingStats processingResults={processingResults} />
       
       {/* Tabs for Document Preview and Extracted Data */}
-      <Tabs defaultValue="document" className="w-full mt-4">
-        <TabsList className="grid w-full grid-cols-2">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mt-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="document" className="flex items-center gap-1">
             <Eye className="h-3.5 w-3.5" /> Document
           </TabsTrigger>
           <TabsTrigger value="extraction" className="flex items-center gap-1">
-            <Table className="h-3.5 w-3.5" /> Extracted Tables
+            <Table className="h-3.5 w-3.5" /> Tables
+          </TabsTrigger>
+          <TabsTrigger value="json" className="flex items-center gap-1">
+            <FileJson className="h-3.5 w-3.5" /> JSON
           </TabsTrigger>
         </TabsList>
         
@@ -92,10 +116,20 @@ export const ProcessingResults: React.FC<ProcessingResultsProps> = ({
             </div>
           )}
         </TabsContent>
+        
+        {/* New JSON tab with minimalist view */}
+        <TabsContent value="json" className="mt-4">
+          <div className="border rounded-md p-4 bg-muted/5">
+            <h4 className="text-sm font-medium mb-2">Raw JSON Data</h4>
+            <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-md overflow-x-auto">
+              <pre className="text-xs font-mono whitespace-pre-wrap">{getRawJsonForDisplay() || "No JSON data available"}</pre>
+            </div>
+          </div>
+        </TabsContent>
       </Tabs>
       
       {/* Insights from Gemini */}
-      {processingResults.insights && (
+      {processingResults?.insights && (
         <div className="p-4 border rounded-md bg-blue-50/30 mt-4">
           <h4 className="text-sm font-medium mb-2 flex items-center">
             <Sparkles className="h-4 w-4 mr-1 text-blue-500" /> 

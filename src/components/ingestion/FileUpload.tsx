@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useFileProcessing } from '@/hooks/useFileProcessing';
@@ -9,7 +10,7 @@ import PostProcessingWorkflow from './PostProcessingWorkflow';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAgentProcessing } from '@/hooks/useAgentProcessing';
 import { useToast } from '@/hooks/use-toast';
-import { fileToBase64, extractTablesFromImageWithGemini } from '@/services/api';
+import { fileToBase64, extractTablesFromImageWithGemini, DEFAULT_TABLE_EXTRACTION_PROMPT } from '@/services/api';
 
 const FileUpload = () => {
   const [showProcessingDialog, setShowProcessingDialog] = useState(false);
@@ -76,34 +77,11 @@ const FileUpload = () => {
         let tableData = null;
         
         // Get the custom prompt if specified or use default
-        const tableExtractionPrompt = processingOptions.ocrSettings?.customPrompt || 
-        `You're an OCR assistant. Read this scanned document image and extract clean, structured text.
-        You are also an expert in extracting tables from scanned images.
-        If the image has Checks, Mention that it is a check image and extract the values accordingly.
-        - Give appropriate title for the image according to the type of image.
-        Instructions:
-        - Extract all clear tabular structures from the image.
-        - Extract all possible tabular structures with data from the image
-        - Extract the Headings of the table {extracted heading}
-        - Avoid any logos or text not part of a structured table.
-        - Output JSON only in the format:
-
-        \`\`\`json
-        {
-          "tables": [
-            {
-              "title": "extracted heading",
-              "headers": ["Column A", "Column B"],
-              "rows": [
-                ["value1", "value2"],
-                ...
-              ]
-            }
-          ]
-        }
-        \`\`\``;
+        const tableExtractionPrompt = processingOptions.ocrSettings?.customPrompt || DEFAULT_TABLE_EXTRACTION_PROMPT;
         
         console.log("Using table extraction prompt:", tableExtractionPrompt);
+        
+        let extractedFiles = [];
         
         for (const file of selectedFiles) {
           if (file.file && (file.file.type.startsWith('image/') || file.file.type === 'application/pdf')) {
@@ -115,6 +93,8 @@ const FileUpload = () => {
             console.log(`Table extraction response for ${file.file.name}:`, tableResponse);
             
             if (tableResponse.success && tableResponse.data) {
+              extractedFiles.push(file.file);
+              
               results.push({
                 fileName: file.file.name,
                 extractedTables: tableResponse.data.tables,
@@ -164,6 +144,7 @@ const FileUpload = () => {
           
           console.log("Setting processing results:", processedResults);
           
+          // Process with agents
           await processWithAgents(selectedFiles, {
             ...processingOptions,
             useGemini: true,

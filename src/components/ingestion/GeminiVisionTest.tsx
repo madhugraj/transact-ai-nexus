@@ -5,38 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { Brain, Image as ImageIcon, FileText, Table as TableIcon, Upload } from 'lucide-react';
+import { FileJson, FileText, Table as TableIcon, Upload } from 'lucide-react';
 import * as api from '@/services/api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import DocumentPreview from './DocumentPreview';
 
 const TableExtraction: React.FC = () => {
   // Default OCR prompt template
-  const defaultPrompt = `You're an OCR assistant. Read this scanned document image and extract clean, structured text.
-You are also an expert in extracting tables from scanned images.
-If the image has Checks, Mention that it is a check image and extract the values accordingly.
-- Give appropriate title for the image according to the type of image.
-Instructions:
-- Extract all clear tabular structures from the image.
-- Extract all possible tabular structures with data from the image
-- Extract the Headings of the table {extracted heading}
-- Avoid any logos or text not part of a structured table.
-- Output JSON only in the format:
-
-\`\`\`json
-{
-  "tables": [
-    {
-      "title": "extracted heading",
-      "headers": ["Column A", "Column B"],
-      "rows": [
-        ["value1", "value2"],
-        ...
-      ]
-    }
-  ]
-}
-\`\`\``;
+  const defaultPrompt = api.DEFAULT_TABLE_EXTRACTION_PROMPT;
 
   // Predefined prompt templates
   const promptTemplates = {
@@ -54,6 +30,7 @@ Instructions:
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('table');
   const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -275,8 +252,36 @@ Instructions:
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
+              {/* Tabs for different views */}
+              <div className="border-b border-gray-200 mb-4">
+                <nav className="flex -mb-px space-x-8">
+                  <button
+                    onClick={() => setActiveTab('table')}
+                    className={`pb-3 px-1 border-b-2 ${activeTab === 'table' 
+                      ? 'border-blue-500 text-blue-600' 
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                  >
+                    <span className="flex items-center">
+                      <TableIcon className="h-4 w-4 mr-2" />
+                      Tables
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('json')}
+                    className={`pb-3 px-1 border-b-2 ${activeTab === 'json' 
+                      ? 'border-blue-500 text-blue-600' 
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                  >
+                    <span className="flex items-center">
+                      <FileJson className="h-4 w-4 mr-2" />
+                      JSON
+                    </span>
+                  </button>
+                </nav>
+              </div>
+
               {/* Table Results */}
-              {tableData && tableData.tables && tableData.tables.length > 0 && (
+              {activeTab === 'table' && tableData && tableData.tables && tableData.tables.length > 0 && (
                 <div className="space-y-2">
                   <h3 className="text-sm font-medium flex items-center">
                     <TableIcon className="h-4 w-4 mr-1" />
@@ -314,18 +319,16 @@ Instructions:
                 </div>
               )}
 
-              {/* Raw JSON Results - Minimalistic View */}
-              {result && (
-                <div className="mt-4 space-y-2 collapse">
-                  <details>
-                    <summary className="text-sm font-medium flex items-center cursor-pointer">
-                      <FileText className="h-4 w-4 mr-1" />
-                      Raw Extracted Text
-                    </summary>
-                    <div className="p-3 border rounded-md bg-muted/10 mt-2 overflow-auto max-h-96">
-                      <pre className="text-xs whitespace-pre-wrap font-mono">{result}</pre>
-                    </div>
-                  </details>
+              {/* JSON View - Minimalist */}
+              {activeTab === 'json' && (
+                <div className="border rounded-md p-4 bg-slate-50 dark:bg-slate-900">
+                  <h3 className="text-sm font-medium flex items-center mb-2">
+                    <FileJson className="h-4 w-4 mr-1" />
+                    Raw JSON Data
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <pre className="text-xs font-mono whitespace-pre-wrap">{tableData ? JSON.stringify(tableData, null, 2) : result || "No data available"}</pre>
+                  </div>
                 </div>
               )}
             </div>
