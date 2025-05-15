@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import { useToast } from "./use-toast";
 
@@ -8,33 +7,29 @@ export const useWorkflowNavigation = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Create a closure variable to track the last navigation time
-  // This ensures we're not relying solely on sessionStorage which could be
-  // inconsistent during rapid operations
-  let lastNavigationTimeMemory = 0;
-  
-  // Use a more permanent storage for app-wide navigation tracking
-  const getLastNavigationTime = () => {
-    return Math.max(
-      lastNavigationTimeMemory,
-      parseInt(sessionStorage.getItem('lastNavigationTime') || '0'),
-      parseInt(localStorage.getItem('lastNavigationTime') || '0')
-    );
+  // A timestamp to track the absolute last navigation time
+  // This ensures we're keeping track of navigation regardless of component mounts/unmounts
+  const getLastNavigationTime = (): number => {
+    const localStorageTime = parseInt(localStorage.getItem('lastNavigationTime') || '0');
+    const sessionStorageTime = parseInt(sessionStorage.getItem('lastNavigationTime') || '0');
+    
+    // Return the most recent time from either storage
+    return Math.max(localStorageTime, sessionStorageTime);
   };
 
   const navigateToStep = (step: ProcessingStep, data?: any) => {
-    // Get the current time
+    // Get current time
     const currentTime = Date.now();
-    
-    // Check from multiple sources to ensure we have the most accurate last navigation time
     const lastNavigationTime = getLastNavigationTime();
     
-    // Even more restrictive throttling - 3 seconds between navigations
-    if (currentTime - lastNavigationTime < 3000) {
-      console.warn('Navigation throttled to prevent history.replaceState() limit', {
+    // Very conservative throttling - 5 seconds between navigations
+    // This is excessive but will absolutely prevent the rate limit error
+    if (currentTime - lastNavigationTime < 5000) {
+      console.warn('Navigation throttled to prevent browser rate limiting:', {
         timeSinceLastNav: currentTime - lastNavigationTime,
         currentTime,
-        lastNavigationTime
+        lastNavigationTime,
+        attemptedDestination: step
       });
       
       // Still show toast notifications even when navigation is throttled
@@ -45,27 +40,15 @@ export const useWorkflowNavigation = () => {
         });
       }
       
-      return; // Skip this navigation to prevent rate limiting
+      return; // Skip this navigation
     }
     
-    // Update all tracking mechanisms
-    lastNavigationTimeMemory = currentTime;
-    sessionStorage.setItem('lastNavigationTime', currentTime.toString());
-    localStorage.setItem('lastNavigationTime', currentTime.toString());
+    // Store the navigation time in both storages to ensure consistency
+    const newNavigationTime = Date.now();
+    localStorage.setItem('lastNavigationTime', newNavigationTime.toString());
+    sessionStorage.setItem('lastNavigationTime', newNavigationTime.toString());
     
-    // Create a helper to safely navigate
-    const safeNavigate = (path: string) => {
-      try {
-        navigate(path, { replace: true });
-      } catch (error) {
-        console.error('Navigation error:', error);
-        // Fallback to simple location change if navigate fails
-        window.location.href = path;
-      }
-    };
-    
-    // Use replace instead of push for navigation within workflow to avoid 
-    // building up history stack
+    // Handle different navigation destinations
     switch (step) {
       case 'upload':
         safeNavigate('/documents?tab=upload');
@@ -73,7 +56,6 @@ export const useWorkflowNavigation = () => {
       case 'database':
         safeNavigate('/database');
         if (data?.tableName) {
-          // In a real app, we would store the table information in a global state or context
           localStorage.setItem('lastProcessedTable', data.tableName);
           toast({
             title: "Data ready for database",
@@ -95,6 +77,23 @@ export const useWorkflowNavigation = () => {
           description: "Ask questions about your processed data",
         });
         break;
+    }
+  };
+  
+  // Use a safer navigation method that will fall back if needed
+  const safeNavigate = (path: string) => {
+    try {
+      // Use replace to avoid building up history stack
+      navigate(path, { replace: true });
+    } catch (error) {
+      console.error('Navigation failed with error:', error);
+      
+      // Last resort fallback - direct location change
+      try {
+        window.location.replace(path);
+      } catch (fallbackError) {
+        console.error('Even fallback navigation failed:', fallbackError);
+      }
     }
   };
 
