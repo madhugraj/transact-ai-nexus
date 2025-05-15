@@ -9,6 +9,18 @@ export const useWorkflowNavigation = () => {
   const { toast } = useToast();
 
   const navigateToStep = (step: ProcessingStep, data?: any) => {
+    // Add a check to prevent rapid navigation
+    const lastNavigationTime = parseInt(sessionStorage.getItem('lastNavigationTime') || '0');
+    const currentTime = Date.now();
+    
+    if (currentTime - lastNavigationTime < 1000) {
+      console.warn('Navigation throttled to prevent history.replaceState() limit');
+      return; // Skip this navigation to prevent rate limiting
+    }
+    
+    // Update the last navigation time
+    sessionStorage.setItem('lastNavigationTime', currentTime.toString());
+    
     switch (step) {
       case 'upload':
         navigate('/documents?tab=upload');
