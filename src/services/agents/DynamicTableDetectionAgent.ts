@@ -1,3 +1,4 @@
+
 import { Agent, ProcessingContext } from "./types";
 import * as api from '@/services/api';
 import { extractTableFromText } from "./tableDetection/textTableExtractor";
@@ -29,21 +30,22 @@ export class DynamicTableDetectionAgent implements Agent {
     // Use the tables extracted by previous agents if available
     const extractedTables = data.extractedTables || [];
     
-    // If we already have tables, use those
-    if (extractedTables.length > 0) {
+    // If we already have tables or table data, use those
+    if (extractedTables.length > 0 || data.tableData) {
       console.log("Using tables from previous agent:", {
         count: extractedTables.length,
-        sample: extractedTables[0]?.headers
+        sample: extractedTables[0]?.headers || data.tableData?.headers
       });
       
       // Format the table data for UI display
-      const tableData = {
+      const tableData = data.tableData || {
         headers: extractedTables[0].headers,
         rows: extractedTables[0].rows,
         metadata: {
           totalRows: extractedTables[0].rows.length,
           confidence: extractedTables[0].confidence || 0.9,
-          sourceFile: data.processingId || "unknown"
+          sourceFile: data.processingId || "unknown",
+          title: extractedTables[0].title || "Extracted Table"
         }
       };
       
@@ -52,7 +54,7 @@ export class DynamicTableDetectionAgent implements Agent {
         fileObjects, // PRESERVE FILE OBJECTS for document preview
         dynamicTableDetection: true,
         tableData: tableData,
-        tableCount: extractedTables.length,
+        tableCount: extractedTables.length || 1,
         extractionComplete: true,
         processedBy: 'DynamicTableDetectionAgent'
       };
@@ -118,6 +120,8 @@ export class DynamicTableDetectionAgent implements Agent {
                   processedBy: 'DynamicTableDetectionAgent'
                 };
               }
+            } else {
+              console.log("Table extraction failed:", tableResponse.error);
             }
           }
         } catch (error) {

@@ -30,9 +30,19 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  console.log("ExtractedTablePreview - Received data:", {
+    fileId,
+    initialData: initialData ? {
+      headers: initialData.headers,
+      rowCount: initialData.rows?.length
+    } : null,
+    isLoading
+  });
+
   // Load table data from API if not provided as initialData
   useEffect(() => {
     if (initialData) {
+      console.log("Setting table data from initialData", initialData);
       setTableData(initialData);
       return;
     }
@@ -50,6 +60,7 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
         const response = await api.getTablePreview(fileId);
         
         if (response.success && response.data) {
+          console.log("Successfully fetched table data from API", response.data);
           setTableData({
             headers: response.data.headers,
             rows: response.data.rows
@@ -104,6 +115,7 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
   
   // No data state
   if (!tableData || !tableData.headers || !tableData.rows || tableData.rows.length === 0) {
+    console.log("No table data available", tableData);
     return (
       <Card className="border-muted/40">
         <CardContent className="p-6 flex flex-col items-center justify-center min-h-[200px]">
@@ -112,6 +124,11 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
       </Card>
     );
   }
+  
+  console.log("Rendering table with data:", {
+    headers: tableData.headers,
+    rowCount: tableData.rows.length
+  });
   
   // Render table data
   return (

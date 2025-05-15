@@ -107,7 +107,8 @@ const FileUpload = () => {
                   rows: tableResponse.data.tables[0].rows,
                   metadata: {
                     title: tableResponse.data.tables[0].title || `Table from ${file.file.name}`,
-                    sourceFile: file.file.name
+                    sourceFile: file.file.name,
+                    totalRows: tableResponse.data.tables[0].rows.length
                   }
                 };
                 
@@ -209,7 +210,7 @@ const FileUpload = () => {
       </div>
       
       {/* Post-processing workflow */}
-      {(processingComplete || agentsProcessingComplete) && (
+      {(processingComplete || agentsProcessingComplete) && processingResults && (
         <PostProcessingWorkflow
           tableName={processingOptions.databaseOptions?.tableName}
           processingType={currentAction}

@@ -37,7 +37,7 @@ export class DisplayAgent implements Agent {
     if (data.tableData) {
       console.log("Table data received:", {
         headers: data.tableData.headers,
-        rowCount: data.tableData.rows.length
+        rowCount: data.tableData.rows?.length || 0
       });
     }
     
@@ -46,7 +46,7 @@ export class DisplayAgent implements Agent {
         count: data.extractedTables.length,
         sample: {
           headers: data.extractedTables[0].headers,
-          rowCount: data.extractedTables[0].rows.length
+          rowCount: data.extractedTables[0].rows?.length || 0
         }
       });
     }
@@ -68,7 +68,8 @@ export class DisplayAgent implements Agent {
     
     // Count tables if available
     const tableCount = data.extractedTables ? data.extractedTables.length : 
-                      (data.tables && Array.isArray(data.tables)) ? data.tables.length : 0;
+                      (data.tables && Array.isArray(data.tables)) ? data.tables.length : 
+                      (data.tableData ? 1 : 0);
     
     // Check if we used Gemini
     const usingGemini = Boolean(geminiResults.length > 0 || data.ocrProvider === "gemini");
@@ -100,7 +101,7 @@ export class DisplayAgent implements Agent {
       uiData.tableData = data.tableData;
       console.log("Table data being passed to UI:", {
         headers: data.tableData.headers,
-        rowCount: data.tableData.rows.length
+        rowCount: data.tableData.rows?.length || 0
       });
     }
     
@@ -111,7 +112,7 @@ export class DisplayAgent implements Agent {
         count: data.extractedTables.length,
         sample: {
           headers: data.extractedTables[0].headers,
-          rowCount: data.extractedTables[0].rows.length
+          rowCount: data.extractedTables[0].rows?.length || 0
         }
       });
     } else if (data.tables && data.tables.length > 0) {

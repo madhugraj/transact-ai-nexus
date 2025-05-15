@@ -23,11 +23,39 @@ export const ProcessingResults: React.FC<ProcessingResultsProps> = ({
   // State to track the active tab
   const [activeTab, setActiveTab] = useState('document');
   
-  // Check if we have table data to display
-  const hasTableData = processingResults?.tableData || 
-                     (processingResults?.extractedTables && processingResults.extractedTables.length > 0);
-                     
-  // Get raw JSON for display
+  // Check if we have table data to display - improved detection logic
+  const hasTableData = Boolean(
+    processingResults?.tableData || 
+    (processingResults?.extractedTables && processingResults.extractedTables.length > 0)
+  );
+  
+  console.log("ProcessingResults - Checking table data:", {
+    hasTableData,
+    tableData: Boolean(processingResults?.tableData),
+    extractedTables: Boolean(processingResults?.extractedTables && processingResults.extractedTables.length > 0),
+    processingResults: processingResults
+  });
+  
+  // Format table data for display
+  const getTableDataForDisplay = () => {
+    if (!processingResults) return null;
+    
+    if (processingResults.tableData) {
+      return {
+        headers: processingResults.tableData.headers,
+        rows: processingResults.tableData.rows
+      };
+    } else if (processingResults.extractedTables && processingResults.extractedTables.length > 0) {
+      return {
+        headers: processingResults.extractedTables[0].headers,
+        rows: processingResults.extractedTables[0].rows
+      };
+    }
+    
+    return null;
+  };
+  
+  // Get raw JSON for display with syntax highlighting
   const getRawJsonForDisplay = () => {
     if (!processingResults) return null;
     
@@ -67,7 +95,7 @@ export const ProcessingResults: React.FC<ProcessingResultsProps> = ({
         
         <TabsContent value="document" className="mt-4 border rounded-md p-4">
           {hasFileToPreview ? (
-            <DocumentPreview fileUrl={getFileUrl()} fileName={files[0].file?.name} fileType={files[0].file?.type} />
+            <DocumentPreview fileUrl={getFileUrl()} fileName={files[0]?.file?.name} fileType={files[0]?.file?.type} />
           ) : (
             <div className="text-center p-6 text-muted-foreground">
               No document available for preview
@@ -76,53 +104,39 @@ export const ProcessingResults: React.FC<ProcessingResultsProps> = ({
         </TabsContent>
         
         <TabsContent value="extraction" className="mt-4">
-          {hasTableData ? (
-            <div className="space-y-4">
-              {processingResults.extractedText && (
-                <div className="border rounded-md p-4 bg-muted/10">
-                  <h4 className="text-sm font-medium mb-2">Extracted Text</h4>
-                  <div className="text-sm max-h-60 overflow-y-auto whitespace-pre-wrap bg-muted/5 p-3 rounded">
-                    {processingResults.extractedText}
-                  </div>
+          <div className="space-y-4">
+            {processingResults?.extractedText && (
+              <div className="border rounded-md p-4 bg-muted/10">
+                <h4 className="text-sm font-medium mb-2">Extracted Text</h4>
+                <div className="text-sm max-h-60 overflow-y-auto whitespace-pre-wrap bg-muted/5 p-3 rounded">
+                  {processingResults.extractedText}
+                </div>
+              </div>
+            )}
+            
+            <div className="border rounded-md p-4">
+              <h4 className="text-sm font-medium mb-2">Extracted Tables</h4>
+              {hasTableData && getTableDataForDisplay() ? (
+                <ExtractedTablePreview 
+                  initialData={getTableDataForDisplay()}
+                />
+              ) : (
+                <div className="text-center p-6 text-muted-foreground">
+                  No tables were extracted from this document
                 </div>
               )}
-              
-              <div className="border rounded-md p-4">
-                <h4 className="text-sm font-medium mb-2">Extracted Tables</h4>
-                {processingResults.tableData ? (
-                  <ExtractedTablePreview 
-                    initialData={{
-                      headers: processingResults.tableData.headers,
-                      rows: processingResults.tableData.rows
-                    }}
-                  />
-                ) : processingResults.extractedTables && processingResults.extractedTables.length > 0 ? (
-                  <ExtractedTablePreview 
-                    initialData={{
-                      headers: processingResults.extractedTables[0].headers,
-                      rows: processingResults.extractedTables[0].rows
-                    }}
-                  />
-                ) : (
-                  <div className="text-center p-6 text-muted-foreground">
-                    No tables were extracted from this document
-                  </div>
-                )}
-              </div>
             </div>
-          ) : (
-            <div className="text-center p-6 text-muted-foreground">
-              No extraction data available
-            </div>
-          )}
+          </div>
         </TabsContent>
         
-        {/* New JSON tab with minimalist view */}
+        {/* JSON tab with minimalist view and syntax highlighting */}
         <TabsContent value="json" className="mt-4">
           <div className="border rounded-md p-4 bg-muted/5">
             <h4 className="text-sm font-medium mb-2">Raw JSON Data</h4>
             <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-md overflow-x-auto">
-              <pre className="text-xs font-mono whitespace-pre-wrap">{getRawJsonForDisplay() || "No JSON data available"}</pre>
+              <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto">
+                {getRawJsonForDisplay() || "No JSON data available"}
+              </pre>
             </div>
           </div>
         </TabsContent>
