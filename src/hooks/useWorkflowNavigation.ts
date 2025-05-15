@@ -12,18 +12,30 @@ export const useWorkflowNavigation = () => {
   // This ensures we're not relying solely on sessionStorage which could be
   // inconsistent during rapid operations
   let lastNavigationTimeMemory = 0;
+  
+  // Use a more permanent storage for app-wide navigation tracking
+  const getLastNavigationTime = () => {
+    return Math.max(
+      lastNavigationTimeMemory,
+      parseInt(sessionStorage.getItem('lastNavigationTime') || '0'),
+      parseInt(localStorage.getItem('lastNavigationTime') || '0')
+    );
+  };
 
   const navigateToStep = (step: ProcessingStep, data?: any) => {
     // Get the current time
     const currentTime = Date.now();
     
-    // Check from memory first, then fallback to sessionStorage
-    const lastNavigationTime = lastNavigationTimeMemory || 
-                              parseInt(sessionStorage.getItem('lastNavigationTime') || '0');
+    // Check from multiple sources to ensure we have the most accurate last navigation time
+    const lastNavigationTime = getLastNavigationTime();
     
-    // More restrictive throttling - 2 seconds between navigations
-    if (currentTime - lastNavigationTime < 2000) {
-      console.warn('Navigation throttled to prevent history.replaceState() limit');
+    // Even more restrictive throttling - 3 seconds between navigations
+    if (currentTime - lastNavigationTime < 3000) {
+      console.warn('Navigation throttled to prevent history.replaceState() limit', {
+        timeSinceLastNav: currentTime - lastNavigationTime,
+        currentTime,
+        lastNavigationTime
+      });
       
       // Still show toast notifications even when navigation is throttled
       if (data?.tableName) {
@@ -36,18 +48,30 @@ export const useWorkflowNavigation = () => {
       return; // Skip this navigation to prevent rate limiting
     }
     
-    // Update both the memory variable and sessionStorage
+    // Update all tracking mechanisms
     lastNavigationTimeMemory = currentTime;
     sessionStorage.setItem('lastNavigationTime', currentTime.toString());
+    localStorage.setItem('lastNavigationTime', currentTime.toString());
+    
+    // Create a helper to safely navigate
+    const safeNavigate = (path: string) => {
+      try {
+        navigate(path, { replace: true });
+      } catch (error) {
+        console.error('Navigation error:', error);
+        // Fallback to simple location change if navigate fails
+        window.location.href = path;
+      }
+    };
     
     // Use replace instead of push for navigation within workflow to avoid 
     // building up history stack
     switch (step) {
       case 'upload':
-        navigate('/documents?tab=upload', { replace: true });
+        safeNavigate('/documents?tab=upload');
         break;
       case 'database':
-        navigate('/database', { replace: true });
+        safeNavigate('/database');
         if (data?.tableName) {
           // In a real app, we would store the table information in a global state or context
           localStorage.setItem('lastProcessedTable', data.tableName);
@@ -58,14 +82,14 @@ export const useWorkflowNavigation = () => {
         }
         break;
       case 'dashboard':
-        navigate('/dashboard', { replace: true });
+        safeNavigate('/dashboard');
         toast({
           title: "Analysis complete",
           description: "Your processed data is now available in the dashboard",
         });
         break;
       case 'assistant':
-        navigate('/assistant', { replace: true });
+        safeNavigate('/assistant');
         toast({
           title: "Ready for AI assistance",
           description: "Ask questions about your processed data",

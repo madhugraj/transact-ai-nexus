@@ -1,18 +1,31 @@
 
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const Index = () => {
   const navigate = useNavigate();
-  const hasRedirected = useRef(false);
+  const [redirected, setRedirected] = useState(false);
 
-  // Redirect to assistant page on load only once
+  // Redirect to assistant page on load only once with a small delay
   useEffect(() => {
-    if (!hasRedirected.current) {
-      hasRedirected.current = true;
-      navigate("/assistant", { replace: true });
+    if (!redirected) {
+      // Use sessionStorage as a more robust way to prevent redirect loops
+      const hasAlreadyRedirected = sessionStorage.getItem('hasRedirectedFromIndex');
+      
+      if (!hasAlreadyRedirected) {
+        // Set both local state and session storage
+        setRedirected(true);
+        sessionStorage.setItem('hasRedirectedFromIndex', 'true');
+        
+        // Small timeout to ensure we're not rapidly navigating
+        const timer = setTimeout(() => {
+          navigate("/assistant", { replace: true });
+        }, 100);
+        
+        return () => clearTimeout(timer);
+      }
     }
-  }, [navigate]);
+  }, [navigate, redirected]);
 
   return <div>Redirecting to AI Assistant...</div>;
 };
