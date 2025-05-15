@@ -31,7 +31,7 @@ export class DynamicTableDetectionAgent implements Agent {
       fileObjectsCount: fileObjects.length
     });
     
-    // Use the tables extracted by PDFTableExtractionAgent if available
+    // Use the tables extracted by previous agents if available
     const extractedTables = data.extractedTables || [];
     
     // If we already have tables, use those
@@ -83,25 +83,8 @@ export class DynamicTableDetectionAgent implements Agent {
       };
     }
     
-    // Fallback - create a mock table if none were found
-    console.log("No tables found from extraction, creating mock table data");
-    
-    const mockTableData = {
-      headers: ['Date', 'Description', 'Amount', 'Balance'],
-      rows: [
-        ['01/27/2023', 'GROCERY STORE', '-$125.65', '$3,245.89'],
-        ['01/30/2023', 'DIRECT DEPOSIT SALARY', '+$2,450.00', '$5,695.89'],
-        ['02/03/2023', 'RENT PAYMENT', '-$1,800.00', '$3,895.89'],
-        ['02/10/2023', 'ONLINE PURCHASE', '-$79.99', '$3,815.90']
-      ],
-      metadata: {
-        totalRows: 4,
-        confidence: 0.85,
-        sourceFile: data.processingId || "unknown"
-      }
-    };
-    
-    if (useGemini && hasGeminiResults) {
+    // If we have text content and Gemini is enabled, try to extract tables from the text
+    if (useGemini && extractedText.length > 0) {
       console.log("Using Gemini for table detection and analysis");
       
       try {
@@ -117,25 +100,48 @@ export class DynamicTableDetectionAgent implements Agent {
         });
         
         if (insightsResponse.success && insightsResponse.data) {
-          return {
-            ...data,
-            fileObjects, // PRESERVE FILE OBJECTS for document preview
-            dynamicTableDetection: true,
-            tableData: mockTableData,
-            extractedTables: [{
-              tableId: "table-gemini-1",
-              headers: mockTableData.headers,
-              rows: mockTableData.rows,
-              confidence: mockTableData.metadata.confidence
-            }],
-            insights: {
-              summary: insightsResponse.data.summary,
-              keyPoints: insightsResponse.data.keyPoints,
-              rawInsights: insightsResponse.data.insights
-            },
-            extractionComplete: true,
-            processedBy: 'DynamicTableDetectionAgent'
-          };
+          // Try to detect table structure from the text using a structured approach
+          const tableStructure = await this.extractTableFromText(extractedText);
+          
+          if (tableStructure && tableStructure.headers.length > 0) {
+            console.log("Successfully extracted table structure from text");
+            
+            return {
+              ...data,
+              fileObjects, // PRESERVE FILE OBJECTS for document preview
+              dynamicTableDetection: true,
+              tableData: tableStructure,
+              extractedTables: [{
+                tableId: "table-gemini-extracted-1",
+                headers: tableStructure.headers,
+                rows: tableStructure.rows,
+                confidence: 0.8
+              }],
+              insights: {
+                summary: insightsResponse.data.summary,
+                keyPoints: insightsResponse.data.keyPoints,
+                rawInsights: insightsResponse.data.insights
+              },
+              extractionComplete: true,
+              processedBy: 'DynamicTableDetectionAgent'
+            };
+          } else {
+            console.log("No table structure detected in text, returning insights only");
+            
+            return {
+              ...data,
+              fileObjects, // PRESERVE FILE OBJECTS for document preview
+              dynamicTableDetection: true,
+              insights: {
+                summary: insightsResponse.data.summary,
+                keyPoints: insightsResponse.data.keyPoints,
+                rawInsights: insightsResponse.data.insights
+              },
+              noTablesDetected: true,
+              extractionComplete: true,
+              processedBy: 'DynamicTableDetectionAgent'
+            };
+          }
         } else {
           console.error("Failed to generate insights:", insightsResponse.error);
         }
@@ -144,23 +150,89 @@ export class DynamicTableDetectionAgent implements Agent {
       }
     }
     
-    // If Gemini failed or is not used, continue with standard processing
-    console.log("Using standard table detection (fallback)");
+    // If all other attempts failed, let the user know
+    console.log("No tables detected through any method");
     
     return {
       ...data, 
       fileObjects, // PRESERVE FILE OBJECTS for document preview
       dynamicTableDetection: false,
-      tableData: mockTableData,
-      extractedTables: [{
-        tableId: "table-standard-1",
-        headers: mockTableData.headers,
-        rows: mockTableData.rows,
-        confidence: mockTableData.metadata.confidence
-      }],
+      noTablesDetected: true,
       extractionComplete: true,
       processedBy: 'DynamicTableDetectionAgent'
     };
+  }
+  
+  private async extractTableFromText(text: string): Promise<{ headers: string[], rows: string[][], metadata: any } | null> {
+    try {
+      // Use Gemini to extract table structure from text
+      const prompt = `
+Extract table data from the following text. If there's a table structure, format it as a JSON object with 'headers' array and 'rows' array of arrays. 
+If no clear table is found, respond with { "found": false }.
+
+TEXT:
+${text}
+
+OUTPUT FORMAT:
+{
+  "found": true,
+  "headers": ["Column1", "Column2", ...],
+  "rows": [
+    ["row1col1", "row1col2", ...],
+    ["row2col1", "row2col2", ...],
+    ...
+  ]
+}`;
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.1,
+              topP: 0.95,
+              topK: 40,
+              maxOutputTokens: 4096
+            }
+          })
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      
+      // Extract JSON from response text
+      const jsonMatch = responseText.match(/\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}/);
+      if (!jsonMatch) {
+        return null;
+      }
+      
+      const parsedData = JSON.parse(jsonMatch[0]);
+      
+      if (!parsedData.found) {
+        return null;
+      }
+      
+      return {
+        headers: parsedData.headers || [],
+        rows: parsedData.rows || [],
+        metadata: {
+          totalRows: (parsedData.rows || []).length,
+          confidence: 0.8,
+          sourceFile: "text-extraction"
+        }
+      };
+    } catch (error) {
+      console.error("Error extracting table from text:", error);
+      return null;
+    }
   }
   
   canProcess(data: any): boolean {

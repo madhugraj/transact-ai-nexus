@@ -5,13 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { Brain, Image as ImageIcon, FileText } from 'lucide-react';
+import { Brain, Image as ImageIcon, FileText, Table as TableIcon } from 'lucide-react';
 import * as api from '@/services/api';
 
 const GeminiVisionTest: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [prompt, setPrompt] = useState<string>('Analyze this image and extract all text and data.');
   const [result, setResult] = useState<string>('');
+  const [tableData, setTableData] = useState<{
+    tables: { title?: string; headers: string[]; rows: string[][]; }[];
+  } | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
   const { toast } = useToast();
@@ -45,6 +48,7 @@ const GeminiVisionTest: React.FC = () => {
     setIsProcessing(true);
     setProgress(10);
     setResult('');
+    setTableData(null);
 
     try {
       // Progress simulation
@@ -69,11 +73,22 @@ const GeminiVisionTest: React.FC = () => {
         selectedFile.type
       );
 
+      // Try to extract tables from the image
+      const tableResponse = await api.extractTablesFromImageWithGemini(
+        base64Image,
+        selectedFile.type
+      );
+
       clearInterval(progressInterval);
       setProgress(100);
 
       if (response.success) {
         setResult(response.data || '');
+        
+        if (tableResponse.success && tableResponse.data) {
+          setTableData(tableResponse.data);
+        }
+        
         toast({
           title: "Image processed successfully",
           description: "Gemini Vision has analyzed your image",
@@ -172,7 +187,46 @@ const GeminiVisionTest: React.FC = () => {
             </div>
           )}
 
-          {/* Results */}
+          {/* Table Results */}
+          {tableData && tableData.tables && tableData.tables.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <h3 className="text-sm font-medium flex items-center">
+                <TableIcon className="h-4 w-4 mr-1" />
+                Extracted Tables
+              </h3>
+              {tableData.tables.map((table, tableIndex) => (
+                <div key={tableIndex} className="border rounded-md p-4 mt-2">
+                  {table.title && <h4 className="font-medium mb-2">{table.title}</h4>}
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead>
+                        <tr>
+                          {table.headers.map((header, i) => (
+                            <th key={i} className="px-3 py-2 bg-muted/50 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                              {header}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {table.rows.map((row, rowIndex) => (
+                          <tr key={rowIndex}>
+                            {row.map((cell, cellIndex) => (
+                              <td key={cellIndex} className="px-3 py-2 whitespace-nowrap text-sm">
+                                {cell}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Text Results */}
           {result && (
             <div className="mt-4 space-y-2">
               <h3 className="text-sm font-medium flex items-center">

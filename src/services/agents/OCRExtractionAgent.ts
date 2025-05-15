@@ -96,50 +96,16 @@ export class OCRExtractionAgent implements Agent {
       }
     }
     
-    // If we don't have Gemini results, generate mock content based on file type
-    if (extractedTextContent.length === 0 && fileObjects && fileObjects.length > 0) {
-      console.log("Using standard OCR processing or mock data");
-      
-      // Generate content based on the first file's type
-      const firstFile = fileObjects[0];
-      
-      if (firstFile.type === 'application/pdf' || firstFile.type.includes('document')) {
-        extractedTextContent = `Sample Bank Statement
-Account Number: XXXX-XXXX-1234
-Statement Period: 01/25/2023 - 02/25/2023
-
-Transaction History:
-Date       | Description           | Amount    | Balance
------------|-----------------------|-----------|----------
-01/27/2023 | GROCERY STORE         | -$125.65  | $3,245.89
-01/30/2023 | DIRECT DEPOSIT SALARY | +$2,450.00| $5,695.89
-02/03/2023 | RENT PAYMENT          | -$1,800.00| $3,895.89
-02/10/2023 | ONLINE PURCHASE       | -$79.99   | $3,815.90
-02/15/2023 | RESTAURANT            | -$65.43   | $3,750.47
-02/20/2023 | UTILITY BILL          | -$124.56  | $3,625.91
-
-Account Summary:
-Starting Balance: $3,371.54
-Total Deposits: $2,450.00
-Total Withdrawals: $2,195.63
-Ending Balance: $3,625.91`;
-      } else if (firstFile.type.includes('image')) {
-        extractedTextContent = "This is extracted text from an image file. The image appears to contain financial information that could be processed into a table.";
-      } else {
-        extractedTextContent = "Extracted content from uploaded file";
-      }
-    }
-    
-    // Return processed data including file objects for document preview!
+    // Return processed data including file objects for document preview
     return {
       processingId: data.processingId,
       fileIds: data.fileIds,
       fileObjects: data.fileObjects, // Pass through the file objects for document preview
-      ocrApplied: true,
+      ocrApplied: Boolean(geminiResults.length > 0),
       ocrSettings,
       geminiResults: geminiResults.length > 0 ? geminiResults : undefined,
-      extractedTextContent,
-      ocrProvider: geminiResults.length > 0 ? "gemini" : "standard",
+      extractedTextContent: extractedTextContent.length > 0 ? extractedTextContent : undefined,
+      ocrProvider: geminiResults.length > 0 ? "gemini" : undefined,
       processedBy: 'OCRExtractionAgent'
     };
   }
