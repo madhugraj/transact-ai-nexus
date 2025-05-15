@@ -28,8 +28,8 @@ function App() {
         <Route path="/actions" element={<Actions />} />
         <Route path="/assistant" element={<Assistant />} />
         <Route path="/settings" element={<Settings />} />
-        <Route path="/email" element={<EmailConnector />} />
-        <Route path="/sap" element={<SapData />} />
+        <Route path="/email-connector" element={<EmailConnector />} />
+        <Route path="/sap-data" element={<SapData />} />
         <Route path="/index" element={<Index />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

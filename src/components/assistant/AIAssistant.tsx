@@ -36,16 +36,68 @@ const AIAssistant: React.FC = () => {
   ]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<string | null>(null);
+  const [processedDocuments, setProcessedDocuments] = useState<Document[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Mock processed documents
-  const processedDocuments: Document[] = [
-    { id: '1', name: 'Invoice_ABC_Corp_May2023.pdf', type: 'document', extractedAt: '2023-05-15 14:32' },
-    { id: '2', name: 'Quarterly_Sales_Report', type: 'table', extractedAt: '2023-05-14 10:15' },
-    { id: '3', name: 'Employee_Expenses_Q2', type: 'table', extractedAt: '2023-05-13 09:45' },
-    { id: '4', name: 'Statement_XYZ_April.pdf', type: 'document', extractedAt: '2023-05-12 16:20' },
-  ];
+  // Load processed documents from localStorage
+  useEffect(() => {
+    const fetchProcessedDocuments = () => {
+      try {
+        // Try to get processed documents from localStorage
+        const processedTablesStr = localStorage.getItem('processedTables');
+        const processedFilesStr = localStorage.getItem('processedFiles');
+        
+        const tables = processedTablesStr ? JSON.parse(processedTablesStr) : [];
+        const files = processedFilesStr ? JSON.parse(processedFilesStr) : [];
+        
+        const docs: Document[] = [
+          ...tables.map((table: any) => ({
+            id: table.id || `table-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            name: table.name || 'Extracted Table',
+            type: 'table',
+            extractedAt: table.extractedAt || new Date().toISOString()
+          })),
+          ...files.map((file: any) => ({
+            id: file.id || file.backendId || `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            name: file.name || file.file?.name || 'Processed Document',
+            type: file.file?.type?.includes('image') ? 'image' : 'document',
+            extractedAt: file.extractedAt || new Date().toISOString()
+          }))
+        ];
+        
+        // If no documents found in localStorage, use mock data for demo
+        if (docs.length === 0) {
+          setProcessedDocuments([
+            { id: '1', name: 'Invoice_ABC_Corp_May2023.pdf', type: 'document', extractedAt: '2023-05-15 14:32' },
+            { id: '2', name: 'Quarterly_Sales_Report', type: 'table', extractedAt: '2023-05-14 10:15' },
+            { id: '3', name: 'Employee_Expenses_Q2', type: 'table', extractedAt: '2023-05-13 09:45' },
+            { id: '4', name: 'Statement_XYZ_April.pdf', type: 'document', extractedAt: '2023-05-12 16:20' },
+          ]);
+        } else {
+          setProcessedDocuments(docs);
+        }
+      } catch (error) {
+        console.error("Error fetching processed documents:", error);
+        // Fallback to mock data if error occurs
+        setProcessedDocuments([
+          { id: '1', name: 'Invoice_ABC_Corp_May2023.pdf', type: 'document', extractedAt: '2023-05-15 14:32' },
+          { id: '2', name: 'Quarterly_Sales_Report', type: 'table', extractedAt: '2023-05-14 10:15' },
+          { id: '3', name: 'Employee_Expenses_Q2', type: 'table', extractedAt: '2023-05-13 09:45' },
+          { id: '4', name: 'Statement_XYZ_April.pdf', type: 'document', extractedAt: '2023-05-12 16:20' },
+        ]);
+      }
+    };
+    
+    fetchProcessedDocuments();
+    
+    // Set up event listener for document processing
+    window.addEventListener('documentProcessed', fetchProcessedDocuments);
+    
+    return () => {
+      window.removeEventListener('documentProcessed', fetchProcessedDocuments);
+    };
+  }, []);
 
   // Scroll to bottom when new messages are added
   useEffect(() => {
@@ -70,18 +122,50 @@ const AIAssistant: React.FC = () => {
     // Simulate AI processing
     setTimeout(() => {
       let responseContent = '';
+      
+      // Get document data if possible
+      let documentData = null;
+      if (selectedDocument) {
+        try {
+          const tablesStr = localStorage.getItem('processedTables');
+          const filesStr = localStorage.getItem('processedFiles');
+          
+          const tables = tablesStr ? JSON.parse(tablesStr) : [];
+          const files = filesStr ? JSON.parse(filesStr) : [];
+          
+          const selectedTable = tables.find((t: any) => t.id === selectedDocument);
+          const selectedFile = files.find((f: any) => f.id === selectedDocument || f.backendId === selectedDocument);
+          
+          documentData = selectedTable || selectedFile || null;
+        } catch (error) {
+          console.error("Error retrieving document data:", error);
+        }
+      }
 
       // Generate different responses based on document selection and query
       if (selectedDocument) {
         const doc = processedDocuments.find(d => d.id === selectedDocument);
-        if (message.toLowerCase().includes('total') || message.toLowerCase().includes('sum')) {
-          responseContent = `Based on the ${doc?.type} "${doc?.name}", the total amount is $12,450.75.`;
-        } else if (message.toLowerCase().includes('date') || message.toLowerCase().includes('when')) {
-          responseContent = `The ${doc?.type} "${doc?.name}" is dated May 15, 2023.`;
-        } else if (message.toLowerCase().includes('who') || message.toLowerCase().includes('vendor')) {
-          responseContent = `The vendor mentioned in ${doc?.name} is ABC Corporation.`;
+        
+        if (documentData) {
+          // Use actual data if available
+          if (message.toLowerCase().includes('total') || message.toLowerCase().includes('sum')) {
+            responseContent = `Based on the ${doc?.type} "${doc?.name}", I've analyzed the data and found several numeric values. If you're looking for a specific total, please clarify which column or field you're interested in.`;
+          } else if (message.toLowerCase().includes('date') || message.toLowerCase().includes('when')) {
+            responseContent = `The ${doc?.type} "${doc?.name}" was processed on ${doc?.extractedAt || new Date().toLocaleString()}. For specific dates within the document, please ask about a particular field.`;
+          } else {
+            responseContent = `I've analyzed the ${doc?.type} "${doc?.name}" and found ${documentData.data ? documentData.data.length + ' records' : 'the following information'}. You can ask specific questions about the content, such as totals, dates, or specific entries.`;
+          }
         } else {
-          responseContent = `I've analyzed the ${doc?.type} "${doc?.name}" and found the following information: This is an invoice for IT services rendered in April 2023, with a total of $12,450.75, due by June 15, 2023.`;
+          // Use generic responses if no data is available
+          if (message.toLowerCase().includes('total') || message.toLowerCase().includes('sum')) {
+            responseContent = `Based on the ${doc?.type} "${doc?.name}", the total amount is $12,450.75.`;
+          } else if (message.toLowerCase().includes('date') || message.toLowerCase().includes('when')) {
+            responseContent = `The ${doc?.type} "${doc?.name}" is dated May 15, 2023.`;
+          } else if (message.toLowerCase().includes('who') || message.toLowerCase().includes('vendor')) {
+            responseContent = `The vendor mentioned in ${doc?.name} is ABC Corporation.`;
+          } else {
+            responseContent = `I've analyzed the ${doc?.type} "${doc?.name}" and found the following information: This is an invoice for IT services rendered in April 2023, with a total of $12,450.75, due by June 15, 2023.`;
+          }
         }
       } else {
         if (message.toLowerCase().includes('table') || message.toLowerCase().includes('extract')) {
@@ -142,18 +226,24 @@ const AIAssistant: React.FC = () => {
               <SelectValue placeholder="Select a document" />
             </SelectTrigger>
             <SelectContent>
-              {processedDocuments.map((doc) => (
-                <SelectItem key={doc.id} value={doc.id}>
-                  <div className="flex items-center">
-                    {doc.type === 'table' ? (
-                      <TableIcon className="h-4 w-4 mr-2 text-blue-500" />
-                    ) : (
-                      <FileText className="h-4 w-4 mr-2 text-blue-500" />
-                    )}
-                    {doc.name}
-                  </div>
-                </SelectItem>
-              ))}
+              {processedDocuments.length === 0 ? (
+                <div className="p-2 text-center text-sm text-muted-foreground">
+                  No processed documents found
+                </div>
+              ) : (
+                processedDocuments.map((doc) => (
+                  <SelectItem key={doc.id} value={doc.id}>
+                    <div className="flex items-center">
+                      {doc.type === 'table' ? (
+                        <TableIcon className="h-4 w-4 mr-2 text-blue-500" />
+                      ) : (
+                        <FileText className="h-4 w-4 mr-2 text-blue-500" />
+                      )}
+                      {doc.name}
+                    </div>
+                  </SelectItem>
+                ))
+              )}
             </SelectContent>
           </Select>
         </CardTitle>
