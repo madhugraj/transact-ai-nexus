@@ -3,11 +3,52 @@ import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { getAgentGraph } from '@/services/agents/AgentRegistry';
 
+// Define the type for agent info
+export interface AgentInfo {
+  id: string;
+  name: string;
+  description: string;
+}
+
 export function useAgentProcessing() {
   const [processing, setProcessing] = useState(false);
   const [processingResults, setProcessingResults] = useState<any>(null);
   const [processingComplete, setProcessingComplete] = useState(false);
   const { toast } = useToast();
+  
+  // Define a list of available agents
+  const agents: AgentInfo[] = [
+    {
+      id: 'DataInput',
+      name: 'Data Input Agent',
+      description: 'Processes incoming files and prepares them for extraction'
+    },
+    {
+      id: 'OCRExtraction',
+      name: 'OCR Extraction',
+      description: 'Extracts text from images and scanned documents'
+    },
+    {
+      id: 'PDFTableExtraction',
+      name: 'PDF Table Extraction',
+      description: 'Extracts tables from PDF documents'
+    },
+    {
+      id: 'ImageTableExtraction',
+      name: 'Image Table Extraction',
+      description: 'Extracts tables from images using Gemini AI'
+    },
+    {
+      id: 'DynamicTableDetection',
+      name: 'Dynamic Table Detection',
+      description: 'Detects and normalizes table structures from various sources'
+    },
+    {
+      id: 'DisplayAgent',
+      name: 'Display Agent',
+      description: 'Formats and prepares extracted data for display'
+    }
+  ];
 
   // Process files using the agent system
   const processFiles = async (files: any[], options?: any) => {
@@ -78,10 +119,11 @@ export function useAgentProcessing() {
   };
 
   return {
-    processing,
+    isProcessing: processing, // Rename processing to isProcessing for component consumption
     processingResults,
     processingComplete,
     processFiles,
-    resetProcessing
+    resetProcessing,
+    agents // Add the agents array to the return value
   };
 }

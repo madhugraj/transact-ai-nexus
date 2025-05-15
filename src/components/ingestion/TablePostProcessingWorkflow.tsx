@@ -119,7 +119,7 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
   };
 
   // Handle export
-  const handleExport = async (format: 'csv' | 'excel') => {
+  const handleExport = async (format: 'csv' | 'xlsx') => {
     if (!fileId) {
       toast({
         title: "Export error",
@@ -141,19 +141,27 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
         return;
       }
       
-      // Create download link
-      const url = window.URL.createObjectURL(response.data!);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `${tableName}.${format === 'csv' ? 'csv' : 'xlsx'}`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      
-      toast({
-        title: "Export successful",
-        description: `Table exported as ${format.toUpperCase()}`,
-      });
+      // Create download link from the blob data
+      if (response.data instanceof Blob) {
+        const url = window.URL.createObjectURL(response.data);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `${tableName}.${format === 'csv' ? 'csv' : 'xlsx'}`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        
+        toast({
+          title: "Export successful",
+          description: `Table exported as ${format.toUpperCase()}`,
+        });
+      } else {
+        toast({
+          title: "Export error",
+          description: "Invalid export data format",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       toast({
         title: "Export error",

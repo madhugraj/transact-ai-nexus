@@ -47,14 +47,26 @@ export const getTablePreview = async (tableId: string, limit: number = 10): Prom
  * Export table data to a specific format
  * @param tableId The ID of the table to export
  * @param format The format to export to (csv, xlsx, json)
- * @returns ApiResponse with the export URL
+ * @returns ApiResponse with a Blob of the exported data
  */
-export const exportTableData = async (tableId: string, format: 'csv' | 'xlsx' | 'json'): Promise<ApiResponse<string>> => {
+export const exportTableData = async (tableId: string, format: 'csv' | 'xlsx' | 'json'): Promise<ApiResponse<Blob>> => {
   return new Promise((resolve) => {
     setTimeout(() => {
+      // Create a simple mock CSV data
+      const csvData = "Category,Value,Percentage,Status\nRevenue,$125430.00,100%,Final\nExpenses,$78500.00,62.6%,Estimated";
+      
+      // Create a blob with the appropriate MIME type
+      const mimeTypes = {
+        'csv': 'text/csv',
+        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'json': 'application/json'
+      };
+      
+      const blob = new Blob([csvData], { type: mimeTypes[format] });
+      
       resolve({
         success: true,
-        data: `https://example.com/api/tables/${tableId}/export?format=${format}&token=mock-download-token`
+        data: blob
       });
     }, 800);
   });
