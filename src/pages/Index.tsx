@@ -1,23 +1,16 @@
-import { useAuth } from "@/components/auth/UserAuthContext";
-import LoginForm from "@/components/auth/LoginForm";
-import AppLayout from "@/components/layout/AppLayout";
-import Dashboard from "./Dashboard";
 
-// Main app entry point
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+
 const Index = () => {
-  const { isAuthenticated } = useAuth();
-  
-  // If user is authenticated, show the main application content
-  if (isAuthenticated) {
-    return (
-      <AppLayout>
-        <Dashboard />
-      </AppLayout>
-    );
-  }
-  
-  // Otherwise show the login form
-  return <LoginForm />;
+  const navigate = useNavigate();
+
+  // Redirect to assistant page on load
+  useEffect(() => {
+    navigate("/assistant");
+  }, [navigate]);
+
+  return <div>Redirecting to AI Assistant...</div>;
 };
 
 export default Index;
