@@ -23,7 +23,7 @@ export const useAIAssistant = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: 'Hello! I am your AI business analyst assistant. I can help you analyze documents and tables that have been processed in the system. Ask me specific questions about your data, and I'll provide insights and business recommendations.',
+      content: 'Hello! I am your AI business analyst assistant. I can help you analyze documents and tables that have been processed in the system. Ask me specific questions about your data, and I\'ll provide insights and business recommendations.',
       sender: 'assistant',
       timestamp: new Date()
     }
@@ -206,3 +206,4 @@ ${message}`;
 };
 
 export default useAIAssistant;
+
