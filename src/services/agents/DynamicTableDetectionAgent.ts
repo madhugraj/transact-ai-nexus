@@ -1,3 +1,4 @@
+
 import { Agent, ProcessingContext } from "./types";
 import * as api from '@/services/api';
 
@@ -177,9 +178,9 @@ OUTPUT FORMAT:
   ]
 }`;
 
-      // Call the Gemini API directly to extract tables
+      // Call the Gemini API directly to extract tables - updated to use gemini-1.5-flash
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk`,
+        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

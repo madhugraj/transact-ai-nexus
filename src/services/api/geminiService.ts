@@ -29,8 +29,9 @@ export const processImageWithGemini = async (
   console.log(`Processing image with Gemini API, prompt length: ${prompt.length}, image length: ${base64Image.length}`);
   
   try {
+    // Using Gemini 1.5 Flash model instead of the deprecated Gemini Pro Vision
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk`,
       {
         method: 'POST',
         headers: {
@@ -176,8 +177,9 @@ export const generateInsightsWithGemini = async (
   console.log(`Generating insights with Gemini, text length: ${text.length}`);
   
   try {
+    // Update to use Gemini 1.5 Flash model for text generation
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk`,
       {
         method: 'POST',
         headers: {
