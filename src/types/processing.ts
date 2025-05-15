@@ -1,32 +1,40 @@
 
-export type PostProcessAction = 'table_extraction' | 'insights' | 'summary' | 'combine_data' | 'push_to_db';
+// Available post-processing actions
+export type PostProcessAction = 
+  | 'table_extraction'
+  | 'combine_data'
+  | 'push_to_db'
+  | 'insights'
+  | 'summary';
 
+// Processing options interface
 export interface ProcessingOptions {
   tableFormat?: {
-    hasHeaders: boolean;
+    hasHeaders?: boolean;
     headerRow?: number;
     skipRows?: number;
-    delimiter?: string;
+    delimiter?: 'auto' | ',' | ';' | '\t';
   };
   dataProcessing?: {
-    normalizeData: boolean;
-    removeEmptyRows: boolean;
-    detectTypes: boolean;
+    normalizeData?: boolean;
+    removeEmptyRows?: boolean;
+    detectTypes?: boolean;
   };
   databaseOptions?: {
-    connection: string;
-    tableName: string;
-    createIfNotExists: boolean;
+    connection?: string;
+    tableName?: string;
+    createIfNotExists?: boolean;
+    updateExisting?: boolean;
+    schema?: Record<string, string>;
   };
   ocrOptions?: {
-    enabled: boolean;
-    enhanceImage: boolean;
-    language: string;
+    enabled?: boolean;
+    enhanceImage?: boolean;
+    language?: string;
   };
   extractionOptions?: {
-    confidenceThreshold: number;
-    retainFormatting: boolean;
-    detectMultipleTables: boolean;
+    confidenceThreshold?: number;
+    retainFormatting?: boolean;
+    detectMultipleTables?: boolean;
   };
-  useGemini?: boolean; // Added this property to support Gemini AI processing
 }

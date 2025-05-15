@@ -2,126 +2,86 @@
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { getAgentGraph } from '@/services/agents/AgentRegistry';
-import { ProcessingOptions } from '@/types/processing';
-import { UploadedFile } from '@/types/fileUpload';
 
 export function useAgentProcessing() {
-  const [processingId, setProcessingId] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [processingComplete, setProcessingComplete] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [processingResults, setProcessingResults] = useState<any>(null);
-  const [processingError, setProcessingError] = useState<string | null>(null);
+  const [processingComplete, setProcessingComplete] = useState(false);
   const { toast } = useToast();
 
-  // Initialize the agent graph
-  const agentGraph = getAgentGraph();
-  
-  // Start the processing pipeline with the DataInput agent
-  const processFiles = async (
-    files: UploadedFile[], 
-    options: ProcessingOptions = {}
-  ) => {
-    if (files.length === 0) {
-      console.error("No files provided for processing");
-      toast({
-        title: "No files to process",
-        description: "Please select files for processing",
-        variant: "destructive",
-      });
-      return;
-    }
+  // Process files using the agent system
+  const processFiles = async (files: any[], options?: any) => {
+    setProcessing(true);
+    setProcessingComplete(false);
+    setProcessingResults(null);
     
-    setIsProcessing(true);
-    setProcessingError(null);
     console.log("Starting processing with options:", options);
     
     try {
-      toast({
-        title: "Processing started",
-        description: `Processing ${files.length} files through agent system`,
-      });
-      
-      const context = { options };
-      
-      // Log important information before processing
-      console.log(`Starting agent processing with ${files.length} files`);
-      console.log("Files:", files.map(f => ({ 
-        id: f.id, 
-        name: f.file?.name, 
+      console.log("Starting agent processing with", files.length, "files");
+      console.log("Files:", files.map(f => ({
+        id: f.id,
+        name: f.file?.name,
         type: f.file?.type,
         backendId: f.backendId,
         size: f.file?.size,
         lastModified: f.file?.lastModified
       })));
-      console.log("Using Gemini:", options.useGemini);
-      console.log("Options:", JSON.stringify(options, null, 2));
+      console.log("Using Gemini:", Boolean(options?.useGemini));
+      console.log("Options:", options);
       
-      // Process through the agent pipeline
+      // Initialize the agent graph
+      const agentGraph = getAgentGraph();
+      
+      // Create processing context with options
+      const context = {
+        options: options || {},
+      };
+      
+      // Process the files with the DataInput agent
       const result = await agentGraph.process(files, "DataInput", context);
       
       console.log("Agent processing result:", result);
       
-      if (result.success) {
-        console.log("Agent processing completed successfully:", result.data);
-        setProcessingId(result.data.processingId);
-        
-        // Make sure to log table data specifically for debugging
-        if (result.data.tableData) {
-          console.log("Table data received:", result.data.tableData);
-        } else if (result.data.extractedTables && result.data.extractedTables.length > 0) {
-          console.log("Extracted tables received:", result.data.extractedTables);
-        } else {
-          console.warn("No table data found in processing results");
-        }
-        
-        setProcessingResults(result.data);
-        setProcessingComplete(true);
-        
-        toast({
-          title: "Processing complete",
-          description: `${files.length} files processed successfully`,
-        });
-      } else {
+      if (!result.success) {
         console.error("Agent processing failed:", result.error);
-        setProcessingError(result.error || "An unknown error occurred");
-        
         toast({
-          title: "Processing failed",
-          description: result.error || "An unknown error occurred",
+          title: "Processing Error",
+          description: result.error || "An unknown error occurred during processing",
           variant: "destructive",
         });
+        return null;
       }
-    } catch (error) {
-      console.error("Agent processing error:", error);
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
-      setProcessingError(errorMessage);
       
+      console.log("Agent processing complete, results:", result.data);
+      setProcessingResults(result.data);
+      setProcessingComplete(true);
+      
+      return result.data;
+    } catch (error) {
+      console.error("Error in agent processing:", error);
       toast({
-        title: "Processing error",
-        description: errorMessage,
+        title: "Processing Error",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       });
+      return null;
     } finally {
-      setIsProcessing(false);
+      setProcessing(false);
     }
   };
-  
-  // Reset the processing state
+
+  // Reset processing state
   const resetProcessing = () => {
-    setProcessingId(null);
-    setProcessingResults(null);
     setProcessingComplete(false);
-    setProcessingError(null);
+    setProcessingResults(null);
   };
-  
+
   return {
-    processingId,
-    isProcessing,
-    processingComplete,
+    processing,
     processingResults,
-    processingError,
+    processingComplete,
     processFiles,
-    resetProcessing,
-    agents: agentGraph.getAvailableAgents()
+    resetProcessing
   };
 }

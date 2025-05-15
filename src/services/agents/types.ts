@@ -1,31 +1,43 @@
 
+/**
+ * Interface for processing context passed between agents
+ */
+export interface ProcessingContext {
+  options?: Record<string, any>;
+  results?: Map<string, any>;
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Interface that all agents must implement
+ */
 export interface Agent {
   id: string;
   name: string;
   description: string;
-  process: (data: any, context?: any) => Promise<any>;
-  canProcess: (data: any) => boolean;
+  
+  /**
+   * Process data with this agent
+   */
+  process(data: any, context?: ProcessingContext): Promise<any>;
+  
+  /**
+   * Determine if this agent can process the given data
+   */
+  canProcess(data: any): boolean;
 }
 
+/**
+ * Node in the agent processing graph
+ */
 export interface AgentNode {
   agent: Agent;
   nextAgents: string[];
 }
 
-export interface AgentGraph {
-  nodes: Map<string, AgentNode>;
-  addNode: (id: string, agent: Agent) => void;
-  connect: (fromId: string, toId: string) => void;
-  process: (inputData: any, startAgentId: string) => Promise<any>;
-}
-
-export interface ProcessingContext {
-  processingId?: string;
-  options?: any;
-  files?: any[];
-  results?: Map<string, any>;
-}
-
+/**
+ * Agent processing result interface
+ */
 export interface ProcessingResult {
   success: boolean;
   data?: any;
@@ -35,4 +47,16 @@ export interface ProcessingResult {
     processingTime: number;
     nextAgent?: string;
   };
+}
+
+/**
+ * Agent graph interface
+ */
+export interface AgentGraph {
+  nodes: Map<string, AgentNode>;
+  
+  addNode(id: string, agent: Agent): void;
+  connect(fromId: string, toId: string): void;
+  process(inputData: any, startAgentId: string, context?: ProcessingContext): Promise<ProcessingResult>;
+  getAvailableAgents(): Agent[];
 }

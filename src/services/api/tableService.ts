@@ -3,66 +3,58 @@ import { ApiResponse } from './types';
 
 export interface TableData {
   headers: string[];
-  rows: string[][];
+  rows: any[][];
   metadata?: {
     totalRows: number;
-    confidence: number;
-    sourceFile: string;
-  }
+    confidence?: number;
+    sourceFile?: string;
+    title?: string;
+  };
 }
 
 /**
- * Get a preview of the extracted table
+ * Get a preview of table data
+ * @param tableId The ID of the table to preview
+ * @param limit The maximum number of rows to return
+ * @returns ApiResponse with the table data
  */
-export const getTablePreview = async (fileId: string): Promise<ApiResponse<TableData>> => {
-  console.log(`Getting table preview for file: ${fileId}`);
-  
-  // Simulate API call with mock data
+export const getTablePreview = async (tableId: string, limit: number = 10): Promise<ApiResponse<TableData>> => {
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve({
         success: true,
         data: {
-          headers: ["Date", "Description", "Amount", "Balance"],
+          headers: ["Category", "Value", "Percentage", "Status"],
           rows: [
-            ["2025-05-01", "Direct Deposit", "+$2,450.00", "$5,678.90"],
-            ["2025-05-02", "ATM Withdrawal", "-$100.00", "$5,578.90"],
-            ["2025-05-03", "Online Payment", "-$245.67", "$5,333.23"],
-            ["2025-05-05", "Check #1234", "-$1,200.00", "$4,133.23"],
-            ["2025-05-10", "Grocery Store", "-$85.75", "$4,047.48"],
+            ["Revenue", "$125,430.00", "100%", "Final"],
+            ["Expenses", "$78,500.00", "62.6%", "Estimated"],
+            ["Profit", "$46,930.00", "37.4%", "Calculated"],
+            ["Taxes", "$11,732.50", "9.4%", "Pending"]
           ],
           metadata: {
-            totalRows: 5,
+            totalRows: 4,
             confidence: 0.95,
-            sourceFile: fileId
+            sourceFile: "financial_report.pdf",
+            title: "Financial Summary"
           }
         }
       });
-    }, 600);
+    }, 500);
   });
 };
 
 /**
  * Export table data to a specific format
+ * @param tableId The ID of the table to export
+ * @param format The format to export to (csv, xlsx, json)
+ * @returns ApiResponse with the export URL
  */
-export const exportTableData = async (fileId: string, format: 'csv' | 'excel'): Promise<ApiResponse<Blob>> => {
-  console.log(`Exporting table data for file: ${fileId} in ${format} format`);
-  
-  // Mock implementation
+export const exportTableData = async (tableId: string, format: 'csv' | 'xlsx' | 'json'): Promise<ApiResponse<string>> => {
   return new Promise((resolve) => {
     setTimeout(() => {
-      // Create a simple CSV string
-      let csvContent = "Date,Description,Amount,Balance\n";
-      csvContent += "2025-05-01,Direct Deposit,+$2450.00,$5678.90\n";
-      csvContent += "2025-05-02,ATM Withdrawal,-$100.00,$5578.90\n";
-      csvContent += "2025-05-03,Online Payment,-$245.67,$5333.23\n";
-      
-      // Convert to blob
-      const blob = new Blob([csvContent], { type: format === 'csv' ? 'text/csv' : 'application/vnd.ms-excel' });
-      
       resolve({
         success: true,
-        data: blob
+        data: `https://example.com/api/tables/${tableId}/export?format=${format}&token=mock-download-token`
       });
     }, 800);
   });

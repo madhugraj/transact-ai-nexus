@@ -8,53 +8,57 @@ export function useFileProcessingOptions() {
       hasHeaders: true,
       headerRow: 1,
       skipRows: 0,
-      delimiter: 'auto',
+      delimiter: 'auto'
     },
     dataProcessing: {
       normalizeData: true,
       removeEmptyRows: true,
-      detectTypes: true,
+      detectTypes: true
     },
     databaseOptions: {
-      connection: 'ERP Database',
-      tableName: '',
-      createIfNotExists: true,
+      connection: 'Default Connection',
+      tableName: 'extracted_data',
+      createIfNotExists: true
     },
     ocrOptions: {
       enabled: false,
       enhanceImage: true,
-      language: 'eng',
+      language: 'eng'
     },
     extractionOptions: {
       confidenceThreshold: 0.8,
       retainFormatting: false,
-      detectMultipleTables: false,
+      detectMultipleTables: false
     }
   });
-
-  // Set default table name based on file name
+  
+  // Set default table name based on file
   const setDefaultTableName = (fileName: string) => {
-    const tableName = fileName.split('.')[0].toLowerCase().replace(/[^a-z0-9]/g, '_');
-    setProcessingOptions(prev => ({
-      ...prev,
+    const sanitizedName = fileName
+      .toLowerCase()
+      .replace(/\.[^/.]+$/, '') // Remove extension
+      .replace(/[^a-z0-9_]/g, '_'); // Replace non-alphanumeric with underscore
+      
+    setProcessingOptions(prevOptions => ({
+      ...prevOptions,
       databaseOptions: {
-        ...prev.databaseOptions,
-        tableName
+        ...prevOptions.databaseOptions,
+        tableName: sanitizedName
       }
     }));
   };
-
-  // Update OCR settings based on file types
-  const updateOcrSettings = (enableOcr: boolean) => {
-    setProcessingOptions(prev => ({
-      ...prev,
+  
+  // Update OCR settings
+  const updateOcrSettings = (enabled: boolean) => {
+    setProcessingOptions(prevOptions => ({
+      ...prevOptions,
       ocrOptions: {
-        ...prev.ocrOptions,
-        enabled: enableOcr
+        ...prevOptions.ocrOptions,
+        enabled
       }
     }));
   };
-
+  
   return {
     processingOptions,
     setProcessingOptions,

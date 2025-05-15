@@ -2,24 +2,40 @@
 import { UploadedFile } from '@/types/fileUpload';
 
 export function useFileTypeDetection() {
-  // Determine if file is a document (PDF/image) or data file (CSV/Excel)
-  const isDocumentFile = (file: File) => {
-    return file.type === 'application/pdf' || file.type.startsWith('image/');
+  // Check if a file is a document (PDF or image)
+  const isDocumentFile = (file: File): boolean => {
+    return (
+      file.type === 'application/pdf' ||
+      file.type.startsWith('image/')
+    );
   };
-
-  // Determine if file is a data file (CSV/Excel)
-  const isDataFile = (file: File) => {
-    return file.type.includes('excel') || file.type.includes('spreadsheet') || file.type === 'text/csv';
+  
+  // Check if a file is a data file (CSV, Excel)
+  const isDataFile = (file: File): boolean => {
+    return (
+      file.type === 'text/csv' ||
+      file.type.includes('excel') ||
+      file.type.includes('spreadsheet') ||
+      file.name.toLowerCase().endsWith('.csv') ||
+      file.name.toLowerCase().endsWith('.xls') ||
+      file.name.toLowerCase().endsWith('.xlsx')
+    );
   };
-
-  // Detect file types for a group of files
+  
+  // Detect file types in a collection
   const detectFileTypes = (files: UploadedFile[]) => {
-    const allDocuments = files.every(file => isDocumentFile(file.file));
-    const allData = files.every(file => isDataFile(file.file));
+    const documentCount = files.filter(file => isDocumentFile(file.file)).length;
+    const dataCount = files.filter(file => isDataFile(file.file)).length;
     
-    return { allDocuments, allData };
+    return {
+      documentCount,
+      dataCount,
+      allDocuments: documentCount === files.length && documentCount > 0,
+      allData: dataCount === files.length && dataCount > 0,
+      mixed: documentCount > 0 && dataCount > 0
+    };
   };
-
+  
   return {
     isDocumentFile,
     isDataFile,

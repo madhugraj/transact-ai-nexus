@@ -4,11 +4,7 @@ export * from './uploadService';
 export * from './processService';
 export * from './fileService';
 export * from './dataService';
-export { 
-  generateInsightsWithGemini,
-  processImageWithGemini,
-  fileToBase64
-} from './geminiService';  // Explicitly export Gemini service functions to avoid conflicts
+export * from './geminiService';  // Export all Gemini service functions
 
 // Export tableService with explicit naming to avoid conflicts
 export { 

@@ -1,63 +1,53 @@
 
 import { ApiResponse } from './types';
-import { ProcessingOptions, PostProcessAction } from '@/types/processing';
-
-export interface ProcessResponse {
-  processingId: string;
-  status: 'queued' | 'processing' | 'completed' | 'failed';
-}
+import { PostProcessAction } from '@/types/processing';
 
 /**
- * Process uploaded files with the specified action
+ * Process a file with the specified action
+ * @param fileIds Array of file IDs to process
+ * @param action The processing action to apply
+ * @param options Additional processing options
+ * @returns ApiResponse with the processing ID
  */
-export const processFile = async (
-  fileIds: string[],
-  action: PostProcessAction,
-  options: ProcessingOptions
-): Promise<ApiResponse<ProcessResponse>> => {
-  console.log(`Processing files ${fileIds.join(', ')} with action: ${action}`);
-  console.log('Processing options:', options);
+export const processFile = async (fileIds: string[], action: PostProcessAction, options: any): Promise<ApiResponse<{processingId: string}>> => {
+  console.log(`Processing files with ${action}:`, fileIds);
+  console.log("Processing options:", options);
   
-  try {
-    // Mock implementation - in a real app this would call an API endpoint
-    // Simulate network delay for more realistic behavior
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    return {
-      success: true,
-      data: {
-        processingId: `proc-${Date.now()}`,
-        status: 'queued'
-      }
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Error processing files'
-    };
-  }
+  return new Promise((resolve) => {
+    // Simulate processing delay
+    setTimeout(() => {
+      const processingId = `process_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      
+      resolve({
+        success: true,
+        data: {
+          processingId
+        }
+      });
+    }, 1200); // Simulated delay
+  });
 };
 
 /**
- * Check the status of a file processing job
+ * Check the status of a processing job
+ * @param processingId The ID of the processing job to check
+ * @returns ApiResponse with the processing status
  */
-export const checkProcessingStatus = async (processingId: string): Promise<ApiResponse<ProcessResponse & { progress: number }>> => {
+export const checkProcessingStatus = async (processingId: string): Promise<ApiResponse<{status: 'pending' | 'processing' | 'completed' | 'failed', progress: number, message?: string}>> => {
   console.log(`Checking processing status for: ${processingId}`);
   
-  try {
-    // Simulate processing status - in a real app this would call an API endpoint
-    return {
-      success: true,
-      data: {
-        processingId,
-        status: 'completed',
-        progress: 100
-      }
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Error checking processing status'
-    };
-  }
+  return new Promise((resolve) => {
+    // Simulate checking delay
+    setTimeout(() => {
+      // For demonstration, return completed status
+      resolve({
+        success: true,
+        data: {
+          status: 'completed',
+          progress: 100,
+          message: 'Processing completed successfully'
+        }
+      });
+    }, 500);
+  });
 };
