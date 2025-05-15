@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useAgentProcessing } from '@/hooks/useAgentProcessing';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { UploadedFile } from '@/types/fileUpload';
 import { ProcessingOptions } from '@/types/processing';
-import { Brain } from 'lucide-react';
+import { Brain, Loader } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import AgentStatusVisualizer from './AgentStatusVisualizer';
 import { AgentsList } from './agent-processing/AgentsList';
@@ -87,8 +88,9 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
               </Badge>
             </div>
             {isProcessing && (
-              <Badge variant="outline" className="bg-blue-50 text-blue-600">
-                Processing
+              <Badge variant="outline" className="bg-blue-50 text-blue-600 flex items-center">
+                <Loader className="h-3.5 w-3.5 mr-1 animate-spin" />
+                Processing...
               </Badge>
             )}
             {processingComplete && (
@@ -127,16 +129,24 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
                 files={files} 
               />
             ) : (
-              <div className="p-6 border rounded-md text-center">
-                {hasFileToPreview ? (
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-medium">Document Preview</h4>
-                    <DocumentPreview fileUrl={getFileUrl()} fileName={files[0].file?.name} fileType={files[0].file?.type} />
+              <div className="p-6 border rounded-md">
+                {isProcessing ? (
+                  <div className="text-center space-y-4">
+                    <Loader className="h-8 w-8 animate-spin mx-auto text-blue-500" />
+                    <p className="text-muted-foreground">Processing document with Gemini AI...</p>
+                    <p className="text-xs text-muted-foreground">This may take a few moments depending on the document size.</p>
                   </div>
                 ) : (
-                  <div className="text-muted-foreground">
-                    Select files to preview and process
-                  </div>
+                  hasFileToPreview ? (
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-medium">Document Preview</h4>
+                      <DocumentPreview fileUrl={getFileUrl()} fileName={files[0].file?.name} fileType={files[0].file?.type} />
+                    </div>
+                  ) : (
+                    <div className="text-center text-muted-foreground">
+                      Select files to preview and process
+                    </div>
+                  )
                 )}
               </div>
             )}

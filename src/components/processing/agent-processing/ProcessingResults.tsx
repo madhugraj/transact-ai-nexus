@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Eye, Table, Sparkles, FileJson } from 'lucide-react';
+import { Eye, Table, Sparkles, FileJson, Loader } from 'lucide-react';
 import DocumentPreview from '../../ingestion/DocumentPreview';
 import ExtractedTablePreview from '../../ingestion/ExtractedTablePreview';
 import { UploadedFile } from '@/types/fileUpload';
@@ -22,6 +22,7 @@ export const ProcessingResults: React.FC<ProcessingResultsProps> = ({
 }) => {
   // State to track the active tab
   const [activeTab, setActiveTab] = useState('document');
+  const [isTableLoading, setIsTableLoading] = useState(false);
   
   // Check if we have table data to display - improved detection logic
   const hasTableData = Boolean(
@@ -35,6 +36,17 @@ export const ProcessingResults: React.FC<ProcessingResultsProps> = ({
     extractedTables: Boolean(processingResults?.extractedTables && processingResults.extractedTables.length > 0),
     processingResults: processingResults
   });
+
+  // Show table loading state when switching to extraction tab
+  useEffect(() => {
+    if (activeTab === 'extraction') {
+      setIsTableLoading(true);
+      const timer = setTimeout(() => {
+        setIsTableLoading(false);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab]);
   
   // Format table data for display
   const getTableDataForDisplay = () => {
@@ -116,7 +128,12 @@ export const ProcessingResults: React.FC<ProcessingResultsProps> = ({
             
             <div className="border rounded-md p-4">
               <h4 className="text-sm font-medium mb-2">Extracted Tables</h4>
-              {hasTableData && getTableDataForDisplay() ? (
+              {isTableLoading ? (
+                <div className="flex flex-col items-center justify-center p-8 text-center">
+                  <Loader className="h-8 w-8 animate-spin mb-3 text-blue-500" />
+                  <p className="text-muted-foreground">Preparing table data...</p>
+                </div>
+              ) : hasTableData && getTableDataForDisplay() ? (
                 <ExtractedTablePreview 
                   initialData={getTableDataForDisplay()}
                 />

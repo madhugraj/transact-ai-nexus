@@ -43,12 +43,21 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
   useEffect(() => {
     if (initialData) {
       console.log("Setting table data from initialData", initialData);
-      setTableData(initialData);
+      // Validate initial data structure
+      if (initialData.headers && Array.isArray(initialData.headers) && 
+          initialData.rows && Array.isArray(initialData.rows)) {
+        setTableData(initialData);
+      } else {
+        console.error("Invalid table data structure:", initialData);
+        setError("Invalid table data structure");
+      }
+      setLoading(false);
       return;
     }
     
     if (!fileId) {
       setError("No file or data provided for table preview");
+      setLoading(false);
       return;
     }
     
@@ -113,9 +122,14 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
     );
   }
   
+  // Check if we have valid table data
+  const isValidTableData = tableData && 
+    Array.isArray(tableData.headers) && tableData.headers.length > 0 &&
+    Array.isArray(tableData.rows) && tableData.rows.length > 0;
+  
   // No data state
-  if (!tableData || !tableData.headers || !tableData.rows || tableData.rows.length === 0) {
-    console.log("No table data available", tableData);
+  if (!isValidTableData) {
+    console.log("No valid table data available", tableData);
     return (
       <Card className="border-muted/40">
         <CardContent className="p-6 flex flex-col items-center justify-center min-h-[200px]">

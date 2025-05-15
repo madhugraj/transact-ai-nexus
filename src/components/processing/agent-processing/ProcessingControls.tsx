@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
+import { Loader } from 'lucide-react';
 
 interface ProcessingControlsProps {
   isProcessing: boolean;
@@ -36,7 +37,14 @@ export const ProcessingControls: React.FC<ProcessingControlsProps> = ({
             disabled={isProcessing || filesLength === 0}
             className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
           >
-            Start Processing with Gemini
+            {isProcessing ? (
+              <>
+                <Loader className="h-4 w-4 animate-spin mr-2" />
+                Processing...
+              </>
+            ) : (
+              "Start Processing with Gemini"
+            )}
           </Button>
         </>
       )}
