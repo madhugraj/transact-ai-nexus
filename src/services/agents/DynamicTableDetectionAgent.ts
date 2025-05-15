@@ -1,3 +1,4 @@
+
 import { Agent, ProcessingContext } from "./types";
 import * as api from '@/services/api';
 
@@ -62,6 +63,7 @@ export class DynamicTableDetectionAgent implements Agent {
         fileObjects, // PRESERVE FILE OBJECTS for document preview
         dynamicTableDetection: true,
         tableData: tableData, // Make sure this is properly formatted
+        tableCount: extractedTables.length,
         extractionComplete: true,
         processedBy: 'DynamicTableDetectionAgent'
       };
@@ -78,6 +80,7 @@ export class DynamicTableDetectionAgent implements Agent {
         ...data,
         fileObjects, // PRESERVE FILE OBJECTS for document preview
         dynamicTableDetection: true,
+        tableCount: 1,
         extractionComplete: true,
         processedBy: 'DynamicTableDetectionAgent'
       };
@@ -117,6 +120,7 @@ export class DynamicTableDetectionAgent implements Agent {
                 rows: tableStructure.rows,
                 confidence: 0.8
               }],
+              tableCount: 1,
               insights: {
                 summary: insightsResponse.data.summary,
                 keyPoints: insightsResponse.data.keyPoints,
@@ -184,6 +188,7 @@ OUTPUT FORMAT:
   ]
 }`;
 
+      // Call the Gemini API directly to extract tables
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk`,
         {

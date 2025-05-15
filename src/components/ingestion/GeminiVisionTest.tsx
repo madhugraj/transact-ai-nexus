@@ -74,7 +74,30 @@ const GeminiVisionTest: React.FC = () => {
       );
 
       // Try to extract tables from the image
-      const tableResponse = await api.extractTablesFromImageWithGemini(
+      const tableExtractPrompt = `
+You are an expert in extracting tables from scanned images.
+Instructions:
+- Extract all clear tabular structures from the image.
+- Output JSON only in the format:
+\`\`\`json
+{
+  "tables": [
+    {
+      "title": "optional title",
+      "headers": ["Column A", "Column B"],
+      "rows": [
+        ["value1", "value2"],
+        ...
+      ]
+    }
+  ]
+}
+\`\`\``;
+
+      // Use the processImageWithGemini function as a fallback since extractTablesFromImageWithGemini 
+      // might not be available yet in the build
+      const tableResponse = await api.processImageWithGemini(
+        tableExtractPrompt,
         base64Image,
         selectedFile.type
       );
@@ -86,7 +109,18 @@ const GeminiVisionTest: React.FC = () => {
         setResult(response.data || '');
         
         if (tableResponse.success && tableResponse.data) {
-          setTableData(tableResponse.data);
+          try {
+            // Try to parse table data from the response
+            const jsonMatch = tableResponse.data.match(/\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}/);
+            if (jsonMatch) {
+              const parsedData = JSON.parse(jsonMatch[0]);
+              if (parsedData.tables && Array.isArray(parsedData.tables)) {
+                setTableData(parsedData);
+              }
+            }
+          } catch (parseError) {
+            console.error("Failed to parse table data:", parseError);
+          }
         }
         
         toast({
@@ -96,7 +130,7 @@ const GeminiVisionTest: React.FC = () => {
       } else {
         toast({
           title: "Processing failed",
-          description: response.error,
+          description: response.error || "An error occurred during processing",
           variant: "destructive",
         });
       }

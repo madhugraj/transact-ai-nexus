@@ -4,6 +4,7 @@ export * from './uploadService';
 export * from './processService';
 export * from './fileService';
 export * from './dataService';
+export * from './geminiService';  // Make sure geminiService is explicitly exported
 
 // Export tableService with explicit naming to avoid conflicts
 export { 
