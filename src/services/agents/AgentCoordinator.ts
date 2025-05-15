@@ -10,13 +10,8 @@ export class AgentCoordinator implements AgentGraph {
       throw new Error(`Agent with id ${id} already exists in the graph`);
     }
     
-    const agentWithId = {
-      ...agent,
-      id
-    };
-    
     this.nodes.set(id, {
-      agent: agentWithId,
+      agent,
       nextAgents: []
     });
   }
@@ -49,14 +44,14 @@ export class AgentCoordinator implements AgentGraph {
     }
     
     try {
-      console.log(`🤖 ${node.agent.name} agent starting...`);
+      console.log(`🤖 ${startAgentId} agent starting...`);
       const startTime = performance.now();
       
       // Process data with current agent
       const result = await node.agent.process(inputData, context);
       const processingTime = performance.now() - startTime;
       
-      console.log(`✅ ${node.agent.name} completed in ${processingTime.toFixed(2)}ms`);
+      console.log(`✅ ${startAgentId} completed in ${processingTime.toFixed(2)}ms`);
       
       // Store result in context
       context.results.set(startAgentId, result);
@@ -92,10 +87,10 @@ export class AgentCoordinator implements AgentGraph {
       
       return processedResult;
     } catch (error) {
-      console.error(`Agent ${node.agent.name} error:`, error);
+      console.error(`Agent ${node.agent?.name || startAgentId} error:`, error);
       
       toast({
-        title: `${node.agent.name} Error`,
+        title: `${node.agent?.name || startAgentId} Error`,
         description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       });

@@ -11,9 +11,11 @@ export interface AgentInfo {
 }
 
 export function useAgentProcessing() {
-  const [processing, setProcessing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [processingResults, setProcessingResults] = useState<any>(null);
   const [processingComplete, setProcessingComplete] = useState(false);
+  const [activeAgent, setActiveAgent] = useState<string | null>(null);
+  const [agentsHistory, setAgentsHistory] = useState<Array<{id: string, status: 'pending' | 'active' | 'complete' | 'error', timestamp: Date}>>([]);
   const { toast } = useToast();
   
   // Define a list of available agents
@@ -52,9 +54,10 @@ export function useAgentProcessing() {
 
   // Process files using the agent system
   const processFiles = async (files: any[], options?: any) => {
-    setProcessing(true);
+    setIsProcessing(true);
     setProcessingComplete(false);
     setProcessingResults(null);
+    setAgentsHistory([]);
     
     console.log("Starting processing with options:", options);
     
@@ -78,9 +81,25 @@ export function useAgentProcessing() {
       const context = {
         options: options || {},
       };
+
+      // Add an event listener for agent status changes
+      const agentStatusListener = (agentId: string, status: 'pending' | 'active' | 'complete' | 'error') => {
+        setActiveAgent(status === 'active' ? agentId : null);
+        setAgentsHistory(prev => [...prev, {
+          id: agentId,
+          status,
+          timestamp: new Date()
+        }]);
+      };
       
       // Process the files with the DataInput agent
+      setActiveAgent('DataInput');
+      agentStatusListener('DataInput', 'active');
+      
       const result = await agentGraph.process(files, "DataInput", context);
+      
+      // Mark DataInput as complete
+      agentStatusListener('DataInput', result.success ? 'complete' : 'error');
       
       console.log("Agent processing result:", result);
       
@@ -108,7 +127,8 @@ export function useAgentProcessing() {
       });
       return null;
     } finally {
-      setProcessing(false);
+      setIsProcessing(false);
+      setActiveAgent(null);
     }
   };
 
@@ -116,14 +136,18 @@ export function useAgentProcessing() {
   const resetProcessing = () => {
     setProcessingComplete(false);
     setProcessingResults(null);
+    setAgentsHistory([]);
+    setActiveAgent(null);
   };
 
   return {
-    isProcessing: processing, // Rename processing to isProcessing for component consumption
+    isProcessing,
     processingResults,
     processingComplete,
+    activeAgent,
+    agentsHistory,
     processFiles,
     resetProcessing,
-    agents // Add the agents array to the return value
+    agents
   };
 }

@@ -13,6 +13,7 @@ import { FileText, Database, Layers, Sparkles, Settings, Brain, Eye, Table } fro
 import DocumentPreview from '../ingestion/DocumentPreview';
 import ExtractedTablePreview from '../ingestion/ExtractedTablePreview';
 import { useToast } from '@/hooks/use-toast';
+import AgentStatusVisualizer from './AgentStatusVisualizer';
 
 interface AgentProcessingSystemProps {
   files: UploadedFile[];
@@ -31,7 +32,9 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
     processingResults,
     processFiles,
     resetProcessing,
-    agents
+    agents,
+    activeAgent,
+    agentsHistory
   } = useAgentProcessing();
   
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
@@ -114,6 +117,15 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
         </CardHeader>
         <CardContent>
           <div className="space-y-5">
+            {/* Agent Status Visualizer */}
+            {(isProcessing || processingComplete) && (
+              <AgentStatusVisualizer 
+                activeAgent={activeAgent}
+                agentsHistory={agentsHistory}
+                agents={agents}
+              />
+            )}
+            
             {/* Agent List */}
             <div className="space-y-3">
               <h3 className="text-sm font-medium">Processing Agents with Gemini AI</h3>
@@ -138,7 +150,7 @@ const AgentProcessingSystem: React.FC<AgentProcessingSystemProps> = ({
             </div>
             
             <Separator />
-            
+
             {/* Processing Status */}
             {isProcessing && (
               <div className="space-y-2">

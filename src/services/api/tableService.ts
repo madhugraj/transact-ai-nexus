@@ -1,73 +1,88 @@
 
 import { ApiResponse } from './types';
 
-export interface TableData {
-  headers: string[];
-  rows: any[][];
-  metadata?: {
-    totalRows: number;
-    confidence?: number;
-    sourceFile?: string;
-    title?: string;
-  };
-}
-
 /**
- * Get a preview of table data
- * @param tableId The ID of the table to preview
- * @param limit The maximum number of rows to return
- * @returns ApiResponse with the table data
+ * Get a preview of a table
+ * @param fileId ID of the file to preview
+ * @returns ApiResponse with table data
  */
-export const getTablePreview = async (tableId: string, limit: number = 10): Promise<ApiResponse<TableData>> => {
+export const getTablePreview = async (fileId: string): Promise<ApiResponse<any>> => {
   return new Promise((resolve) => {
+    // Simulate API call
     setTimeout(() => {
       resolve({
         success: true,
         data: {
-          headers: ["Category", "Value", "Percentage", "Status"],
+          headers: ["Date", "Description", "Amount", "Category"],
           rows: [
-            ["Revenue", "$125,430.00", "100%", "Final"],
-            ["Expenses", "$78,500.00", "62.6%", "Estimated"],
-            ["Profit", "$46,930.00", "37.4%", "Calculated"],
-            ["Taxes", "$11,732.50", "9.4%", "Pending"]
+            ["2023-01-15", "Office Supplies", "$120.50", "Expenses"],
+            ["2023-01-22", "Client Payment", "$1,500.00", "Income"],
+            ["2023-02-05", "Software Subscription", "$49.99", "Expenses"],
+            ["2023-02-15", "Consulting Services", "$2,500.00", "Income"],
+            ["2023-03-01", "Server Costs", "$150.00", "Expenses"]
           ],
           metadata: {
-            totalRows: 4,
+            totalRows: 5,
             confidence: 0.95,
-            sourceFile: "financial_report.pdf",
-            title: "Financial Summary"
+            sourceFile: fileId
           }
         }
       });
-    }, 500);
+    }, 800);
   });
 };
 
 /**
- * Export table data to a specific format
- * @param tableId The ID of the table to export
- * @param format The format to export to (csv, xlsx, json)
- * @returns ApiResponse with a Blob of the exported data
+ * Export table data to a file format
+ * @param fileId ID of the file to export
+ * @param format Format to export to (csv, xlsx, json)
+ * @returns ApiResponse with blob data
  */
-export const exportTableData = async (tableId: string, format: 'csv' | 'xlsx' | 'json'): Promise<ApiResponse<Blob>> => {
+export const exportTableData = async (fileId: string, format: 'csv' | 'xlsx' | 'json'): Promise<ApiResponse<Blob>> => {
   return new Promise((resolve) => {
+    // Simulate API call with delay
     setTimeout(() => {
-      // Create a simple mock CSV data
-      const csvData = "Category,Value,Percentage,Status\nRevenue,$125430.00,100%,Final\nExpenses,$78500.00,62.6%,Estimated";
+      // Create a mock blob with appropriate content
+      let blob: Blob;
       
-      // Create a blob with the appropriate MIME type
-      const mimeTypes = {
-        'csv': 'text/csv',
-        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'json': 'application/json'
-      };
-      
-      const blob = new Blob([csvData], { type: mimeTypes[format] });
+      switch(format) {
+        case 'csv':
+          // Mock CSV content
+          blob = new Blob([
+            'Date,Description,Amount,Category\n' +
+            '2023-01-15,"Office Supplies",$120.50,Expenses\n' +
+            '2023-01-22,"Client Payment",$1500.00,Income\n' +
+            '2023-02-05,"Software Subscription",$49.99,Expenses\n' +
+            '2023-02-15,"Consulting Services",$2500.00,Income\n' +
+            '2023-03-01,"Server Costs",$150.00,Expenses'
+          ], { type: 'text/csv' });
+          break;
+          
+        case 'xlsx':
+          // Mock Excel blob (not real Excel, just a placeholder)
+          blob = new Blob(['Excel data would be here'], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          break;
+          
+        case 'json':
+          // Mock JSON content
+          const jsonData = {
+            headers: ["Date", "Description", "Amount", "Category"],
+            rows: [
+              ["2023-01-15", "Office Supplies", "$120.50", "Expenses"],
+              ["2023-01-22", "Client Payment", "$1,500.00", "Income"],
+              ["2023-02-05", "Software Subscription", "$49.99", "Expenses"],
+              ["2023-02-15", "Consulting Services", "$2,500.00", "Income"],
+              ["2023-03-01", "Server Costs", "$150.00", "Expenses"]
+            ]
+          };
+          blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+          break;
+      }
       
       resolve({
         success: true,
         data: blob
       });
-    }, 800);
+    }, 1000);
   });
 };
