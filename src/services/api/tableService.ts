@@ -1,12 +1,23 @@
 
 import { ApiResponse } from './types';
 
+// Define the TableData type that was missing
+export interface TableData {
+  headers: string[];
+  rows: string[][];
+  metadata?: {
+    totalRows: number;
+    confidence: number;
+    sourceFile: string;
+  };
+}
+
 /**
  * Get a preview of a table
  * @param fileId ID of the file to preview
  * @returns ApiResponse with table data
  */
-export const getTablePreview = async (fileId: string): Promise<ApiResponse<any>> => {
+export const getTablePreview = async (fileId: string): Promise<ApiResponse<TableData>> => {
   return new Promise((resolve) => {
     // Simulate API call
     setTimeout(() => {

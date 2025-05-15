@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,10 @@ import ExtractedTablePreview from './ExtractedTablePreview';
 import DocumentPreview from './DocumentPreview';
 import { useToast } from '@/hooks/use-toast';
 import * as api from '@/services/api';
+import { WorkflowSteps } from './workflow/WorkflowSteps';
+import { PreviewTab } from './workflow/PreviewTab';
+import { ValidateTab } from './workflow/ValidateTab';
+import { CompleteTab } from './workflow/CompleteTab';
 
 interface TablePostProcessingWorkflowProps {
   processingId?: string;
@@ -30,7 +35,7 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
   const [currentStep, setCurrentStep] = useState<'preview' | 'validate' | 'complete'>('preview');
   const [activeTab, setActiveTab] = useState('document');
   const [isEditing, setIsEditing] = useState(false);
-  const [tableData, setTableData] = useState<any | null>(null);
+  const [tableData, setTableData] = useState<api.TableData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
@@ -146,7 +151,7 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
         const url = window.URL.createObjectURL(response.data);
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', `${tableName}.${format === 'csv' ? 'csv' : 'xlsx'}`);
+        link.setAttribute('download', `${tableName}.${format}`);
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -193,159 +198,42 @@ const TablePostProcessingWorkflow: React.FC<TablePostProcessingWorkflowProps> = 
           </CardTitle>
         </div>
         
-        {/* Progress Steps */}
-        <div className="flex items-center justify-center mt-4">
-          {getSteps().map((step, index) => (
-            <React.Fragment key={step.id}>
-              <div className="flex flex-col items-center">
-                <div 
-                  className={`w-8 h-8 rounded-full flex items-center justify-center 
-                    ${step.status === 'active' ? 'bg-primary text-primary-foreground' : 
-                      step.status === 'complete' ? 'bg-green-100 text-green-700' : 
-                      'bg-muted text-muted-foreground'}`}
-                >
-                  {step.status === 'complete' ? <Check className="h-4 w-4" /> : index + 1}
-                </div>
-                <span className={`text-xs mt-1 ${step.status === 'active' ? 'font-medium' : ''}`}>
-                  {step.label}
-                </span>
-              </div>
-              
-              {index < getSteps().length - 1 && (
-                <ChevronRight className="h-4 w-4 mx-2 text-muted-foreground" />
-              )}
-            </React.Fragment>
-          ))}
-        </div>
+        <WorkflowSteps steps={getSteps()} />
       </CardHeader>
       
       <CardContent className="p-6">
         <Tabs value={currentStep} className="w-full">
           <TabsContent value="preview" className="mt-0">
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Document & Table Preview</h3>
-                <Button 
-                  onClick={() => setCurrentStep('validate')}
-                  className="gap-1"
-                  disabled={!tableData && !isLoading}
-                >
-                  Continue <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-              
-              {/* Preview tabs */}
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-2 mb-4">
-                  <TabsTrigger value="document" className="flex items-center gap-1">
-                    <FileText className="h-3.5 w-3.5" /> Document
-                  </TabsTrigger>
-                  <TabsTrigger value="table" className="flex items-center gap-1">
-                    <TableIcon className="h-3.5 w-3.5" /> Extracted Table
-                  </TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="document" className="mt-0">
-                  <DocumentPreview 
-                    fileUrl={fileUrl} 
-                    fileName={fileName || undefined}
-                    fileType={fileType || undefined}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="table" className="mt-0">
-                  <ExtractedTablePreview 
-                    fileId={fileId}
-                    initialData={tableData ? { headers: tableData.headers, rows: tableData.rows } : undefined}
-                    isLoading={isLoading}
-                  />
-                </TabsContent>
-              </Tabs>
-            </div>
+            <PreviewTab 
+              tableData={tableData} 
+              isLoading={isLoading} 
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              fileUrl={fileUrl}
+              fileName={fileName}
+              fileType={fileType}
+              fileId={fileId}
+              onContinue={() => setCurrentStep('validate')}
+            />
           </TabsContent>
           
           <TabsContent value="validate" className="mt-0">
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Validate Data</h3>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setIsEditing(!isEditing)}
-                    disabled={!tableData}
-                  >
-                    {isEditing ? 'Done Editing' : (
-                      <>
-                        <Edit className="h-4 w-4 mr-1" /> Edit Data
-                      </>
-                    )}
-                  </Button>
-                  <Button 
-                    onClick={() => setCurrentStep('complete')}
-                    className="gap-1"
-                  >
-                    Confirm <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              
-              {isEditing ? (
-                <div className="border rounded-md p-4 bg-muted/30">
-                  <p className="text-center text-muted-foreground mb-4">
-                    Table editing mode would be implemented here
-                  </p>
-                  <ExtractedTablePreview 
-                    fileId={fileId}
-                    initialData={tableData ? { headers: tableData.headers, rows: tableData.rows } : undefined}
-                  />
-                </div>
-              ) : (
-                <ExtractedTablePreview 
-                  fileId={fileId}
-                  initialData={tableData ? { headers: tableData.headers, rows: tableData.rows } : undefined}
-                />
-              )}
-            </div>
+            <ValidateTab
+              tableData={tableData}
+              fileId={fileId}
+              isEditing={isEditing}
+              setIsEditing={setIsEditing}
+              onContinue={() => setCurrentStep('complete')}
+            />
           </TabsContent>
           
           <TabsContent value="complete" className="mt-0">
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-medium">Extraction Complete</h3>
-                <p className="text-muted-foreground">
-                  Your table has been successfully extracted and processed.
-                </p>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => onViewInDatabase && onViewInDatabase()}
-                >
-                  <Database className="mr-2 h-4 w-4" />
-                  View in Database
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => fileId && handleExport('csv')}
-                  disabled={!fileId}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Export Data
-                </Button>
-              </div>
-              
-              <div className="pt-4 border-t">
-                <Button 
-                  onClick={onClose}
-                  className="w-full"
-                >
-                  Close
-                </Button>
-              </div>
-            </div>
+            <CompleteTab
+              fileId={fileId}
+              onViewInDatabase={onViewInDatabase}
+              handleExport={handleExport}
+              onClose={onClose}
+            />
           </TabsContent>
         </Tabs>
       </CardContent>
