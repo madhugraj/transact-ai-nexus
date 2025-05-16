@@ -29,7 +29,15 @@ serve(async (req) => {
     
     switch(service_name.toLowerCase()) {
       case 'gemini':
-        apiKey = Deno.env.get('GEMINI_API_KEY') || "AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk" // Default API key for testing
+        // Try to get the API key from the stored Supabase secret first
+        apiKey = Deno.env.get('Gemini_key') || null;
+        if (!apiKey) {
+          // Fallback to the default key only if Gemini_key is not set
+          apiKey = "AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk";
+          console.log("Using fallback API key for Gemini");
+        } else {
+          console.log("Using configured Gemini API key from secrets");
+        }
         break;
       // Add other services as needed
       default:
@@ -45,6 +53,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
+    console.error("Error in get_service_key:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }

@@ -1,9 +1,14 @@
+
 import { ApiResponse } from '../types';
 import { supabase } from "@/integrations/supabase/client";
 
 interface GeminiInsightResponse {
   insights?: string;
   summary?: string;
+}
+
+interface ServiceKeyParams {
+  service_name: string;
 }
 
 export const generateInsightsWithGemini = async (
@@ -17,10 +22,9 @@ export const generateInsightsWithGemini = async (
     console.log(`Table context (sample): ${tableContext.substring(0, 100)}...`);
     console.log(`Analysis prompt (sample): ${analysisPrompt.substring(0, 100)}...`);
     
-    // Fix: Use the correct typings for the RPC call
-    const { data, error } = await supabase.rpc('get_service_key', {
-      service_name: 'gemini'
-    } as { service_name: string });
+    // Fix: Define proper types for the RPC call
+    const params: ServiceKeyParams = { service_name: 'gemini' };
+    const { data, error } = await supabase.rpc('get_service_key', params);
     
     if (error) throw error;
     
