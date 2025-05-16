@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
 
@@ -32,6 +31,7 @@ export const ensureStorageBucketExists = async () => {
       
       if (error) {
         console.error('Error creating storage bucket:', error);
+        
         // Check for more specific error types and provide better feedback
         if (error.message.includes('duplicate key value')) {
           console.log('Bucket already exists (race condition). Continuing...');
@@ -40,7 +40,10 @@ export const ensureStorageBucketExists = async () => {
         
         if (error.message.includes('row-level security')) {
           console.error('This appears to be a permissions error. RLS policies may need to be configured.');
+          // With our new RLS policies, this error should not occur anymore
+          return false;
         }
+        
         return false;
       }
       
@@ -70,7 +73,7 @@ export const uploadFileToStorage = async (file: File): Promise<{ path: string; f
     
     if (!bucketExists) {
       console.error('Storage bucket does not exist and could not be created');
-      return null;
+      throw new Error('Failed to initialize storage bucket. Storage may not be properly configured.');
     }
     
     const fileExt = file.name.split('.').pop();
@@ -87,7 +90,7 @@ export const uploadFileToStorage = async (file: File): Promise<{ path: string; f
       
     if (error) {
       console.error('Error uploading file to storage:', error);
-      return null;
+      throw new Error(`Upload failed: ${error.message}`);
     }
     
     console.log('File uploaded successfully:', data);
@@ -113,7 +116,7 @@ export const uploadFileToStorage = async (file: File): Promise<{ path: string; f
     return { path: data.path, fileId: fileData.id };
   } catch (error) {
     console.error('Error in uploadFileToStorage:', error);
-    return null;
+    throw error; // Re-throw so the error can be handled by the caller
   }
 };
 

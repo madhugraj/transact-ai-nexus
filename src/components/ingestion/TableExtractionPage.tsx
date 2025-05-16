@@ -41,11 +41,15 @@ const TableExtractionPage: React.FC = () => {
           setUploadError('Failed to initialize storage. Please try again later.');
           toast({
             title: "Storage Error",
-            description: "Failed to initialize storage. Please check your permissions or try again later.",
+            description: "Failed to initialize storage. The RLS policies may need to be configured.",
             variant: "destructive",
           });
         } else {
           console.log("Storage bucket exists and is ready for use");
+          toast({
+            title: "Storage Ready",
+            description: "Storage has been successfully initialized and is ready to use.",
+          });
         }
       } catch (err) {
         console.error("Error checking storage bucket:", err);
@@ -148,101 +152,119 @@ const TableExtractionPage: React.FC = () => {
       
       console.log("Uploading file to storage...");
       // Upload file to Supabase storage
-      const storageResult = await uploadFileToStorage(file);
-      
-      if (!storageResult) {
-        setUploadError("Failed to upload file to storage. Please try again.");
-        console.error("Failed to upload file to storage");
-        throw new Error("Failed to upload file to storage");
-      }
-      
-      console.log("File uploaded successfully, extracting tables...");
-      toast({
-        title: "Upload successful",
-        description: "Now extracting tables from document...",
-      });
-      
-      // Use Gemini Vision to extract tables from image
-      const base64File = await fileToBase64(file);
-      console.log("File converted to base64, sending to Gemini...");
-      
-      const extractResult = await extractTablesFromImageWithGemini(
-        base64File,
-        file.type
-      );
-      
-      // Stop progress simulation
-      stopProgress();
-      setProcessingProgress(100);
-      
-      if (!extractResult.success || !extractResult.data?.tables || extractResult.data.tables.length === 0) {
-        const errorMessage = extractResult.error || "No tables found in the image. Try with another image that contains clear tabular data.";
-        setError(errorMessage);
-        setIsProcessing(false);
+      try {
+        const storageResult = await uploadFileToStorage(file);
+        
+        if (!storageResult) {
+          setUploadError("Failed to upload file to storage. Please try again.");
+          console.error("Failed to upload file to storage");
+          throw new Error("Failed to upload file to storage");
+        }
+        
+        console.log("File uploaded successfully, extracting tables...");
         toast({
-          title: "Extraction failed",
+          title: "Upload successful",
+          description: "Now extracting tables from document...",
+        });
+        
+        // Use Gemini Vision to extract tables from image
+        const base64File = await fileToBase64(file);
+        console.log("File converted to base64, sending to Gemini...");
+        
+        const extractResult = await extractTablesFromImageWithGemini(
+          base64File,
+          file.type
+        );
+        
+        // Stop progress simulation
+        stopProgress();
+        setProcessingProgress(100);
+        
+        if (!extractResult.success || !extractResult.data?.tables || extractResult.data.tables.length === 0) {
+          const errorMessage = extractResult.error || "No tables found in the image. Try with another image that contains clear tabular data.";
+          setError(errorMessage);
+          setIsProcessing(false);
+          toast({
+            title: "Extraction failed",
+            description: errorMessage,
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        console.log('Extraction successful:', extractResult.data);
+        
+        // Get the first table
+        const firstTable = extractResult.data.tables[0];
+        
+        // Save to Supabase
+        if (storageResult.fileId) {
+          console.log("Saving extracted table to Supabase...");
+          const tableId = await saveExtractedTable(
+            storageResult.fileId,
+            firstTable.title || `Table from ${file.name}`,
+            firstTable.headers,
+            firstTable.rows,
+            firstTable.confidence || 0.9
+          );
+          
+          console.log('Table saved to Supabase with ID:', tableId);
+          
+          if (tableId) {
+            // Include the Supabase IDs in the extracted data
+            firstTable.id = tableId;
+            firstTable.fileId = storageResult.fileId;
+          }
+        }
+        
+        // Save to local storage for AI Assistant
+        await saveProcessedTables([{
+          id: firstTable.id || `table-${uuidv4()}`,
+          title: firstTable.title || `Table from ${file.name}`,
+          name: firstTable.title || `Table from ${file.name}`,
+          headers: firstTable.headers,
+          rows: firstTable.rows,
+          confidence: firstTable.confidence || 0.9,
+          fileId: storageResult.fileId,
+          extractedAt: new Date().toISOString()
+        }]);
+        
+        // Set the extracted data
+        setExtractedData({
+          headers: firstTable.headers,
+          rows: firstTable.rows,
+          metadata: {
+            totalRows: firstTable.rows.length,
+            confidence: firstTable.confidence || 0.9,
+            sourceFile: file.name
+          }
+        });
+        
+        // Switch to the results tab
+        setActiveTab('results');
+        
+        // Show success toast
+        toast({
+          title: "Extraction successful",
+          description: `Found ${extractResult.data.tables.length} table(s) in the document`,
+        });
+      } catch (uploadError) {
+        stopProgress();
+        setProcessingProgress(0);
+        setIsProcessing(false);
+        
+        const errorMessage = uploadError instanceof Error 
+          ? uploadError.message 
+          : "Failed to upload file. Please check your connection and try again.";
+        
+        setUploadError(errorMessage);
+        toast({
+          title: "Upload Error",
           description: errorMessage,
           variant: "destructive",
         });
         return;
       }
-      
-      console.log('Extraction successful:', extractResult.data);
-      
-      // Get the first table
-      const firstTable = extractResult.data.tables[0];
-      
-      // Save to Supabase
-      if (storageResult.fileId) {
-        console.log("Saving extracted table to Supabase...");
-        const tableId = await saveExtractedTable(
-          storageResult.fileId,
-          firstTable.title || `Table from ${file.name}`,
-          firstTable.headers,
-          firstTable.rows,
-          firstTable.confidence || 0.9
-        );
-        
-        console.log('Table saved to Supabase with ID:', tableId);
-        
-        if (tableId) {
-          // Include the Supabase IDs in the extracted data
-          firstTable.id = tableId;
-          firstTable.fileId = storageResult.fileId;
-        }
-      }
-      
-      // Save to local storage for AI Assistant
-      await saveProcessedTables([{
-        id: firstTable.id || `table-${uuidv4()}`,
-        title: firstTable.title || `Table from ${file.name}`,
-        name: firstTable.title || `Table from ${file.name}`,
-        headers: firstTable.headers,
-        rows: firstTable.rows,
-        confidence: firstTable.confidence || 0.9,
-        fileId: storageResult.fileId,
-        extractedAt: new Date().toISOString()
-      }]);
-      
-      // Set the extracted data
-      setExtractedData({
-        headers: firstTable.headers,
-        rows: firstTable.rows,
-        metadata: {
-          totalRows: firstTable.rows.length,
-          confidence: firstTable.confidence || 0.9,
-          sourceFile: file.name
-        }
-      });
-      
-      // Switch to the results tab
-      setActiveTab('results');
-      
-      // Show success toast
-      toast({
-        title: "Extraction successful",
-        description: `Found ${extractResult.data.tables.length} table(s) in the document`,
-      });
     } catch (error) {
       console.error('Error extracting table:', error);
       setError(error instanceof Error ? error.message : "Unknown error occurred during extraction");
