@@ -1,5 +1,6 @@
 
 import { ApiResponse } from '../types';
+import { supabase } from "@/integrations/supabase/client";
 
 interface GeminiInsightResponse {
   insights?: string;
@@ -12,38 +13,79 @@ export const generateInsightsWithGemini = async (
 ): Promise<ApiResponse<GeminiInsightResponse>> => {
   try {
     console.log("Generating insights with Gemini API");
-    console.log("Table context length:", tableContext.length);
-    console.log("Analysis prompt:", analysisPrompt.substring(0, 100) + "...");
     
-    // Simulate API call - in production this would call the Gemini API
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Debug the inputs
+    console.log(`Table context (sample): ${tableContext.substring(0, 100)}...`);
+    console.log(`Analysis prompt (sample): ${analysisPrompt.substring(0, 100)}...`);
     
-    // Generate a more dynamic response based on the table context
-    let insightText = "Based on the provided data, here are key insights:\n\n";
+    // Check if we have the Gemini API key configured
+    const { data: secrets } = await supabase.rpc('get_service_key', { service_name: 'gemini' });
+    const hasValidKey = secrets && secrets.length > 0;
     
-    if (tableContext.includes("sales") || tableContext.includes("revenue")) {
-      insightText += "1. The sales data shows potential growth opportunities in certain segments.\n\n" +
-                     "2. There are seasonal patterns in the revenue that can be leveraged for better forecasting.\n\n" +
-                     "3. Some products are consistently outperforming others.\n\n";
-    } else if (tableContext.includes("expense") || tableContext.includes("cost")) {
-      insightText += "1. Several expense categories show opportunities for cost reduction.\n\n" +
-                     "2. There are patterns in expenditure that may indicate inefficient resource allocation.\n\n" +
-                     "3. The cost structure reveals areas where automation might improve margins.\n\n";
-    } else if (tableContext.includes("customer") || tableContext.includes("client")) {
-      insightText += "1. Customer engagement metrics reveal opportunities to improve retention rates.\n\n" +
-                     "2. There appear to be underserved customer segments that merit additional focus.\n\n" +
-                     "3. Certain customer acquisition channels are performing better than others.\n\n";
-    } else {
-      insightText += "1. The table contains important financial information that could be used for business analysis.\n\n" +
-                     "2. Several patterns in the data suggest opportunities for optimization in your business processes.\n\n" +
-                     "3. There appear to be some outliers in the data that merit further investigation.\n\n";
+    if (!hasValidKey) {
+      console.log("No Gemini API key found, using mock response");
+      // This is where the generic mock response is being used
+      return {
+        success: true,
+        data: {
+          insights: "⚠️ This is a simulated response because the Gemini API key is not configured.\n\n" +
+                   "To get real AI-powered insights on your data, please configure a Gemini API key in the settings.\n\n" +
+                   "Based on the provided data, here is a sample of what insights would look like:\n\n" +
+                   "1. The data shows potential patterns that would be analyzed in detail with the actual API.\n\n" +
+                   "2. Key metrics would be automatically identified and trends highlighted.\n\n" +
+                   "3. Anomalies and outliers would be detected and flagged for your attention."
+        }
+      };
     }
     
-    insightText += "Recommended actions:\n" +
-                   "- Review the highlighted transactions for accuracy\n" +
-                   "- Consider segmenting your data by date ranges for better trend analysis\n" +
-                   "- Implement regular monitoring of the key metrics identified in this analysis\n" +
-                   "- Conduct a deeper analysis of the outliers to identify root causes";
+    // For a real implementation, we would call the Gemini API here
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": secrets[0]
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: `You are a business data analyst. Analyze the following table data and provide specific insights:\n\n${tableContext}\n\n${analysisPrompt}`
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.2,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 1024,
+        }
+      })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Gemini API error:", errorText);
+      throw new Error(`Gemini API returned status ${response.status}: ${errorText}`);
+    }
+    
+    const geminiResponse = await response.json();
+    console.log("Gemini response received:", geminiResponse);
+    
+    // Extract insight text from the Gemini response
+    let insightText = "";
+    if (geminiResponse.candidates && geminiResponse.candidates.length > 0 && 
+        geminiResponse.candidates[0].content && geminiResponse.candidates[0].content.parts) {
+      insightText = geminiResponse.candidates[0].content.parts
+        .filter(part => part.text)
+        .map(part => part.text)
+        .join("\n\n");
+    }
+    
+    if (!insightText) {
+      throw new Error("No insight text found in Gemini response");
+    }
     
     return {
       success: true,

@@ -1,8 +1,9 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { generateInsightsWithGemini } from '@/services/api/gemini/insightGenerator';
 import { Message } from '@/components/assistant/MessageList';
 import { Document } from '@/components/assistant/DocumentSelector.d';
+import { supabase } from '@/integrations/supabase/client';
 
 // Enhanced business analyst prompt template with specific instructions for table analysis
 export const BUSINESS_ANALYST_PROMPT = `You are a business data analyst. Given the table data and user query, find the answer from the provided table only.
@@ -62,6 +63,22 @@ const formatTableForPrompt = (documentData: any): string => {
  */
 export const useAIGeneration = () => {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isGeminiConfigured, setIsGeminiConfigured] = useState<boolean | null>(null);
+
+  // Check if Gemini API is configured
+  useEffect(() => {
+    const checkGeminiConfig = async () => {
+      try {
+        const { data } = await supabase.rpc('get_service_key', { service_name: 'gemini' });
+        setIsGeminiConfigured(Boolean(data && data.length > 0));
+      } catch (error) {
+        console.error("Error checking Gemini configuration:", error);
+        setIsGeminiConfigured(false);
+      }
+    };
+    
+    checkGeminiConfig();
+  }, []);
 
   /**
    * Generate AI response based on a user message and document data
@@ -79,6 +96,13 @@ export const useAIGeneration = () => {
           content: documentName
             ? `I'd like to analyze "${documentName}" for you, but I don't have access to its data. Please try selecting another document or uploading a document with extractable data.`
             : "Please select a document from the dropdown above to analyze. I need data to work with in order to provide insights. You can upload and process documents in the Documents section."
+        };
+      }
+      
+      if (isGeminiConfigured === false) {
+        return {
+          content: "⚠️ Gemini API is not configured. To get AI-powered analysis of your documents, please configure a Gemini API key in the settings. Currently using simulated responses.",
+          error: "Gemini API not configured"
         };
       }
       
@@ -100,6 +124,8 @@ ${tableContext}
 
 User query:
 ${userMessage}`;
+      
+      console.log("Calling Gemini API for insights");
       
       // Call Gemini API for insights
       const response = await generateInsightsWithGemini(tableContext, analysisPrompt);
@@ -139,6 +165,7 @@ ${userMessage}`;
 
   return {
     isProcessing,
+    isGeminiConfigured,
     generateAIResponse,
     generateDocumentWelcomeMessage
   };

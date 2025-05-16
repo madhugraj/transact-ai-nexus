@@ -2,11 +2,14 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import DocumentSelector from './DocumentSelector';
 import useAIAssistant from '@/hooks/useAIAssistant';
-import { PieChart, BarChart3, Table as TableIcon, BrainCircuit, MessagesSquare, FileText, Loader2 } from 'lucide-react';
+import { PieChart, BarChart3, Table as TableIcon, BrainCircuit, MessagesSquare, FileText, Loader2, AlertCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const AIAssistant: React.FC = () => {
   const {
@@ -18,7 +21,8 @@ const AIAssistant: React.FC = () => {
     selectedDocument,
     handleSendMessage,
     handleDocumentChange,
-    isLoadingDocuments
+    isLoadingDocuments,
+    isGeminiConfigured
   } = useAIAssistant();
 
   const hasDocuments = processedDocuments.length > 0;
@@ -70,6 +74,18 @@ const AIAssistant: React.FC = () => {
               </Badge>
             )}
           </div>
+        )}
+        
+        {isGeminiConfigured === false && (
+          <Alert className="mt-3 bg-amber-50 border-amber-200 text-amber-800">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-xs">
+              Gemini API key not configured. Using simulated responses.
+              <Link to="/settings" className="ml-2 underline">
+                Configure in Settings
+              </Link>
+            </AlertDescription>
+          </Alert>
         )}
       </CardHeader>
       

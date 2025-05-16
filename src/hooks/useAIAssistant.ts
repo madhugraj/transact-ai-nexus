@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Message } from '@/components/assistant/MessageList';
@@ -32,6 +31,7 @@ export const useAIAssistant = () => {
   // AI generation capabilities
   const {
     isProcessing,
+    isGeminiConfigured,
     generateAIResponse,
     generateDocumentWelcomeMessage
   } = useAIGeneration();
@@ -174,6 +174,7 @@ export const useAIAssistant = () => {
     isLoadingDocuments,
     selectedDocument,
     processedDocuments,
+    isGeminiConfigured,
     handleSendMessage,
     handleDocumentChange,
     addSystemMessage
