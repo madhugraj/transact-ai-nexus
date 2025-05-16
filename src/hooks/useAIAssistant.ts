@@ -55,13 +55,12 @@ export const useAIAssistant = () => {
             console.log(`Fetched ${extractedTables.length} tables from Supabase:`, extractedTables);
             
             // Map Supabase data to Document format with proper typing
-            const supabaseDocs = extractedTables.map(table => ({
+            const supabaseDocs: Document[] = extractedTables.map(table => ({
               id: table.id,
               name: table.title || 'Extracted Table',
-              type: 'table' as 'table' | 'document' | 'image',
+              type: 'table' as const,
               extractedAt: table.created_at,
-              // Fix: Use literal 'supabase' instead of string "supabase"
-              source: 'supabase' as 'supabase',
+              source: 'supabase' as const,
               data: {
                 headers: table.headers,
                 rows: table.rows
@@ -134,7 +133,7 @@ export const useAIAssistant = () => {
   // Function to get document data, prioritizing Supabase data
   const getDocumentData = async (documentId: string) => {
     // Check if it's a Supabase document
-    const supabaseDoc = processedDocuments.find(d => d.id === documentId && (d as any).source === 'supabase');
+    const supabaseDoc = processedDocuments.find(d => d.id === documentId && d.source === 'supabase');
     
     if (supabaseDoc) {
       console.log("Fetching Supabase document data:", documentId);

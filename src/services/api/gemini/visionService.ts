@@ -15,9 +15,22 @@ export const processImageWithGemini = async (
   console.log(`Processing image with Gemini API, prompt length: ${prompt.length}, image length: ${base64Image.length}`);
   
   try {
+    // Use the Gemini API key from Supabase secrets (environment variables)
+    const geminiApiKey = process.env.GEMINI_API_KEY || 
+                         localStorage.getItem('Gemini_key') || 
+                         'AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk'; // Fallback to hardcoded key only as last resort
+    
+    if (!geminiApiKey) {
+      console.error("Gemini API key not found");
+      return {
+        success: false,
+        error: "Gemini API key not configured"
+      };
+    }
+    
     // Using Gemini 1.5 Flash model instead of the deprecated Gemini Pro Vision
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: {

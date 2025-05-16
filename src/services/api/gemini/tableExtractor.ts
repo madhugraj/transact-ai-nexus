@@ -56,17 +56,60 @@ export const extractTablesFromImageWithGemini = async (
   
   // Try to extract JSON from the response
   try {
-    const jsonMatch = response.data.match(/```json\s*(\{[\s\S]*?\})\s*```/) || 
-                     response.data.match(/\{[\s\S]*"tables"[\s\S]*\}/);
+    // Enhanced JSON extraction pattern to handle different formats
+    const jsonMatch = 
+      // Look for JSON code blocks
+      response.data.match(/```json\s*(\{[\s\S]*?\})\s*```/) || 
+      // Look for JSON code blocks without the 'json' label
+      response.data.match(/```\s*(\{[\s\S]*?\})\s*```/) ||
+      // Look for JSON patterns
+      response.data.match(/\{[\s\S]*"tables"[\s\S]*\}/) ||
+      // Look for any object pattern
+      response.data.match(/\{[\s\S]*\}/);
                      
     if (jsonMatch) {
       const jsonStr = jsonMatch[1] || jsonMatch[0];
-      const parsedData = JSON.parse(jsonStr);
-      console.log("Successfully extracted table data:", parsedData);
-      return {
-        success: true,
-        data: parsedData
-      };
+      
+      try {
+        const parsedData = JSON.parse(jsonStr.trim());
+        console.log("Successfully extracted table data:", parsedData);
+        
+        // Validate the structure of the parsed data
+        if (!parsedData.tables || !Array.isArray(parsedData.tables)) {
+          console.error("Invalid table structure in extracted JSON, missing 'tables' array");
+          
+          // Try to construct a valid structure if possible
+          if (parsedData.headers && parsedData.rows) {
+            return {
+              success: true,
+              data: {
+                tables: [{
+                  title: "Extracted Table",
+                  headers: parsedData.headers,
+                  rows: parsedData.rows
+                }]
+              }
+            };
+          }
+          
+          return {
+            success: false,
+            error: "Invalid table structure in extracted JSON"
+          };
+        }
+        
+        return {
+          success: true,
+          data: parsedData
+        };
+      } catch (parseError) {
+        console.error("Error parsing JSON:", parseError);
+        console.error("JSON string that failed to parse:", jsonStr);
+        return {
+          success: false,
+          error: "Failed to parse extracted JSON"
+        };
+      }
     } else {
       console.error("Could not find JSON in response:", response.data);
       return {

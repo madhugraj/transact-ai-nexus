@@ -11,6 +11,10 @@ export interface Document {
   type: 'table' | 'document' | 'image';
   extractedAt: string;
   source?: 'supabase' | 'localStorage';
+  data?: {
+    headers: string[] | Record<string, string>;
+    rows: string[][] | Record<string, string>[];
+  };
 }
 
 interface DocumentSelectorProps {

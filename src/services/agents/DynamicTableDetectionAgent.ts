@@ -2,6 +2,7 @@
 import { Agent, ProcessingContext } from "./types";
 import * as api from '@/services/api';
 import { extractTableFromText } from "./tableDetection/textTableExtractor";
+import { supabase } from "@/integrations/supabase/client";
 
 export class DynamicTableDetectionAgent implements Agent {
   id: string = "DynamicTableDetection";
@@ -48,6 +49,29 @@ export class DynamicTableDetectionAgent implements Agent {
           title: extractedTables[0].title || "Extracted Table"
         }
       };
+      
+      // Try to save to Supabase if we have valid data
+      if (tableData && tableData.headers && tableData.rows) {
+        try {
+          const { error } = await supabase
+            .from('extracted_tables')
+            .insert({
+              title: tableData.metadata?.title || "Extracted Table",
+              headers: tableData.headers,
+              rows: tableData.rows,
+              confidence: tableData.metadata?.confidence || 0.9,
+              file_id: data.fileIds && data.fileIds.length > 0 ? data.fileIds[0] : null
+            });
+            
+          if (error) {
+            console.error("Error saving table to Supabase:", error);
+          } else {
+            console.log("Successfully saved table to Supabase");
+          }
+        } catch (err) {
+          console.error("Exception saving table to Supabase:", err);
+        }
+      }
       
       return {
         ...data, 
@@ -96,6 +120,27 @@ export class DynamicTableDetectionAgent implements Agent {
                   }
                 };
                 
+                // Try to save to Supabase
+                try {
+                  const { error } = await supabase
+                    .from('extracted_tables')
+                    .insert({
+                      title: extractedTable.title || `Table from ${file.name}`,
+                      headers: extractedTable.headers,
+                      rows: extractedTable.rows,
+                      confidence: 0.9,
+                      file_id: data.fileIds && data.fileIds.length > 0 ? data.fileIds[0] : null
+                    });
+                    
+                  if (error) {
+                    console.error("Error saving table to Supabase:", error);
+                  } else {
+                    console.log("Successfully saved table to Supabase");
+                  }
+                } catch (err) {
+                  console.error("Exception saving table to Supabase:", err);
+                }
+                
                 console.log("Extracted table data:", {
                   headers: tableData.headers,
                   rowCount: tableData.rows.length,
@@ -137,6 +182,27 @@ export class DynamicTableDetectionAgent implements Agent {
       
       if (tableStructure && tableStructure.headers.length > 0) {
         console.log("Successfully extracted table structure from text");
+        
+        // Try to save to Supabase
+        try {
+          const { error } = await supabase
+            .from('extracted_tables')
+            .insert({
+              title: "Extracted Table from Text",
+              headers: tableStructure.headers,
+              rows: tableStructure.rows,
+              confidence: 0.8,
+              file_id: data.fileIds && data.fileIds.length > 0 ? data.fileIds[0] : null
+            });
+            
+          if (error) {
+            console.error("Error saving text-extracted table to Supabase:", error);
+          } else {
+            console.log("Successfully saved text-extracted table to Supabase");
+          }
+        } catch (err) {
+          console.error("Exception saving text-extracted table to Supabase:", err);
+        }
         
         return {
           ...data,

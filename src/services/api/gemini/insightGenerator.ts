@@ -13,9 +13,10 @@ export const generateInsightsWithGemini = async (
   try {
     console.log("Generating insights with Gemini API");
     
-    // Get the API key from environment variables or local storage
-    // Replace Deno.env with process.env and add fallback to localStorage
-    const geminiApiKey = process.env.Gemini_key || localStorage.getItem('Gemini_key');
+    // Use the Gemini API key from Supabase secrets (environment variables)
+    const geminiApiKey = process.env.GEMINI_API_KEY || 
+                         localStorage.getItem('Gemini_key') || 
+                         'AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk'; // Fallback to hardcoded key only as last resort
     
     if (!geminiApiKey) {
       console.error("Gemini API key not found");
