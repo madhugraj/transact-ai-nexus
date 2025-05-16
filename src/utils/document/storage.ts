@@ -1,6 +1,7 @@
 
 import { Document } from "@/components/assistant/DocumentSelector.d";
 import { getExtractedTables, getTableById } from "@/services/supabase/tableService";
+import { ensureStringArray, ensure2DArray } from '@/utils/documentHelpers';
 
 /**
  * Get all processed documents from localStorage and Supabase
@@ -54,18 +55,18 @@ export const getProcessedDocuments = async (): Promise<Document[]> => {
         name: table.name || table.title || 'Extracted Table',
         type: table.type || 'table',
         extractedAt: table.extractedAt || table.created_at || new Date().toISOString(),
-        source: table.source || 'local',
-        headers: Array.isArray(table.headers) ? table.headers : [],
-        rows: Array.isArray(table.rows) ? table.rows : [],
+        source: table.source === 'supabase' ? 'supabase' : 'local',
+        headers: ensureStringArray(table.headers),
+        rows: ensure2DArray(table.rows),
         confidence: table.confidence
-      })),
+      })) as Document[],
       ...localFiles.filter((file: any) => file !== null).map((file: any) => ({
         id: file.id || file.backendId || `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         name: file.name || (file.file && file.file.name) || 'Processed Document',
         type: file.file && file.file.type && file.file.type.includes('image') ? 'image' : 'document',
         extractedAt: file.extractedAt || new Date().toISOString(),
         source: 'local'
-      }))
+      })) as Document[]
     ];
     
     console.log('Returning processed documents:', docs);
@@ -95,7 +96,9 @@ export const getDocumentDataById = async (documentId: string) => {
             headers: Array.isArray(supabaseTable.headers) ? supabaseTable.headers : [],
             rows: Array.isArray(supabaseTable.rows) ? supabaseTable.rows : [],
             confidence: supabaseTable.confidence,
-            extractedAt: supabaseTable.created_at
+            extractedAt: supabaseTable.created_at,
+            source: 'supabase' as const,
+            type: 'table' as const
           };
         }
       } catch (e) {

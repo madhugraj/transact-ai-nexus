@@ -100,7 +100,7 @@ export const useDocumentData = () => {
               name: table.title || 'Extracted Table',
               type: 'table' as const,
               extractedAt: table.created_at,
-              source: 'supabase',
+              source: 'supabase' as const,
               headers: ensureStringArray(table.headers),
               rows: ensure2DArray(table.rows),
               confidence: table.confidence
@@ -127,11 +127,11 @@ export const useDocumentData = () => {
           name: localDoc.name || localDoc.title || 'Document',
           type: localDoc.type || (localDoc.headers && localDoc.rows ? 'table' : 'document'),
           extractedAt: localDoc.extractedAt || new Date().toISOString(),
-          source: 'local',
+          source: (localDoc.source === 'supabase' ? 'supabase' : 'local') as 'local' | 'supabase',
           headers: ensureStringArray(localDoc.headers),
           rows: ensure2DArray(localDoc.rows),
           confidence: localDoc.confidence || 0
-        };
+        } as Document;
       }
       
       console.log("Document not found:", documentId);
@@ -151,7 +151,8 @@ export const useDocumentData = () => {
     if (!documentFound) {
       const docData = await getDocumentDataById(documentId);
       if (docData) {
-        setProcessedDocuments(prev => [...prev, docData]);
+        // Use type assertion to ensure the docData is a valid Document
+        setProcessedDocuments(prev => [...prev, docData as Document]);
       }
     }
     
