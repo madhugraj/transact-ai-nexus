@@ -30,7 +30,9 @@ export const getProcessedDocuments = async (): Promise<Document[]> => {
         type: 'table',
         extractedAt: table.created_at,
         confidence: table.confidence,
-        source: 'supabase'
+        source: 'supabase',
+        headers: table.headers,
+        rows: table.rows
       }));
     } catch (e) {
       console.error("Error fetching tables from Supabase:", e);
@@ -52,7 +54,10 @@ export const getProcessedDocuments = async (): Promise<Document[]> => {
         name: table.name || table.title || 'Extracted Table',
         type: table.type || 'table',
         extractedAt: table.extractedAt || table.created_at || new Date().toISOString(),
-        source: table.source || 'local'
+        source: table.source || 'local',
+        headers: table.headers,
+        rows: table.rows,
+        confidence: table.confidence
       })),
       ...localFiles.filter((file: any) => file !== null).map((file: any) => ({
         id: file.id || file.backendId || `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,

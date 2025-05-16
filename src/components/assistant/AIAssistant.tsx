@@ -6,7 +6,7 @@ import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import DocumentSelector from './DocumentSelector';
 import useAIAssistant from '@/hooks/useAIAssistant';
-import { PieChart, BarChart3, Table as TableIcon, BrainCircuit, MessagesSquare, FileDigit, Loader2 } from 'lucide-react';
+import { PieChart, BarChart3, Table as TableIcon, BrainCircuit, MessagesSquare, Loader2 } from 'lucide-react';
 
 const AIAssistant: React.FC = () => {
   const {

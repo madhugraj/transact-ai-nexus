@@ -367,9 +367,9 @@ ${message}`;
             name: table.title || 'Extracted Table',
             type: 'table',
             extractedAt: table.created_at,
-            source: 'supabase',
             headers: table.headers,
-            rows: table.rows
+            rows: table.rows,
+            source: 'supabase'
           };
           
           // Add to processed documents cache
