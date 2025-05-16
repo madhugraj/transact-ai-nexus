@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Message } from '@/components/assistant/MessageList';
@@ -27,6 +28,30 @@ Always structure your response with these sections:
 2. Key insights (with supporting data points)
 3. Business implications
 4. Recommended actions`;
+
+/**
+ * Ensures that a value is a string array
+ */
+const ensureStringArray = (value: any): string[] => {
+  if (Array.isArray(value)) {
+    return value.map(item => String(item));
+  }
+  return [];
+};
+
+/**
+ * Ensures that a value is a 2D array
+ */
+const ensure2DArray = (value: any): any[][] => {
+  if (Array.isArray(value)) {
+    if (value.length === 0) return [];
+    if (Array.isArray(value[0])) {
+      return value;
+    }
+    return [value]; // Make it a 2D array with a single row
+  }
+  return [];
+};
 
 export const useAIAssistant = () => {
   const [message, setMessage] = useState('');
@@ -80,8 +105,8 @@ export const useAIAssistant = () => {
               source: 'supabase',
               confidence: table.confidence,
               // Pre-load the data to avoid additional calls later
-              headers: table.headers,
-              rows: table.rows
+              headers: ensureStringArray(table.headers),
+              rows: ensure2DArray(table.rows)
             }));
             
             // Set processed documents immediately from Supabase
@@ -115,7 +140,9 @@ export const useAIAssistant = () => {
                   name: table.title || 'Extracted Table',
                   type: 'table' as const,
                   extractedAt: table.created_at,
-                  source: 'supabase'
+                  source: 'supabase',
+                  headers: ensureStringArray(table.headers),
+                  rows: ensure2DArray(table.rows)
                 }));
                 setProcessedDocuments(formattedTables);
               }
@@ -230,8 +257,8 @@ export const useAIAssistant = () => {
               documentData = {
                 id: table.id,
                 name: table.title || 'Extracted Table',
-                headers: table.headers,
-                rows: table.rows,
+                headers: ensureStringArray(table.headers),
+                rows: ensure2DArray(table.rows),
                 confidence: table.confidence,
                 extractedAt: table.created_at
               };
@@ -366,9 +393,10 @@ ${message}`;
             name: table.title || 'Extracted Table',
             type: 'table',
             extractedAt: table.created_at,
-            headers: table.headers,
-            rows: table.rows,
-            source: 'supabase'
+            headers: ensureStringArray(table.headers),
+            rows: ensure2DArray(table.rows),
+            source: 'supabase',
+            confidence: table.confidence
           };
           
           // Add to processed documents cache
@@ -382,8 +410,8 @@ ${message}`;
               name: tableData.title,
               type: 'table',
               extractedAt: tableData.created_at,
-              headers: tableData.headers,
-              rows: tableData.rows,
+              headers: ensureStringArray(tableData.headers),
+              rows: ensure2DArray(tableData.rows),
               source: 'supabase'
             };
           }

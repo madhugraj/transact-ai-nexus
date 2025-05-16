@@ -1,5 +1,5 @@
 
-import { Document } from "@/components/assistant/DocumentSelector";
+import { Document } from "@/components/assistant/DocumentSelector.d";
 import { getExtractedTables, getTableById } from "@/services/supabase/tableService";
 
 /**
@@ -31,8 +31,8 @@ export const getProcessedDocuments = async (): Promise<Document[]> => {
         extractedAt: table.created_at,
         confidence: table.confidence,
         source: 'supabase',
-        headers: table.headers,
-        rows: table.rows
+        headers: Array.isArray(table.headers) ? table.headers : [],
+        rows: Array.isArray(table.rows) ? table.rows : []
       }));
     } catch (e) {
       console.error("Error fetching tables from Supabase:", e);
@@ -55,8 +55,8 @@ export const getProcessedDocuments = async (): Promise<Document[]> => {
         type: table.type || 'table',
         extractedAt: table.extractedAt || table.created_at || new Date().toISOString(),
         source: table.source || 'local',
-        headers: table.headers,
-        rows: table.rows,
+        headers: Array.isArray(table.headers) ? table.headers : [],
+        rows: Array.isArray(table.rows) ? table.rows : [],
         confidence: table.confidence
       })),
       ...localFiles.filter((file: any) => file !== null).map((file: any) => ({
@@ -92,8 +92,8 @@ export const getDocumentDataById = async (documentId: string) => {
           return {
             id: supabaseTable.id,
             name: supabaseTable.title,
-            headers: supabaseTable.headers,
-            rows: supabaseTable.rows,
+            headers: Array.isArray(supabaseTable.headers) ? supabaseTable.headers : [],
+            rows: Array.isArray(supabaseTable.rows) ? supabaseTable.rows : [],
             confidence: supabaseTable.confidence,
             extractedAt: supabaseTable.created_at
           };
