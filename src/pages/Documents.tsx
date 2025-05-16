@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card } from "@/components/ui/card";
@@ -6,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table } from "lucide-react";
 import ProcessingTab from "@/components/processing/ProcessingTab";
 import TableExtractionPage from "@/components/ingestion/TableExtractionPage";
-import { syncLocalStorageWithSupabase } from "@/services/supabaseService";
+import { syncLocalStorageWithSupabase } from "@/services/supabase/syncService";
 
 const Documents = () => {
   const [activeTab, setActiveTab] = useState<string>("tableExtraction");
