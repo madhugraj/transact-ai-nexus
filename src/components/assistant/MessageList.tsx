@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 export interface Message {
   id: string;
   content: string;
-  sender: 'user' | 'assistant';
+  sender: 'user' | 'assistant' | 'system';
   timestamp: Date;
 }
 
@@ -45,6 +45,8 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isProcessing }) => 
                 "rounded-lg px-4 py-2 max-w-[80%]",
                 msg.sender === 'user'
                   ? "bg-primary text-primary-foreground"
+                  : msg.sender === 'system'
+                  ? "bg-muted/60 italic text-muted-foreground text-xs"
                   : "bg-muted"
               )}
             >
