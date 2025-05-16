@@ -9,17 +9,13 @@ interface MessageInputProps {
   setMessage: (message: string) => void;
   handleSendMessage: () => void;
   isProcessing: boolean;
-  placeholder?: string;
-  disabled?: boolean;
 }
 
 const MessageInput: React.FC<MessageInputProps> = ({ 
   message, 
   setMessage, 
   handleSendMessage, 
-  isProcessing,
-  placeholder = "Ask a question about your processed documents...",
-  disabled = false
+  isProcessing 
 }) => {
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -31,18 +27,18 @@ const MessageInput: React.FC<MessageInputProps> = ({
   return (
     <div className="w-full flex gap-2">
       <Textarea
-        placeholder={placeholder}
+        placeholder="Ask a question about your processed documents..."
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         onKeyDown={handleKeyPress}
         className="resize-none"
         rows={1}
         maxLength={500}
-        disabled={disabled || isProcessing}
+        disabled={isProcessing}
       />
       <Button 
         onClick={handleSendMessage} 
-        disabled={!message.trim() || disabled || isProcessing}
+        disabled={!message.trim() || isProcessing}
         size="icon"
         className="shrink-0"
       >

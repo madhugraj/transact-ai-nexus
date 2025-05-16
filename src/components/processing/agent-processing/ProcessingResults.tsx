@@ -33,11 +33,7 @@ export const ProcessingResults = ({
   if (tablesData.length > 0) {
     try {
       console.log("Saving extracted tables to localStorage:", tablesData);
-      saveProcessedTables(tablesData.map(table => ({
-        ...table,
-        type: 'table', // Ensure type is set
-        id: table.id || `table-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-      })), processingResults?.processingId);
+      saveProcessedTables(tablesData, processingResults?.processingId);
       
       // Dispatch event to notify components that new tables are processed
       window.dispatchEvent(new CustomEvent('documentProcessed'));
@@ -73,11 +69,7 @@ export const ProcessingResults = ({
   if (processingResults?.extractedTables && processingResults.extractedTables.length > 0) {
     try {
       console.log("Saving extracted tables array to localStorage:", processingResults.extractedTables);
-      saveProcessedTables(processingResults.extractedTables.map(table => ({
-        ...table,
-        type: 'table', // Ensure type is set
-        id: table.id || `table-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-      })), processingResults?.processingId);
+      saveProcessedTables(processingResults.extractedTables, processingResults?.processingId);
       
       // Dispatch event to notify components that new tables are processed
       window.dispatchEvent(new CustomEvent('documentProcessed'));

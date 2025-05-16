@@ -1,145 +1,135 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { extractTablesFromImageWithGemini } from '@/services/api/gemini/tableExtractor';
-import { Loader, Download, FileText, MessageSquare } from 'lucide-react';
-import ExtractedTablePreview from './ExtractedTablePreview';
-import AIAssistantDialog from '../assistant/AIAssistantDialog';
-import { saveProcessedTables } from '@/utils/documentStorage';
-
-interface TableExtractionResult {
-  tables?: {
-    title?: string;
-    headers?: string[];
-    rows?: string[][];
-  }[];
-}
+import { FileJson, FileText, Table as TableIcon, Upload, Loader } from 'lucide-react';
+import * as api from '@/services/api';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import DocumentPreview from './DocumentPreview';
 
 const TableExtraction: React.FC = () => {
+  // Default OCR prompt template
+  const defaultPrompt = api.DEFAULT_TABLE_EXTRACTION_PROMPT;
+
+  // Predefined prompt templates
+  const promptTemplates = {
+    tableExtraction: defaultPrompt,
+    simpleOcr: "Extract all text from this image and maintain the formatting.",
+    formExtraction: "Extract form fields and their values from this document in a structured format."
+  };
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
-  const [prompt, setPrompt] = useState<string>('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [extractionResult, setExtractionResult] = useState<TableExtractionResult | null>(null);
-  const [displayFormat, setDisplayFormat] = useState<'table' | 'json'>('table');
-  const [generatedTableId, setGeneratedTableId] = useState<string | null>(null);
-  const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [prompt, setPrompt] = useState<string>(defaultPrompt);
+  const [result, setResult] = useState<string>('');
+  const [tableData, setTableData] = useState<{
+    tables: { title?: string; headers: string[]; rows: string[][]; }[];
+  } | null>(null);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [progress, setProgress] = useState<number>(0);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('table');
   const { toast } = useToast();
 
-  // Effect to reset extraction results when file changes
-  useEffect(() => {
-    if (selectedFile) {
-      setExtractionResult(null);
-      // Create local URL for preview
-      const localUrl = URL.createObjectURL(selectedFile);
-      setImagePreviewUrl(localUrl);
-      
-      return () => {
-        URL.revokeObjectURL(localUrl);
-      };
-    } else {
-      setImagePreviewUrl(null);
-    }
-  }, [selectedFile]);
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      const file = files[0];
-      if (file.type.startsWith('image/')) {
-        setSelectedFile(file);
-      } else {
-        toast({
-          title: "Invalid file type",
-          description: "Please select an image file",
-          variant: "destructive",
-        });
-      }
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setSelectedFile(file);
+      setFilePreviewUrl(URL.createObjectURL(file));
     }
   };
 
-  // Handle extraction of tables from image
-  const handleExtract = async () => {
+  const handlePromptTemplateChange = (value: string) => {
+    switch(value) {
+      case 'tableExtraction':
+        setPrompt(promptTemplates.tableExtraction);
+        break;
+      case 'simpleOcr':
+        setPrompt(promptTemplates.simpleOcr);
+        break;
+      case 'formExtraction':
+        setPrompt(promptTemplates.formExtraction);
+        break;
+      case 'custom':
+        // Keep current prompt for custom
+        break;
+    }
+  };
+
+  const processImage = async () => {
     if (!selectedFile) {
       toast({
-        title: "No file selected",
-        description: "Please select an image file first",
+        title: "No image selected",
+        description: "Please select an image to process",
         variant: "destructive",
       });
       return;
     }
 
     setIsProcessing(true);
-    setExtractionResult(null);
+    setProgress(10);
+    setResult('');
+    setTableData(null);
 
     try {
+      // Progress simulation
+      const progressInterval = setInterval(() => {
+        setProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 300);
+
       // Convert image to base64
-      const reader = new FileReader();
-      reader.readAsDataURL(selectedFile);
-      reader.onload = async () => {
-        const base64Image = reader.result as string;
-        const base64Content = base64Image.split(',')[1];
+      const base64Image = await api.fileToBase64(selectedFile);
+      setProgress(50);
 
-        // Call Gemini API for table extraction
-        const result = await extractTablesFromImageWithGemini(
-          base64Content,
-          selectedFile.type,
-          prompt || undefined
-        );
+      // Process with Gemini Vision
+      const response = await api.processImageWithGemini(
+        prompt,
+        base64Image,
+        selectedFile.type
+      );
 
-        if (!result.success) {
-          toast({
-            title: "Extraction failed",
-            description: result.error || "Failed to extract tables from the image",
-            variant: "destructive",
-          });
-          setIsProcessing(false);
-          return;
+      // Try to extract tables from the image using our specialized function
+      const tableResponse = await api.extractTablesFromImageWithGemini(
+        base64Image,
+        selectedFile.type,
+        prompt
+      );
+
+      clearInterval(progressInterval);
+      setProgress(100);
+
+      if (response.success) {
+        setResult(response.data || '');
+        
+        if (tableResponse.success && tableResponse.data) {
+          console.log("Table extraction successful:", tableResponse.data);
+          setTableData(tableResponse.data);
         }
-
-        console.log("Extraction result:", result.data);
-
-        // Process the result
-        if (result.data && result.data.tables && result.data.tables.length > 0) {
-          setExtractionResult(result.data);
-          
-          // Generate a unique ID for the table and save it
-          const tableId = `table-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-          setGeneratedTableId(tableId);
-          
-          // Save the extracted tables to localStorage for AI Assistant
-          const tablesWithMetadata = result.data.tables.map((table, index) => ({
-            id: `${tableId}-${index}`,
-            title: table.title || `Extracted Table ${index + 1}`,
-            name: table.title || `${selectedFile.name} - Table ${index + 1}`,
-            headers: table.headers || [],
-            rows: table.rows || [],
-            type: 'table',
-            extractedAt: new Date().toISOString()
-          }));
-          
-          saveProcessedTables(tablesWithMetadata);
-          
-          toast({
-            title: "Extraction successful",
-            description: `Extracted ${result.data.tables.length} table(s)`,
-          });
-        } else {
-          toast({
-            title: "No tables found",
-            description: "No tables were detected in the image",
-            variant: "default",
-          });
-        }
-      };
+        
+        toast({
+          title: "Image processed successfully",
+          description: "Table extraction complete",
+        });
+      } else {
+        toast({
+          title: "Processing failed",
+          description: response.error || "An error occurred during processing",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
+      console.error("Processing error:", error);
       toast({
-        title: "Error during extraction",
-        description: error instanceof Error ? error.message : "An unknown error occurred",
+        title: "Processing error",
+        description: error instanceof Error ? error.message : "Unknown error",
         variant: "destructive",
       });
     } finally {
@@ -147,223 +137,204 @@ const TableExtraction: React.FC = () => {
     }
   };
 
-  const handleDownload = () => {
-    if (!extractionResult || !extractionResult.tables || extractionResult.tables.length === 0) {
-      toast({
-        title: "No data to download",
-        description: "Please extract table data first",
-        variant: "default",
-      });
-      return;
-    }
-
-    try {
-      // Generate CSV content
-      const table = extractionResult.tables[0];
-      let csvContent = '';
-      
-      // Add headers
-      if (table.headers && table.headers.length > 0) {
-        csvContent += table.headers.map(header => `"${header}"`).join(',') + '\n';
-      }
-      
-      // Add rows
-      if (table.rows && table.rows.length > 0) {
-        table.rows.forEach(row => {
-          csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
-        });
-      }
-      
-      // Create and download file
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${selectedFile?.name || 'table'}-extracted.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      
-      toast({
-        title: "Download complete",
-        description: "Table data has been downloaded as CSV",
-      });
-    } catch (error) {
-      toast({
-        title: "Download error",
-        description: error instanceof Error ? error.message : "Failed to download table data",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const openAIAssistant = () => {
-    if (!extractionResult || !extractionResult.tables || extractionResult.tables.length === 0) {
-      toast({
-        title: "No table data available",
-        description: "Please extract a table first before using the AI Assistant",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Get the last generated table ID
-    if (!generatedTableId) {
-      toast({
-        title: "Table data not properly saved",
-        description: "Please try extracting the table again",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Open the AI Assistant with the selected document
-    setShowAIAssistant(true);
-  };
-
   return (
     <div className="space-y-6">
-      <Card>
-        <CardContent className="p-6 space-y-4">
-          <div>
-            <h3 className="text-lg font-medium mb-2">Upload Image</h3>
-            <Input
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="cursor-pointer"
-            />
-          </div>
-          
-          {imagePreviewUrl && (
-            <div className="mt-4">
-              <h3 className="text-lg font-medium mb-2">Image Preview</h3>
-              <div className="relative border rounded-md overflow-hidden">
-                <img
-                  src={imagePreviewUrl}
-                  alt="Preview"
-                  className="w-full h-auto max-h-[400px] object-contain"
+      <Card className="shadow-md">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <TableIcon className="h-5 w-5 mr-2 text-blue-500" />
+            Table Extraction
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left column - Document Upload & Preview */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => document.getElementById('image-upload')?.click()}
+                  disabled={isProcessing}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Select Image/PDF
+                </Button>
+                <Button
+                  className="bg-blue-500 hover:bg-blue-600"
+                  onClick={processImage}
+                  disabled={!selectedFile || isProcessing}
+                >
+                  {isProcessing ? "Processing..." : "Extract Tables"}
+                </Button>
+              </div>
+              <input
+                id="image-upload"
+                type="file"
+                className="hidden"
+                accept="image/*,application/pdf"
+                onChange={handleFileChange}
+                disabled={isProcessing}
+              />
+              {selectedFile && (
+                <p className="text-xs text-muted-foreground">
+                  Selected: {selectedFile.name}
+                </p>
+              )}
+              
+              {/* Document Preview */}
+              <div className="mt-4">
+                <h3 className="text-sm font-medium mb-2">Document Preview</h3>
+                <DocumentPreview 
+                  fileUrl={filePreviewUrl}
+                  fileName={selectedFile?.name}
+                  fileType={selectedFile?.type}
+                  height="300px"
                 />
               </div>
             </div>
-          )}
-          
-          <div className="mt-4">
-            <h3 className="text-lg font-medium mb-2">Custom Extraction Prompt (Optional)</h3>
-            <Textarea
-              placeholder="Enter a custom prompt to guide the table extraction..."
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              className="min-h-[100px]"
-            />
-            <p className="text-sm text-muted-foreground mt-2">
-              Leave blank to use the default extraction prompt
-            </p>
-          </div>
-          
-          <div className="flex flex-wrap items-center gap-2 mt-4">
-            <Button 
-              onClick={handleExtract} 
-              disabled={!selectedFile || isProcessing}
-              className="flex items-center gap-2"
-            >
-              {isProcessing ? <Loader className="h-4 w-4 animate-spin" /> : null}
-              Extract
-            </Button>
-            
-            {extractionResult && extractionResult.tables && extractionResult.tables.length > 0 && (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={handleDownload}
-                  className="flex items-center gap-2"
-                >
-                  <Download className="h-4 w-4" />
-                  Download CSV
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  onClick={openAIAssistant}
-                  className="flex items-center gap-2"
-                >
-                  <MessageSquare className="h-4 w-4" />
-                  Ask AI Assistant
-                </Button>
-                
-                <div className="flex items-center gap-2 ml-auto">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={displayFormat === 'table' ? 'bg-muted' : ''}
-                    onClick={() => setDisplayFormat('table')}
-                  >
-                    Table
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={displayFormat === 'json' ? 'bg-muted' : ''}
-                    onClick={() => setDisplayFormat('json')}
-                  >
-                    Results (Formatted)
-                  </Button>
+
+            {/* Right column - Prompt & Settings */}
+            <div className="space-y-4">
+              {/* Prompt Templates */}
+              <div className="space-y-2">
+                <label htmlFor="promptTemplate" className="text-sm font-medium">
+                  Prompt Template
+                </label>
+                <Select onValueChange={handlePromptTemplateChange} defaultValue="tableExtraction">
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a prompt template" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="tableExtraction">Table Extraction</SelectItem>
+                    <SelectItem value="simpleOcr">Simple OCR</SelectItem>
+                    <SelectItem value="formExtraction">Form Extraction</SelectItem>
+                    <SelectItem value="custom">Custom Prompt</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Prompt */}
+              <div className="space-y-2">
+                <label htmlFor="prompt" className="text-sm font-medium">
+                  Extraction Prompt
+                </label>
+                <Textarea
+                  id="prompt"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  className="min-h-24 text-xs font-mono"
+                  placeholder="Enter instructions for table extraction"
+                  disabled={isProcessing}
+                />
+              </div>
+
+              {/* Progress */}
+              {isProcessing && (
+                <div className="space-y-2 mt-4">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Processing the document...</span>
+                    <span>{progress}%</span>
+                  </div>
+                  <Progress value={progress} className="h-2" />
                 </div>
-              </>
-            )}
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
-      
-      {isProcessing && (
-        <div className="flex flex-col items-center justify-center p-12">
-          <Loader className="h-8 w-8 animate-spin text-primary mb-4" />
-          <p className="text-lg">Extracting tables from image...</p>
-          <p className="text-sm text-muted-foreground mt-2">
-            This may take a few moments depending on image complexity
-          </p>
-        </div>
-      )}
-      
-      {extractionResult && !isProcessing && (
-        <div className="space-y-4">
-          <h3 className="text-xl font-medium">Extraction Results</h3>
-          
-          {extractionResult.tables && extractionResult.tables.length > 0 ? (
-            extractionResult.tables.map((table, index) => (
-              <div key={index} className="space-y-2">
-                {table.title && <h4 className="text-lg font-medium">{table.title}</h4>}
-                <ExtractedTablePreview 
-                  initialData={{
-                    headers: table.headers || [],
-                    rows: table.rows || []
-                  }}
-                  displayFormat={displayFormat}
-                />
+
+      {/* Results Section */}
+      {(tableData || result) && (
+        <Card className="shadow-md">
+          <CardHeader>
+            <CardTitle className="text-lg">Extraction Results</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {/* Tabs for different views */}
+              <div className="border-b border-gray-200 mb-4">
+                <nav className="flex -mb-px space-x-8">
+                  <button
+                    onClick={() => setActiveTab('table')}
+                    className={`pb-3 px-1 border-b-2 ${activeTab === 'table' 
+                      ? 'border-blue-500 text-blue-600' 
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                  >
+                    <span className="flex items-center">
+                      <TableIcon className="h-4 w-4 mr-2" />
+                      Tables
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('json')}
+                    className={`pb-3 px-1 border-b-2 ${activeTab === 'json' 
+                      ? 'border-blue-500 text-blue-600' 
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                  >
+                    <span className="flex items-center">
+                      <FileJson className="h-4 w-4 mr-2" />
+                      JSON
+                    </span>
+                  </button>
+                </nav>
               </div>
-            ))
-          ) : (
-            <Card>
-              <CardContent className="p-6 flex flex-col items-center justify-center">
-                <FileText className="h-16 w-16 text-muted-foreground mb-4" />
-                <p className="text-lg">No tables found in the image</p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Try adjusting the extraction prompt or using a different image
-                </p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+
+              {/* Table Results */}
+              {activeTab === 'table' && tableData && tableData.tables && tableData.tables.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium flex items-center">
+                    <TableIcon className="h-4 w-4 mr-1" />
+                    Extracted Tables
+                  </h3>
+                  {tableData.tables.map((table, tableIndex) => (
+                    <div key={tableIndex} className="border rounded-md p-4 mt-2 bg-white dark:bg-gray-900">
+                      {table.title && <h4 className="font-medium mb-2">{table.title}</h4>}
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead>
+                            <tr>
+                              {table.headers.map((header, i) => (
+                                <th key={i} className="px-3 py-2 bg-muted/50 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                  {header}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {table.rows.map((row, rowIndex) => (
+                              <tr key={rowIndex}>
+                                {row.map((cell, cellIndex) => (
+                                  <td key={cellIndex} className="px-3 py-2 whitespace-nowrap text-sm">
+                                    {cell}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* JSON View - Minimalist */}
+              {activeTab === 'json' && (
+                <div className="border rounded-md p-4 bg-slate-50 dark:bg-slate-900">
+                  <h3 className="text-sm font-medium flex items-center mb-2">
+                    <FileJson className="h-4 w-4 mr-1" />
+                    Raw JSON Data
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <pre className="text-xs font-mono whitespace-pre-wrap">{tableData ? JSON.stringify(tableData, null, 2) : result || "No data available"}</pre>
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
-      
-      {/* AI Assistant Dialog */}
-      <AIAssistantDialog
-        open={showAIAssistant}
-        onOpenChange={setShowAIAssistant}
-        initialDocument={generatedTableId ? `${generatedTableId}-0` : undefined}
-        initialPrompt="Analyze this table data and provide key insights"
-      />
     </div>
   );
 };
