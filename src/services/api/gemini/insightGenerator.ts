@@ -20,7 +20,8 @@ export const generateInsightsWithGemini = async (
     
     // Check if we have the Gemini API key configured
     const { data: secrets } = await supabase.rpc('get_service_key', { service_name: 'gemini' });
-    const hasValidKey = secrets && secrets.length > 0;
+    const apiKey = secrets && Array.isArray(secrets) && secrets.length > 0 ? secrets[0] : null;
+    const hasValidKey = !!apiKey;
     
     if (!hasValidKey) {
       console.log("No Gemini API key found, using mock response");
@@ -43,7 +44,7 @@ export const generateInsightsWithGemini = async (
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-goog-api-key": secrets[0]
+        "x-goog-api-key": apiKey
       },
       body: JSON.stringify({
         contents: [

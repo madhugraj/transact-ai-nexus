@@ -70,7 +70,8 @@ export const useAIGeneration = () => {
     const checkGeminiConfig = async () => {
       try {
         const { data } = await supabase.rpc('get_service_key', { service_name: 'gemini' });
-        setIsGeminiConfigured(Boolean(data && data.length > 0));
+        const hasValidKey = data && Array.isArray(data) && data.length > 0;
+        setIsGeminiConfigured(hasValidKey);
       } catch (error) {
         console.error("Error checking Gemini configuration:", error);
         setIsGeminiConfigured(false);
