@@ -1,4 +1,3 @@
-
 import { ApiResponse } from '../types';
 import { supabase } from "@/integrations/supabase/client";
 
@@ -18,11 +17,14 @@ export const generateInsightsWithGemini = async (
     console.log(`Table context (sample): ${tableContext.substring(0, 100)}...`);
     console.log(`Analysis prompt (sample): ${analysisPrompt.substring(0, 100)}...`);
     
-    // Check if we have the Gemini API key configured - using proper typing
-    const { data: secretData } = await supabase.rpc('get_service_key', { service_name: 'gemini' });
-    // Explicitly cast the response to the correct type
-    const apiKeys = secretData as unknown as string[];
-    const apiKey = apiKeys && apiKeys.length > 0 ? apiKeys[0] : null;
+    // Use explicit typing for the RPC call to ensure TypeScript correctness
+    const { data } = await supabase.rpc<string[]>('get_service_key', {
+      service_name: 'gemini'
+    });
+    
+    // Process the response with proper typing
+    const apiKeys = data || [];
+    const apiKey = apiKeys.length > 0 ? apiKeys[0] : null;
     const hasValidKey = !!apiKey;
     
     if (!hasValidKey) {

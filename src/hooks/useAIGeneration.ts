@@ -69,10 +69,14 @@ export const useAIGeneration = () => {
   useEffect(() => {
     const checkGeminiConfig = async () => {
       try {
-        const { data } = await supabase.rpc('get_service_key', { service_name: 'gemini' });
-        // Explicitly cast the response to the correct type
-        const apiKeys = data as unknown as string[];
-        const hasValidKey = apiKeys && Array.isArray(apiKeys) && apiKeys.length > 0;
+        // Use explicit typing for the RPC call to ensure TypeScript correctness
+        const { data } = await supabase.rpc<string[]>('get_service_key', { 
+          service_name: 'gemini' 
+        });
+        
+        // Handle the response with proper typing
+        const apiKeys = data || [];
+        const hasValidKey = apiKeys.length > 0;
         setIsGeminiConfigured(hasValidKey);
       } catch (error) {
         console.error("Error checking Gemini configuration:", error);
@@ -173,3 +177,4 @@ ${userMessage}`;
     generateDocumentWelcomeMessage
   };
 };
+
