@@ -20,7 +20,9 @@ export const generateInsightsWithGemini = async (
     
     // Check if we have the Gemini API key configured
     const { data: secrets } = await supabase.rpc('get_service_key', { service_name: 'gemini' });
-    const apiKey = secrets && Array.isArray(secrets) && secrets.length > 0 ? secrets[0] : null;
+    // Properly type and handle the response
+    const apiKeys = secrets as string[] | null;
+    const apiKey = apiKeys && apiKeys.length > 0 ? apiKeys[0] : null;
     const hasValidKey = !!apiKey;
     
     if (!hasValidKey) {
