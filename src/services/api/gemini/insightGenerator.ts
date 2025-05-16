@@ -7,10 +7,6 @@ interface GeminiInsightResponse {
   summary?: string;
 }
 
-interface ServiceKeyParams {
-  service_name: string;
-}
-
 export const generateInsightsWithGemini = async (
   tableContext: string,
   analysisPrompt: string
@@ -22,14 +18,15 @@ export const generateInsightsWithGemini = async (
     console.log(`Table context (sample): ${tableContext.substring(0, 100)}...`);
     console.log(`Analysis prompt (sample): ${analysisPrompt.substring(0, 100)}...`);
     
-    // Fix: Define proper types for the RPC call
-    const params: ServiceKeyParams = { service_name: 'gemini' };
-    const { data, error } = await supabase.rpc('get_service_key', params);
+    // Fix: Use the correct typing for the RPC function call
+    const { data, error } = await supabase.rpc<string[]>('get_service_key', {
+      service_name: 'gemini'
+    });
     
     if (error) throw error;
     
     // Cast the returned data to string array and handle it properly
-    const apiKeys = data as string[] || [];
+    const apiKeys = data || [];
     const apiKey = apiKeys.length > 0 ? apiKeys[0] : null;
     const hasValidKey = !!apiKey;
     
