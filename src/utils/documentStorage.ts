@@ -54,14 +54,17 @@ export const saveProcessedTables = (tables: any[], processingId?: string) => {
     
     // Add newly processed tables with timestamp
     const newProcessedTables = Array.isArray(tables) 
-      ? tables.map((table: any) => ({
-          ...table,
-          id: table.id || `table-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          name: table.name || table.title || 'Extracted Table',
-          type: 'table', // Ensure type is set for document selector
-          extractedAt: new Date().toISOString(),
-          processingId
-        }))
+      ? tables.map((table: any) => {
+          const tableId = table.id || `table-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          return {
+            ...table,
+            id: tableId,
+            name: table.name || table.title || 'Extracted Table',
+            type: 'table', // Ensure type is set for document selector
+            extractedAt: new Date().toISOString(),
+            processingId
+          };
+        })
       : [{
           ...(tables as any),
           id: (tables as any).id || `table-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -70,6 +73,12 @@ export const saveProcessedTables = (tables: any[], processingId?: string) => {
           extractedAt: new Date().toISOString(),
           processingId
         }];
+    
+    // Log each table to help with debugging
+    newProcessedTables.forEach((table, index) => {
+      console.log(`Processed table ${index} - ID: ${table.id}, Name: ${table.name}`);
+      console.log(`Has headers: ${Boolean(table.headers)}, Row count: ${table.rows?.length || 0}`);
+    });
     
     // Update localStorage with combined array
     localStorage.setItem('processedTables', JSON.stringify([...processedTables, ...newProcessedTables]));
@@ -146,15 +155,42 @@ export const getDocumentDataById = (documentId: string) => {
     const tables = tablesStr ? JSON.parse(tablesStr) : [];
     const files = filesStr ? JSON.parse(filesStr) : [];
     
-    const selectedTable = tables.find((t: any) => t.id === documentId);
-    const selectedFile = files.find((f: any) => f.id === documentId || f.backendId === documentId);
+    // First check for exact match
+    let selectedTable = tables.find((t: any) => t.id === documentId);
+    let selectedFile = files.find((f: any) => f.id === documentId || f.backendId === documentId);
+    
+    // If not found, try to check if the document is a partial ID (when tables are saved with index suffixes)
+    if (!selectedTable && documentId.includes('-')) {
+      const baseId = documentId.split('-').slice(0, -1).join('-');
+      console.log('Trying base ID match:', baseId);
+      selectedTable = tables.find((t: any) => t.id.startsWith(baseId));
+    }
     
     const result = selectedTable || selectedFile || null;
-    console.log('Found document data:', result ? 'Document found' : 'Document not found');
+    console.log('Document data found:', result ? 'Yes' : 'No');
+    
+    if (result) {
+      // Log the data structure to help with debugging
+      console.log('Document structure:', {
+        id: result.id,
+        name: result.name || result.title,
+        hasHeaders: Boolean(result.headers),
+        hasRows: Boolean(result.rows),
+        rowCount: result.rows?.length || 0,
+        keys: Object.keys(result)
+      });
+    }
     
     return result;
   } catch (error) {
     console.error("Error retrieving document data:", error);
     return null;
   }
+};
+
+/**
+ * Check if a document ID exists in localStorage
+ */
+export const documentExists = (documentId: string): boolean => {
+  return getDocumentDataById(documentId) !== null;
 };

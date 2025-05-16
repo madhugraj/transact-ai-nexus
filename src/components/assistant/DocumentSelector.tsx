@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Check, ChevronDown, Table, FileText, FileImage } from 'lucide-react';
+import { Check, ChevronDown, Table, FileText, FileImage, AlertTriangle } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
@@ -17,6 +17,8 @@ import {
 } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '../ui/scroll-area';
+import { getDocumentDataById } from '@/utils/documentStorage';
+import { useToast } from '@/hooks/use-toast';
 
 export interface Document {
   id: string;
@@ -38,17 +40,52 @@ const DocumentSelector: React.FC<DocumentSelectorProps> = ({
 }) => {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(selectedDocumentId || "");
+  const [validDocuments, setValidDocuments] = useState<Document[]>([]);
+  const { toast } = useToast();
 
+  // Validate documents on load and filter out any that don't have data
   useEffect(() => {
+    // First set the selected ID if provided
     if (selectedDocumentId) {
       setValue(selectedDocumentId);
+      console.log("DocumentSelector: Setting initial ID:", selectedDocumentId);
     }
-  }, [selectedDocumentId]);
+
+    // Validate which documents actually have data
+    const validated = documents.filter(doc => {
+      const hasData = getDocumentDataById(doc.id) !== null;
+      if (!hasData) {
+        console.log(`DocumentSelector: Document ${doc.id} (${doc.name}) has no data`);
+      }
+      return hasData;
+    });
+
+    if (validated.length !== documents.length) {
+      console.log(`DocumentSelector: Filtered ${documents.length - validated.length} documents without data`);
+    }
+
+    setValidDocuments(validated);
+  }, [documents, selectedDocumentId]);
 
   const handleSelect = (currentValue: string) => {
+    // Verify document has data before selecting
+    const docData = getDocumentDataById(currentValue);
+    
+    if (!docData) {
+      toast({
+        title: "Document data not available",
+        description: "The selected document has no data associated with it",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setValue(currentValue);
     setOpen(false);
     onDocumentChange(currentValue);
+    
+    console.log("DocumentSelector: Selected document:", currentValue);
+    console.log("DocumentSelector: Document data:", docData);
   };
 
   const getDocumentIcon = (type: string) => {
@@ -62,7 +99,7 @@ const DocumentSelector: React.FC<DocumentSelectorProps> = ({
     }
   };
 
-  const selectedDocument = documents.find((doc) => doc.id === value);
+  const selectedDocument = validDocuments.find((doc) => doc.id === value);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -92,8 +129,8 @@ const DocumentSelector: React.FC<DocumentSelectorProps> = ({
           <CommandEmpty>No documents found.</CommandEmpty>
           <ScrollArea className="h-64">
             <CommandGroup>
-              {documents.length > 0 ? (
-                documents.map((doc) => (
+              {validDocuments.length > 0 ? (
+                validDocuments.map((doc) => (
                   <CommandItem
                     key={doc.id}
                     value={doc.id}

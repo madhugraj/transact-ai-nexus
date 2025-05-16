@@ -6,6 +6,14 @@ import { Document } from '@/components/assistant/DocumentSelector';
 import { getProcessedDocuments, getDocumentDataById } from '@/utils/documentStorage';
 import { generateInsightsWithGemini } from '@/services/api/gemini/insightGenerator';
 
+// Extend the Message type to include 'system' as a valid sender type
+// This augmentation is necessary since we can't modify the original Message interface
+declare module '@/components/assistant/MessageList' {
+  interface Message {
+    sender: 'user' | 'assistant' | 'system';
+  }
+}
+
 // Business analyst prompt template
 const BUSINESS_ANALYST_PROMPT = `You are a business data analyst. Given the table data and user query, find the answer from the provided table only.
 
@@ -82,7 +90,7 @@ export const useAIAssistant = () => {
     const systemMessage: Message = {
       id: `system-${Date.now()}`,
       content,
-      sender: 'system',
+      sender: 'system', // This is now valid with our module augmentation
       timestamp: new Date()
     };
     

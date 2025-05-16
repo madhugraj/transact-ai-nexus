@@ -7,6 +7,8 @@ import MessageInput from './MessageInput';
 import DocumentSelector from './DocumentSelector';
 import useAIAssistant from '@/hooks/useAIAssistant';
 import { X } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { getDocumentDataById } from '@/utils/documentStorage';
 
 interface AIAssistantDialogProps {
   open: boolean;
@@ -31,22 +33,39 @@ const AIAssistantDialog: React.FC<AIAssistantDialogProps> = ({
     handleDocumentChange,
     addSystemMessage
   } = useAIAssistant();
+  
+  const { toast } = useToast();
 
   // Initialize with the provided document and prompt if available
   useEffect(() => {
-    if (open && initialDocument) {
-      console.log("Setting initial document:", initialDocument);
-      handleDocumentChange(initialDocument);
-    }
-    
-    if (open && initialPrompt && initialPrompt.trim() !== '') {
-      console.log("Setting initial prompt:", initialPrompt);
-      setMessage(initialPrompt);
+    if (open) {
+      if (initialDocument) {
+        console.log("Setting initial document:", initialDocument);
+        
+        // Check if document data exists
+        const documentData = getDocumentDataById(initialDocument);
+        if (documentData) {
+          console.log("Document data found:", documentData);
+          handleDocumentChange(initialDocument);
+        } else {
+          console.warn("Document data not found for ID:", initialDocument);
+          toast({
+            title: "Document not found",
+            description: "The selected document data could not be loaded",
+            variant: "destructive",
+          });
+        }
+      }
       
-      // Add a system message indicating a custom prompt was loaded
-      addSystemMessage(`Custom prompt loaded: "${initialPrompt}"`);
+      if (initialPrompt && initialPrompt.trim() !== '') {
+        console.log("Setting initial prompt:", initialPrompt);
+        setMessage(initialPrompt);
+        
+        // Add a system message indicating a custom prompt was loaded
+        addSystemMessage(`Custom prompt loaded: "${initialPrompt}"`);
+      }
     }
-  }, [open, initialDocument, initialPrompt]);
+  }, [open, initialDocument, initialPrompt, toast]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
