@@ -64,10 +64,10 @@ export const useAIAssistant = () => {
             console.log("Supabase tables:", tables);
             
             if (tables.length > 0) {
-              const formattedTables = tables.map(table => ({
+              const formattedTables: Document[] = tables.map(table => ({
                 id: table.id,
                 name: table.title || 'Extracted Table',
-                type: 'table',
+                type: 'table' as const,
                 extractedAt: table.created_at
               }));
               setProcessedDocuments(formattedTables);

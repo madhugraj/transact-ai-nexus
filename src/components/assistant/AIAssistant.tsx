@@ -39,7 +39,7 @@ const AIAssistant: React.FC = () => {
           <DocumentSelector 
             documents={processedDocuments} 
             onDocumentChange={handleDocumentChange}
-            selectedDocument={selectedDocument}
+            selectedDocumentId={selectedDocument}
           />
         </CardTitle>
       </CardHeader>
