@@ -1,6 +1,5 @@
-
 import React, { useEffect, useState } from 'react';
-import { Check, ChevronDown, Table, FileText, FileImage, AlertTriangle } from 'lucide-react';
+import { Check, ChevronDown, Table, FileText, FileImage } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
@@ -19,13 +18,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '../ui/scroll-area';
 import { getDocumentDataById } from '@/utils/documentStorage';
 import { useToast } from '@/hooks/use-toast';
-
-export interface Document {
-  id: string;
-  name: string;
-  type: 'table' | 'document' | 'image';
-  extractedAt?: string;
-}
+import { Document } from './DocumentSelector.d';
 
 interface DocumentSelectorProps {
   documents: Document[];

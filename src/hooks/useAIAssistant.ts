@@ -1,8 +1,7 @@
-
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Message } from '@/components/assistant/MessageList';
-import { Document } from '@/components/assistant/DocumentSelector';
+import { Document } from '@/components/assistant/DocumentSelector.d';
 import { getProcessedDocuments, getDocumentDataById } from '@/utils/documentStorage';
 import { generateInsightsWithGemini } from '@/services/api/gemini/insightGenerator';
 import { getExtractedTables, getTableById } from '@/services/supabaseService';
@@ -383,6 +382,8 @@ ${message}`;
               name: tableData.title,
               type: 'table',
               extractedAt: tableData.created_at,
+              headers: tableData.headers,
+              rows: tableData.rows,
               source: 'supabase'
             };
           }

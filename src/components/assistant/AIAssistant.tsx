@@ -6,7 +6,7 @@ import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import DocumentSelector from './DocumentSelector';
 import useAIAssistant from '@/hooks/useAIAssistant';
-import { PieChart, BarChart3, Table as TableIcon, BrainCircuit, MessagesSquare, Loader2 } from 'lucide-react';
+import { PieChart, BarChart3, Table as TableIcon, BrainCircuit, MessagesSquare, FileText, Loader2 } from 'lucide-react';
 
 const AIAssistant: React.FC = () => {
   const {
@@ -61,7 +61,7 @@ const AIAssistant: React.FC = () => {
               Table Analysis
             </Badge>
             <Badge variant="outline" className="flex items-center gap-1 bg-primary/5">
-              <FileDigit className="h-3 w-3" /> 
+              <FileText className="h-3 w-3" /> 
               {selectedDocumentData?.name}
             </Badge>
             {selectedDocumentData.source && (
