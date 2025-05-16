@@ -77,6 +77,18 @@ export const useAIAssistant = () => {
     };
   }, [toast]);
 
+  // Add a system message to the chat
+  const addSystemMessage = (content: string) => {
+    const systemMessage: Message = {
+      id: `system-${Date.now()}`,
+      content,
+      sender: 'system',
+      timestamp: new Date()
+    };
+    
+    setMessages(prev => [...prev, systemMessage]);
+  };
+
   const handleSendMessage = async () => {
     if (!message.trim()) return;
 
@@ -202,7 +214,8 @@ ${message}`;
     selectedDocument,
     processedDocuments,
     handleSendMessage,
-    handleDocumentChange
+    handleDocumentChange,
+    addSystemMessage
   };
 };
 

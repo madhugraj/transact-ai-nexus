@@ -5,10 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { FileJson, FileText, Table as TableIcon, Upload, Loader } from 'lucide-react';
+import { FileJson, FileText, Table as TableIcon, Upload, Loader, Download, FileExcel } from 'lucide-react';
 import * as api from '@/services/api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import DocumentPreview from './DocumentPreview';
+import AIAssistantDialog from '../assistant/AIAssistantDialog';
+import { saveProcessedTables } from '@/utils/documentStorage';
 
 const TableExtraction: React.FC = () => {
   // Default OCR prompt template
@@ -30,8 +32,11 @@ const TableExtraction: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<string>('table');
+  const [activeTab, setActiveTab] = useState('table');
+  const [aiAssistantOpen, setAiAssistantOpen] = useState(false);
+  const [currentDocumentId, setCurrentDocumentId] = useState<string | null>(null);
   const { toast } = useToast();
+  const [exportFormat, setExportFormat] = useState<'csv' | 'xlsx'>('csv');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -72,6 +77,7 @@ const TableExtraction: React.FC = () => {
     setProgress(10);
     setResult('');
     setTableData(null);
+    setCurrentDocumentId(null);
 
     try {
       // Progress simulation
@@ -112,6 +118,31 @@ const TableExtraction: React.FC = () => {
         if (tableResponse.success && tableResponse.data) {
           console.log("Table extraction successful:", tableResponse.data);
           setTableData(tableResponse.data);
+          
+          // Save extracted tables to localStorage for AI Assistant
+          if (tableResponse.data.tables && tableResponse.data.tables.length > 0) {
+            const savedTables = tableResponse.data.tables.map((table, index) => ({
+              id: `table-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+              title: table.title || `Table ${index + 1}`,
+              name: table.title || `Extracted Table ${index + 1}`,
+              headers: table.headers,
+              rows: table.rows,
+              type: 'table',
+              extractedAt: new Date().toISOString(),
+              processingId: `vision-${Date.now()}`
+            }));
+            
+            // Save to localStorage
+            saveProcessedTables(savedTables);
+            
+            // Remember the ID of the first table for AI Assistant
+            setCurrentDocumentId(savedTables[0].id);
+            
+            // Dispatch event to notify components that new tables are processed
+            window.dispatchEvent(new CustomEvent('documentProcessed'));
+            
+            console.log("Saved tables to localStorage with IDs:", savedTables.map(t => t.id));
+          }
         }
         
         toast({
@@ -134,6 +165,74 @@ const TableExtraction: React.FC = () => {
       });
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const openAssistantWithPrompt = () => {
+    if (!currentDocumentId) {
+      // If no table has been extracted yet, show a warning
+      toast({
+        title: "No table data available",
+        description: "Please extract a table first before using the AI Assistant",
+        variant: "warning",
+      });
+      return;
+    }
+    
+    setAiAssistantOpen(true);
+  };
+
+  const handleExport = () => {
+    if (!tableData || !tableData.tables || tableData.tables.length === 0) {
+      toast({
+        title: "No data to export",
+        description: "Please extract table data first",
+        variant: "warning",
+      });
+      return;
+    }
+
+    try {
+      // Create CSV content
+      let content = '';
+      const table = tableData.tables[0];
+      
+      if (exportFormat === 'csv') {
+        // Add headers
+        content += table.headers.map(h => `"${h}"`).join(',') + '\n';
+        
+        // Add rows
+        content += table.rows.map(row => 
+          row.map(cell => `"${cell}"`).join(',')
+        ).join('\n');
+        
+        const blob = new Blob([content], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `extracted_table.csv`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        
+        toast({
+          title: "Export successful",
+          description: "Table exported as CSV",
+        });
+      } else if (exportFormat === 'xlsx') {
+        // For XLSX we would use a library like exceljs or xlsx
+        // Here we're just mocking the functionality
+        toast({
+          title: "XLSX Export",
+          description: "XLSX export would be implemented with a library like exceljs",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Export error",
+        description: error instanceof Error ? error.message : "Unknown error during export",
+        variant: "destructive",
+      });
     }
   };
 
@@ -165,7 +264,7 @@ const TableExtraction: React.FC = () => {
                   onClick={processImage}
                   disabled={!selectedFile || isProcessing}
                 >
-                  {isProcessing ? "Processing..." : "Extract Tables"}
+                  {isProcessing ? "Processing..." : "Extract"}
                 </Button>
               </div>
               <input
@@ -216,8 +315,17 @@ const TableExtraction: React.FC = () => {
 
               {/* Prompt */}
               <div className="space-y-2">
-                <label htmlFor="prompt" className="text-sm font-medium">
-                  Extraction Prompt
+                <label htmlFor="prompt" className="text-sm font-medium flex justify-between items-center">
+                  <span>Extraction Prompt</span>
+                  {/* AI Assistant button for custom prompts */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={openAssistantWithPrompt}
+                  >
+                    Open in AI Assistant
+                  </Button>
                 </label>
                 <Textarea
                   id="prompt"
@@ -248,7 +356,35 @@ const TableExtraction: React.FC = () => {
       {(tableData || result) && (
         <Card className="shadow-md">
           <CardHeader>
-            <CardTitle className="text-lg">Extraction Results</CardTitle>
+            <CardTitle className="text-lg flex items-center justify-between">
+              <span>Extraction Results</span>
+              
+              {/* Export options */}
+              {tableData && tableData.tables && tableData.tables.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Select 
+                    defaultValue="csv" 
+                    onValueChange={(value) => setExportFormat(value as 'csv' | 'xlsx')}
+                  >
+                    <SelectTrigger className="w-[130px]">
+                      <SelectValue placeholder="Export format" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="csv">CSV Format</SelectItem>
+                      <SelectItem value="xlsx">Excel Format</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleExport}
+                  >
+                    <Download className="h-4 w-4 mr-1" /> Download
+                  </Button>
+                </div>
+              )}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
@@ -274,7 +410,7 @@ const TableExtraction: React.FC = () => {
                   >
                     <span className="flex items-center">
                       <FileJson className="h-4 w-4 mr-2" />
-                      JSON
+                      Results (Formatted)
                     </span>
                   </button>
                 </nav>
@@ -335,6 +471,14 @@ const TableExtraction: React.FC = () => {
           </CardContent>
         </Card>
       )}
+      
+      {/* AI Assistant Dialog */}
+      <AIAssistantDialog 
+        open={aiAssistantOpen} 
+        onOpenChange={setAiAssistantOpen} 
+        initialDocument={currentDocumentId || undefined}
+        initialPrompt={prompt}
+      />
     </div>
   );
 };

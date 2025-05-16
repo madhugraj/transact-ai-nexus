@@ -113,7 +113,8 @@ export class DynamicTableDetectionAgent implements Agent {
                     headers: extractedTable.headers,
                     rows: extractedTable.rows,
                     confidence: 0.9,
-                    source: file.name
+                    source: file.name,
+                    type: 'table' // Ensure type is set for AI Assistant
                   }],
                   tableCount: 1,
                   extractionComplete: true,
@@ -147,7 +148,8 @@ export class DynamicTableDetectionAgent implements Agent {
             tableId: "table-text-extracted-1",
             headers: tableStructure.headers,
             rows: tableStructure.rows,
-            confidence: 0.8
+            confidence: 0.8,
+            type: 'table' // Ensure type is set for AI Assistant
           }],
           tableCount: 1,
           extractionComplete: true,
