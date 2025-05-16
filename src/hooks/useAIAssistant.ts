@@ -7,6 +7,7 @@ import { getProcessedDocuments, getDocumentDataById } from '@/utils/documentStor
 import { generateInsightsWithGemini } from '@/services/api/gemini/insightGenerator';
 import { getExtractedTables, getTableById } from '@/services/supabaseService';
 import { useSearchParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
 // Enhanced business analyst prompt template with specific instructions for table analysis
 const BUSINESS_ANALYST_PROMPT = `You are a business data analyst. Given the table data and user query, find the answer from the provided table only.
@@ -39,6 +40,7 @@ export const useAIAssistant = () => {
     }
   ]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<string | null>(null);
   const [processedDocuments, setProcessedDocuments] = useState<Document[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -47,42 +49,91 @@ export const useAIAssistant = () => {
   // Load processed documents from localStorage and Supabase
   useEffect(() => {
     const fetchProcessedDocuments = async () => {
+      setIsLoadingDocuments(true);
       try {
         console.log("Fetching processed documents...");
-        const docs = await getProcessedDocuments();
-        console.log(`Fetched ${docs.length} processed documents`);
-        setProcessedDocuments(docs);
         
-        if (docs.length === 0) {
-          console.log("No documents found. Checking sources:");
-          console.log("localStorage - processedTables:", localStorage.getItem('processedTables'));
-          console.log("localStorage - processedFiles:", localStorage.getItem('processedFiles'));
-          
-          // Try fetching directly from Supabase
-          try {
-            const tables = await getExtractedTables();
-            console.log("Supabase tables:", tables);
+        // First try to get from Supabase directly to ensure we have the latest data
+        let supabaseTables: Document[] = [];
+        try {
+          const { data: tables, error } = await supabase
+            .from('extracted_tables')
+            .select(`
+              id,
+              title,
+              headers,
+              rows,
+              created_at,
+              confidence,
+              file_id,
+              uploaded_files (name, file_type)
+            `)
+            .order('created_at', { ascending: false });
             
-            if (tables.length > 0) {
-              const formattedTables: Document[] = tables.map(table => ({
-                id: table.id,
-                name: table.title || 'Extracted Table',
-                type: 'table' as const,
-                extractedAt: table.created_at
-              }));
-              setProcessedDocuments(formattedTables);
+          if (!error && tables && tables.length > 0) {
+            console.log(`Retrieved ${tables.length} tables from Supabase directly`, tables);
+            
+            supabaseTables = tables.map((table: any) => ({
+              id: table.id,
+              name: table.title || 'Table from database',
+              type: 'table' as const,
+              extractedAt: table.created_at,
+              source: 'supabase',
+              confidence: table.confidence,
+              // Pre-load the data to avoid additional calls later
+              headers: table.headers,
+              rows: table.rows
+            }));
+            
+            // Set processed documents immediately from Supabase
+            if (supabaseTables.length > 0) {
+              setProcessedDocuments(supabaseTables);
             }
-          } catch (error) {
-            console.error("Error fetching from Supabase:", error);
+          }
+        } catch (e) {
+          console.error("Error directly querying Supabase tables:", e);
+          // Continue to fallback methods
+        }
+        
+        // If we couldn't get from Supabase directly or want to include locally stored documents
+        if (supabaseTables.length === 0) {
+          const docs = await getProcessedDocuments();
+          console.log(`Fetched ${docs.length} processed documents from utilities`);
+          
+          if (docs.length > 0) {
+            setProcessedDocuments(docs);
+          } else {
+            console.log("No documents found. Checking alternate sources:");
+            
+            // Try fetching directly from Supabase again using the utility function
+            try {
+              const tables = await getExtractedTables();
+              console.log("Supabase tables from utility:", tables);
+              
+              if (tables.length > 0) {
+                const formattedTables: Document[] = tables.map(table => ({
+                  id: table.id,
+                  name: table.title || 'Extracted Table',
+                  type: 'table' as const,
+                  extractedAt: table.created_at,
+                  source: 'supabase'
+                }));
+                setProcessedDocuments(formattedTables);
+              }
+            } catch (error) {
+              console.error("Error fetching from Supabase via utility:", error);
+            }
           }
         }
       } catch (error) {
         console.error("Error fetching processed documents:", error);
         toast({
           title: "Error loading documents",
-          description: "Could not load processed documents",
+          description: "Could not load processed documents. Try refreshing the page.",
           variant: "destructive",
         });
+      } finally {
+        setIsLoadingDocuments(false);
       }
     };
     
@@ -98,7 +149,7 @@ export const useAIAssistant = () => {
     window.addEventListener('documentProcessed', handleDocumentProcessed);
     
     // Poll every few seconds to make sure we catch any updates
-    const intervalId = setInterval(fetchProcessedDocuments, 5000);
+    const intervalId = setInterval(fetchProcessedDocuments, 10000);
     
     return () => {
       window.removeEventListener('documentProcessed', handleDocumentProcessed);
@@ -160,14 +211,46 @@ export const useAIAssistant = () => {
     
     try {
       if (selectedDocument) {
-        // First try from Supabase if it looks like a UUID
-        if (selectedDocument.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-          documentData = await getTableById(selectedDocument);
+        // First check if the document data is already in our processed documents
+        const preloadedDoc = processedDocuments.find(doc => doc.id === selectedDocument);
+        if (preloadedDoc && preloadedDoc.headers && preloadedDoc.rows) {
+          documentData = preloadedDoc;
+          console.log("Using pre-loaded document data:", documentData);
+        } 
+        // If not found in preloaded data, try direct Supabase query for table data
+        else if (selectedDocument.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+          console.log("Fetching table data directly from Supabase");
+          try {
+            const { data: table, error } = await supabase
+              .from('extracted_tables')
+              .select('id, title, headers, rows, confidence, created_at')
+              .eq('id', selectedDocument)
+              .single();
+              
+            if (!error && table) {
+              documentData = {
+                id: table.id,
+                name: table.title || 'Extracted Table',
+                headers: table.headers,
+                rows: table.rows,
+                confidence: table.confidence,
+                extractedAt: table.created_at
+              };
+              console.log("Retrieved table data directly from Supabase:", documentData);
+            } else {
+              console.error("Error fetching table from Supabase:", error);
+              // Fall back to utility function
+              documentData = await getTableById(selectedDocument);
+            }
+          } catch (e) {
+            console.error("Error in direct Supabase query:", e);
+          }
         }
         
-        // If not found in Supabase, try localStorage
+        // If still not found, try utility function for localStorage
         if (!documentData) {
           documentData = await getDocumentDataById(selectedDocument);
+          console.log("Retrieved document data from utility function:", documentData);
         }
       }
     } catch (error) {
@@ -271,14 +354,38 @@ ${message}`;
     // If document not found in array, try to get it from Supabase
     if (!doc && value.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
       try {
-        const tableData = await getTableById(value);
-        if (tableData) {
+        // Try direct query first
+        const { data: table, error } = await supabase
+          .from('extracted_tables')
+          .select('id, title, headers, rows, confidence, created_at')
+          .eq('id', value)
+          .single();
+          
+        if (!error && table) {
           doc = {
-            id: tableData.id,
-            name: tableData.title,
+            id: table.id,
+            name: table.title || 'Extracted Table',
             type: 'table',
-            extractedAt: tableData.created_at
+            extractedAt: table.created_at,
+            source: 'supabase',
+            headers: table.headers,
+            rows: table.rows
           };
+          
+          // Add to processed documents cache
+          setProcessedDocuments(prev => [...prev, doc!]);
+        } else {
+          // Fall back to utility function
+          const tableData = await getTableById(value);
+          if (tableData) {
+            doc = {
+              id: tableData.id,
+              name: tableData.title,
+              type: 'table',
+              extractedAt: tableData.created_at,
+              source: 'supabase'
+            };
+          }
         }
       } catch (error) {
         console.error("Error fetching table from Supabase:", error);
@@ -302,6 +409,7 @@ ${message}`;
     setMessage,
     messages,
     isProcessing,
+    isLoadingDocuments,
     selectedDocument,
     processedDocuments,
     handleSendMessage,

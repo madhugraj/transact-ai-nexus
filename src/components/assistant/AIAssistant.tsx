@@ -6,7 +6,7 @@ import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import DocumentSelector from './DocumentSelector';
 import useAIAssistant from '@/hooks/useAIAssistant';
-import { PieChart, BarChart3, Table, BrainCircuit, MessagesSquare, FileDigit } from 'lucide-react';
+import { PieChart, BarChart3, Table as TableIcon, BrainCircuit, MessagesSquare, FileDigit, Loader2 } from 'lucide-react';
 
 const AIAssistant: React.FC = () => {
   const {
@@ -17,7 +17,8 @@ const AIAssistant: React.FC = () => {
     processedDocuments,
     selectedDocument,
     handleSendMessage,
-    handleDocumentChange
+    handleDocumentChange,
+    isLoadingDocuments
   } = useAIAssistant();
 
   const hasDocuments = processedDocuments.length > 0;
@@ -38,23 +39,36 @@ const AIAssistant: React.FC = () => {
               Ask questions about your documents and get AI-powered insights
             </CardDescription>
           </div>
-          <DocumentSelector 
-            documents={processedDocuments} 
-            onDocumentChange={handleDocumentChange}
-            selectedDocumentId={selectedDocument}
-          />
+          <div className="flex items-center gap-2">
+            {isLoadingDocuments && (
+              <div className="flex items-center text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                Loading...
+              </div>
+            )}
+            <DocumentSelector 
+              documents={processedDocuments} 
+              onDocumentChange={handleDocumentChange}
+              selectedDocumentId={selectedDocument}
+            />
+          </div>
         </div>
         
-        {hasTableSelected && (
-          <div className="mt-2 flex flex-wrap gap-2">
+        {hasTableSelected && selectedDocumentData && (
+          <div className="mt-3 flex flex-wrap gap-2">
             <Badge variant="outline" className="flex items-center gap-1 bg-primary/5">
-              <Table className="h-3 w-3" /> 
+              <TableIcon className="h-3 w-3" /> 
               Table Analysis
             </Badge>
             <Badge variant="outline" className="flex items-center gap-1 bg-primary/5">
               <FileDigit className="h-3 w-3" /> 
               {selectedDocumentData?.name}
             </Badge>
+            {selectedDocumentData.source && (
+              <Badge variant="secondary" className="text-xs">
+                {selectedDocumentData.source === 'supabase' ? 'Database' : 'Local Storage'}
+              </Badge>
+            )}
           </div>
         )}
       </CardHeader>
@@ -99,7 +113,7 @@ const AIAssistant: React.FC = () => {
             <BarChart3 className="h-3.5 w-3.5 text-primary/80" /> Data Analysis
           </div>
           <div className="flex items-center gap-1">
-            <Table className="h-3.5 w-3.5 text-primary/80" /> Table Visualization
+            <TableIcon className="h-3.5 w-3.5 text-primary/80" /> Table Visualization
           </div>
         </div>
       )}

@@ -1,3 +1,4 @@
+
 import { Agent, ProcessingContext } from "./types";
 import * as api from '@/services/api';
 import { PDFDocument } from 'pdf-lib';
@@ -36,6 +37,7 @@ export class PDFTableExtractionAgent implements Agent {
     
     // Process PDF files to extract tables
     const extractedTables = [];
+    const failedPages = [];
     
     for (const pdfFile of pdfFiles) {
       try {
@@ -50,22 +52,51 @@ export class PDFTableExtractionAgent implements Agent {
         
         console.log(`PDF has ${pageCount} pages, processing each page individually`);
         
-        // Process each page separately
-        for (let pageIndex = 0; pageIndex < pageCount; pageIndex++) {
-          console.log(`Processing page ${pageIndex + 1} of ${pageCount}`);
-          
+        // First try direct text-based table extraction if available (simulating pdfplumber approach)
+        let directExtractionSucceeded = false;
+        
+        // If we have extracted text content, try to parse tables from it
+        if (data.extractedTextContent) {
           try {
-            // Create a new document with just this page
-            const singlePageDoc = await PDFDocument.create();
-            const [copiedPage] = await singlePageDoc.copyPages(pdfDoc, [pageIndex]);
-            singlePageDoc.addPage(copiedPage);
+            console.log("Attempting direct table extraction from extracted text content");
+            const parsedTables = await this.extractTablesFromText(data.extractedTextContent);
             
-            // Convert single page PDF to base64
-            const singlePageBytes = await singlePageDoc.save();
-            const base64Data = this.arrayBufferToBase64(singlePageBytes);
+            if (parsedTables && parsedTables.length > 0) {
+              console.log(`Successfully extracted ${parsedTables.length} tables directly from text`);
+              extractedTables.push(...parsedTables.map((table, idx) => ({
+                tableId: `pdf-text-table-${pdfFile.name}-${idx + 1}`,
+                source: `${pdfFile.name} (Text extraction)`,
+                title: `${table.title || `Extracted Table from ${pdfFile.name}`}`,
+                headers: table.headers,
+                rows: table.rows,
+                confidence: 0.95
+              })));
+              directExtractionSucceeded = true;
+            }
+          } catch (textExtractionError) {
+            console.error("Error extracting tables from text:", textExtractionError);
+            // Fall back to page-by-page Gemini Vision extraction
+          }
+        }
+        
+        // If direct extraction failed or we want additional tables, process each page with Gemini Vision
+        if (!directExtractionSucceeded || extractedTables.length === 0) {
+          // Process each page separately
+          for (let pageIndex = 0; pageIndex < pageCount; pageIndex++) {
+            console.log(`Processing page ${pageIndex + 1} of ${pageCount}`);
             
-            // Use custom prompt template for better table extraction
-            const tablePrompt = `You are an expert in extracting tables from scanned images.
+            try {
+              // Create a new document with just this page
+              const singlePageDoc = await PDFDocument.create();
+              const [copiedPage] = await singlePageDoc.copyPages(pdfDoc, [pageIndex]);
+              singlePageDoc.addPage(copiedPage);
+              
+              // Convert single page PDF to base64
+              const singlePageBytes = await singlePageDoc.save();
+              const base64Data = this.arrayBufferToBase64(singlePageBytes);
+              
+              // Use updated prompt template that exactly matches the required format
+              const tablePrompt = `You are an expert in extracting tables from scanned images.
 If the image has Checks, Mention that it is a check image and extract the values accordingly.
 - Give appropriate title for the image according to the type of image.
 Instructions:
@@ -88,75 +119,85 @@ Instructions:
   ]
 }
 \`\`\``;
-            
-            // Process each page with Gemini Vision
-            const response = await api.processImageWithGemini(
-              tablePrompt,
-              base64Data,
-              'application/pdf'
-            );
-            
-            if (response.success && response.data) {
-              console.log(`Successfully extracted content from page ${pageIndex + 1}`);
               
-              // Try to extract JSON from the response
-              try {
-                const jsonMatch = response.data.match(/```json\s*(\{[\s\S]*?\})\s*```/) || 
-                                 response.data.match(/\{[\s\S]*"tables"[\s\S]*\}/);
-                                 
-                if (jsonMatch) {
-                  const jsonStr = jsonMatch[1] || jsonMatch[0];
-                  const parsedData = JSON.parse(jsonStr);
-                  
-                  if (parsedData.tables && Array.isArray(parsedData.tables)) {
-                    console.log(`Found ${parsedData.tables.length} tables in page ${pageIndex + 1}`);
+              // Process each page with Gemini Vision
+              const response = await api.processImageWithGemini(
+                tablePrompt,
+                base64Data,
+                'application/pdf'
+              );
+              
+              if (response.success && response.data) {
+                console.log(`Successfully extracted content from page ${pageIndex + 1}`);
+                
+                // Try to extract JSON from the response
+                try {
+                  const jsonMatch = response.data.match(/```json\s*(\{[\s\S]*?\})\s*```/) || 
+                                  response.data.match(/\{[\s\S]*"tables"[\s\S]*\}/);
+                                  
+                  if (jsonMatch) {
+                    const jsonStr = jsonMatch[1] || jsonMatch[0];
+                    const parsedData = JSON.parse(jsonStr);
                     
-                    // Add page number to title for better identification
-                    parsedData.tables.forEach((table, tableIndex) => {
-                      // Ensure we have a title
-                      const baseTitle = table.title || `Table from ${pdfFile.name}`;
-                      table.title = `${baseTitle} (Page ${pageIndex + 1}, Table ${tableIndex + 1})`;
+                    if (parsedData.tables && Array.isArray(parsedData.tables)) {
+                      console.log(`Found ${parsedData.tables.length} tables in page ${pageIndex + 1}`);
                       
-                      // Add to extracted tables
-                      extractedTables.push({
-                        tableId: `pdf-table-p${pageIndex + 1}-t${tableIndex + 1}`,
-                        source: `${pdfFile.name} (Page ${pageIndex + 1})`,
-                        title: table.title,
-                        headers: table.headers,
-                        rows: table.rows,
-                        confidence: 0.9
+                      // Add page number to title for better identification
+                      parsedData.tables.forEach((table, tableIndex) => {
+                        // Ensure we have a title
+                        const baseTitle = table.title || `Table from ${pdfFile.name}`;
+                        table.title = `${baseTitle} (Page ${pageIndex + 1}, Table ${tableIndex + 1})`;
+                        
+                        // Add to extracted tables
+                        extractedTables.push({
+                          tableId: `pdf-table-p${pageIndex + 1}-t${tableIndex + 1}`,
+                          source: `${pdfFile.name} (Page ${pageIndex + 1})`,
+                          title: table.title,
+                          headers: table.headers,
+                          rows: table.rows,
+                          confidence: 0.9
+                        });
                       });
-                    });
+                    }
+                  } else {
+                    console.log(`No valid JSON found in response for page ${pageIndex + 1}`);
+                    // Try direct text-based table extraction as fallback
+                    const extractedTable = await this.extractTableFromText(response.data);
+                    if (extractedTable) {
+                      extractedTables.push({
+                        tableId: `pdf-table-p${pageIndex + 1}-fallback`,
+                        source: `${pdfFile.name} (Page ${pageIndex + 1})`,
+                        title: `Extracted Table from ${pdfFile.name} (Page ${pageIndex + 1})`,
+                        headers: extractedTable.headers,
+                        rows: extractedTable.rows,
+                        confidence: 0.8
+                      });
+                    } else {
+                      failedPages.push(pageIndex + 1);
+                    }
                   }
-                } else {
-                  console.log(`No valid JSON found in response for page ${pageIndex + 1}`);
-                  // Try direct text-based table extraction as fallback
-                  const extractedTable = await this.extractTableFromText(response.data);
-                  if (extractedTable) {
-                    extractedTables.push({
-                      tableId: `pdf-table-p${pageIndex + 1}-fallback`,
-                      source: `${pdfFile.name} (Page ${pageIndex + 1})`,
-                      title: `Extracted Table from ${pdfFile.name} (Page ${pageIndex + 1})`,
-                      headers: extractedTable.headers,
-                      rows: extractedTable.rows,
-                      confidence: 0.8
-                    });
-                  }
+                } catch (parseError) {
+                  console.error(`Error parsing JSON from page ${pageIndex + 1}:`, parseError);
+                  console.error("Raw response:", response.data.substring(0, 200) + "...");
+                  failedPages.push(pageIndex + 1);
                 }
-              } catch (parseError) {
-                console.error(`Error parsing JSON from page ${pageIndex + 1}:`, parseError);
-                console.error("Raw response:", response.data.substring(0, 200) + "...");
+              } else {
+                console.error(`Failed to extract content from page ${pageIndex + 1}:`, response.error);
+                failedPages.push(pageIndex + 1);
               }
-            } else {
-              console.error(`Failed to extract content from page ${pageIndex + 1}:`, response.error);
+            } catch (pageError) {
+              console.error(`Error processing page ${pageIndex + 1}:`, pageError);
+              failedPages.push(pageIndex + 1);
             }
-          } catch (pageError) {
-            console.error(`Error processing page ${pageIndex + 1}:`, pageError);
           }
         }
       } catch (fileError) {
         console.error(`Error processing PDF file ${pdfFile.name}:`, fileError);
       }
+    }
+    
+    if (failedPages.length > 0) {
+      console.log(`Warning: Failed to extract tables from pages: ${failedPages.join(', ')}`);
     }
     
     console.log(`Extracted ${extractedTables.length} tables from PDF files`);
@@ -166,8 +207,89 @@ Instructions:
       fileObjects, // Preserve file objects for document preview
       pdfTablesExtracted: extractedTables.length > 0,
       extractedTables: [...(data.extractedTables || []), ...extractedTables],
+      failedExtractedPages: failedPages,
       processedBy: 'PDFTableExtractionAgent'
     };
+  }
+
+  // Helper method to extract tables from text content (simulating pdfplumber functionality)
+  private async extractTablesFromText(text: string): Promise<{title: string, headers: string[], rows: string[][]}[]> {
+    try {
+      // Use Gemini to parse text into structured tables
+      const parsePrompt = `
+I need you to extract ALL possible tables from the following text. Many tables may be present.
+Extract each table with its headers and data rows.
+Return ONLY a JSON object with this format:
+{
+  "tables": [
+    {
+      "title": "Table name or description",
+      "headers": ["Header1", "Header2", ...],
+      "rows": [
+        ["row1col1", "row1col2", ...],
+        ["row2col1", "row2col2", ...],
+        ...
+      ]
+    },
+    {
+      "title": "Second table name",
+      "headers": [...],
+      "rows": [...]
+    }
+  ]
+}
+
+Only include clear tabular data. Here's the text:
+${text.substring(0, 15000)}`; // Limit text length to avoid token limits
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: parsePrompt }] }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 4096
+            }
+          })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      
+      // Extract JSON from the response
+      const jsonMatch = resultText.match(/\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}/);
+      if (!jsonMatch) {
+        console.error("No valid JSON found in text extraction response");
+        return [];
+      }
+      
+      const parsedData = JSON.parse(jsonMatch[0]);
+      
+      if (!parsedData.tables || !Array.isArray(parsedData.tables) || parsedData.tables.length === 0) {
+        console.log("No tables found in text extraction");
+        return [];
+      }
+      
+      // Validate each table has the required structure
+      return parsedData.tables.filter(table => 
+        table.headers && Array.isArray(table.headers) && 
+        table.rows && Array.isArray(table.rows) && 
+        table.rows.length > 0
+      );
+    } catch (error) {
+      console.error("Error extracting tables from text:", error);
+      return [];
+    }
   }
   
   private async extractTableFromText(text: string): Promise<{ headers: string[], rows: string[][] } | null> {
