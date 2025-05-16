@@ -69,10 +69,10 @@ export const useAIGeneration = () => {
   useEffect(() => {
     const checkGeminiConfig = async () => {
       try {
-        // Properly call the RPC function with type casting for the response
+        // Fix: Use the correct typings for the RPC call
         const { data, error } = await supabase.rpc('get_service_key', { 
           service_name: 'gemini' 
-        });
+        } as { service_name: string });
         
         if (error) throw error;
         

@@ -1,4 +1,3 @@
-
 import { ApiResponse } from '../types';
 import { supabase } from "@/integrations/supabase/client";
 
@@ -18,10 +17,10 @@ export const generateInsightsWithGemini = async (
     console.log(`Table context (sample): ${tableContext.substring(0, 100)}...`);
     console.log(`Analysis prompt (sample): ${analysisPrompt.substring(0, 100)}...`);
     
-    // Properly call the RPC function with correct approach for type handling
+    // Fix: Use the correct typings for the RPC call
     const { data, error } = await supabase.rpc('get_service_key', {
       service_name: 'gemini'
-    });
+    } as { service_name: string });
     
     if (error) throw error;
     
