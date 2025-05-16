@@ -54,14 +54,14 @@ export const useAIAssistant = () => {
           } else if (extractedTables?.length > 0) {
             console.log(`Fetched ${extractedTables.length} tables from Supabase:`, extractedTables);
             
-            // Map Supabase data to Document format
+            // Map Supabase data to Document format with proper typing
             const supabaseDocs = extractedTables.map(table => ({
               id: table.id,
               name: table.title || 'Extracted Table',
               type: 'table' as 'table' | 'document' | 'image',
               extractedAt: table.created_at,
-              // Add Supabase flag to distinguish the source
-              source: 'supabase',
+              // Fix: Use literal 'supabase' instead of string "supabase"
+              source: 'supabase' as 'supabase',
               data: {
                 headers: table.headers,
                 rows: table.rows
@@ -91,7 +91,7 @@ export const useAIAssistant = () => {
               id: doc.id,
               name: doc.name,
               type: doc.type,
-              source: (doc as any).source || 'localStorage'
+              source: doc.source || 'localStorage'
             });
           });
         }
