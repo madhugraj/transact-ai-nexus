@@ -1,9 +1,11 @@
+
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Message } from '@/components/assistant/MessageList';
 import { Document } from '@/components/assistant/DocumentSelector';
 import { getProcessedDocuments, getDocumentDataById } from '@/utils/documentStorage';
 import { generateInsightsWithGemini } from '@/services/api/gemini/insightGenerator';
+import { getExtractedTables, getTableById } from '@/services/supabaseService';
 
 // Business analyst prompt template
 const BUSINESS_ANALYST_PROMPT = `You are a business data analyst. Given the table data and user query, find the answer from the provided table only.
@@ -32,19 +34,27 @@ export const useAIAssistant = () => {
   const [processedDocuments, setProcessedDocuments] = useState<Document[]>([]);
   const { toast } = useToast();
 
-  // Load real processed documents from localStorage
+  // Load processed documents from localStorage and Supabase
   useEffect(() => {
-    const fetchProcessedDocuments = () => {
+    const fetchProcessedDocuments = async () => {
       try {
         console.log("Fetching processed documents...");
-        const docs = getProcessedDocuments();
+        const docs = await getProcessedDocuments();
         console.log(`Fetched ${docs.length} processed documents`);
         setProcessedDocuments(docs);
         
         if (docs.length === 0) {
-          console.log("No documents found. Checking localStorage directly:");
-          console.log("processedTables:", localStorage.getItem('processedTables'));
-          console.log("processedFiles:", localStorage.getItem('processedFiles'));
+          console.log("No documents found. Checking sources:");
+          console.log("localStorage - processedTables:", localStorage.getItem('processedTables'));
+          console.log("localStorage - processedFiles:", localStorage.getItem('processedFiles'));
+          
+          // Try fetching directly from Supabase
+          try {
+            const tables = await getExtractedTables();
+            console.log("Supabase tables:", tables);
+          } catch (error) {
+            console.error("Error fetching from Supabase:", error);
+          }
         }
       } catch (error) {
         console.error("Error fetching processed documents:", error);
@@ -104,7 +114,24 @@ export const useAIAssistant = () => {
     setMessage('');
 
     // Get document data if available
-    const documentData = selectedDocument ? getDocumentDataById(selectedDocument) : null;
+    let documentData = null;
+    
+    try {
+      if (selectedDocument) {
+        // First try from Supabase if it looks like a UUID
+        if (selectedDocument.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+          documentData = await getTableById(selectedDocument);
+        }
+        
+        // If not found in Supabase, try localStorage
+        if (!documentData) {
+          documentData = await getDocumentDataById(selectedDocument);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching document data:", error);
+    }
+    
     const doc = processedDocuments.find(d => d.id === selectedDocument);
 
     try {
@@ -119,9 +146,15 @@ export const useAIAssistant = () => {
         
         if (documentData.headers && documentData.rows) {
           // Format table data as readable text
-          const headers = documentData.headers.join(' | ');
-          const rows = documentData.rows.map(row => row.join(' | ')).join('\n');
-          tableContext = `Table: ${documentData.name || doc?.name || 'Unknown'}\n\nHeaders: ${headers}\n\nData:\n${rows}`;
+          const headers = Array.isArray(documentData.headers) 
+            ? documentData.headers.join(' | ')
+            : Object.values(documentData.headers).join(' | ');
+            
+          const rows = Array.isArray(documentData.rows)
+            ? documentData.rows.map(row => Array.isArray(row) ? row.join(' | ') : Object.values(row).join(' | ')).join('\n')
+            : [];
+            
+          tableContext = `Table: ${documentData.name || documentData.title || doc?.name || 'Unknown'}\n\nHeaders: ${headers}\n\nData:\n${rows}`;
         } else if (documentData.data && Array.isArray(documentData.data)) {
           // Handle alternative data structure
           tableContext = JSON.stringify(documentData.data, null, 2);
@@ -188,10 +221,27 @@ ${message}`;
     }
   };
 
-  const handleDocumentChange = (value: string) => {
+  const handleDocumentChange = async (value: string) => {
     setSelectedDocument(value);
     
-    const doc = processedDocuments.find(d => d.id === value);
+    let doc = processedDocuments.find(d => d.id === value);
+    
+    // If document not found in array, try to get it from Supabase
+    if (!doc && value.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      try {
+        const tableData = await getTableById(value);
+        if (tableData) {
+          doc = {
+            id: tableData.id,
+            name: tableData.title,
+            type: 'table',
+            extractedAt: tableData.created_at
+          };
+        }
+      } catch (error) {
+        console.error("Error fetching table from Supabase:", error);
+      }
+    }
     
     if (doc) {
       const aiMessage: Message = {

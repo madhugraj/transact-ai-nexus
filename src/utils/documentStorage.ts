@@ -1,12 +1,14 @@
 
 import { Document } from "@/components/assistant/DocumentSelector";
+import { supabase } from "@/integrations/supabase/client";
+import { getExtractedTables, getTableById } from "@/services/supabaseService";
 
 /**
- * Utility functions for storing and retrieving processed documents from localStorage
+ * Utility functions for storing and retrieving processed documents from localStorage and Supabase
  */
 
 /**
- * Save processed files to localStorage
+ * Save processed files to localStorage and Supabase if connected
  */
 export const saveProcessedFiles = (files: any[], processingId?: string) => {
   try {
@@ -37,16 +39,16 @@ export const saveProcessedFiles = (files: any[], processingId?: string) => {
 };
 
 /**
- * Save processed tables to localStorage
+ * Save processed tables to localStorage and Supabase if connected
  */
-export const saveProcessedTables = (tables: any[], processingId?: string) => {
+export const saveProcessedTables = async (tables: any[], processingId?: string) => {
   try {
     if (!tables || tables.length === 0) {
       console.log("No tables provided to save");
       return false;
     }
     
-    console.log("Saving tables to localStorage:", tables);
+    console.log("Saving tables to localStorage and Supabase:", tables);
     
     // Get existing processed tables or initialize empty array
     const existingTables = localStorage.getItem('processedTables');
@@ -83,6 +85,26 @@ export const saveProcessedTables = (tables: any[], processingId?: string) => {
     // Update localStorage with combined array
     localStorage.setItem('processedTables', JSON.stringify([...processedTables, ...newProcessedTables]));
     
+    // Try to save to Supabase if it exists
+    for (const table of newProcessedTables) {
+      if (table.fileId && table.headers && table.rows) {
+        try {
+          // If we have supabase and file ID, save there too
+          await supabase
+            .from('extracted_tables')
+            .insert({
+              file_id: table.fileId,
+              title: table.name,
+              headers: table.headers,
+              rows: table.rows,
+              confidence: table.confidence || 0.9
+            });
+        } catch (e) {
+          console.error("Error saving table to Supabase:", e);
+        }
+      }
+    }
+    
     // Dispatch event to notify components that new tables are processed
     window.dispatchEvent(new CustomEvent('documentProcessed'));
     
@@ -95,9 +117,9 @@ export const saveProcessedTables = (tables: any[], processingId?: string) => {
 };
 
 /**
- * Get all processed documents from localStorage
+ * Get all processed documents from localStorage and Supabase
  */
-export const getProcessedDocuments = (): Document[] => {
+export const getProcessedDocuments = async (): Promise<Document[]> => {
   try {
     // Try to get processed documents from localStorage
     const processedTablesStr = localStorage.getItem('processedTables');
@@ -108,29 +130,50 @@ export const getProcessedDocuments = (): Document[] => {
       processedFilesStr: processedFilesStr ? `${processedFilesStr.substring(0, 100)}...` : 'null'
     });
     
-    const tables = processedTablesStr ? JSON.parse(processedTablesStr) : [];
-    const files = processedFilesStr ? JSON.parse(processedFilesStr) : [];
+    const localTables = processedTablesStr ? JSON.parse(processedTablesStr) : [];
+    const localFiles = processedFilesStr ? JSON.parse(processedFilesStr) : [];
     
-    console.log('Parsed localStorage data:', {
-      tablesCount: tables.length,
-      filesCount: files.length,
-      tablesSample: tables.length > 0 ? tables[0].name : 'No tables',
-      filesSample: files.length > 0 ? files[0].name : 'No files'
-    });
+    // Try to get documents from Supabase
+    let supabaseTables: any[] = [];
+    
+    try {
+      const tablesData = await getExtractedTables();
+      supabaseTables = tablesData.map((table: any) => ({
+        id: table.id,
+        name: table.title,
+        type: 'table',
+        extractedAt: table.created_at,
+        confidence: table.confidence,
+        source: 'supabase'
+      }));
+    } catch (e) {
+      console.error("Error fetching tables from Supabase:", e);
+    }
+    
+    // Combine tables from both sources, prioritizing Supabase
+    const combinedTables = [
+      ...supabaseTables,
+      ...localTables.filter((table: any) => 
+        table !== null && 
+        !supabaseTables.some((sTable: any) => sTable.id === table.id)
+      )
+    ];
     
     // Create properly formatted Document objects for the selector
     const docs: Document[] = [
-      ...tables.filter((table: any) => table !== null).map((table: any) => ({
+      ...combinedTables.map((table: any) => ({
         id: table.id || `table-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         name: table.name || table.title || 'Extracted Table',
         type: table.type || 'table',
-        extractedAt: table.extractedAt || new Date().toISOString()
+        extractedAt: table.extractedAt || table.created_at || new Date().toISOString(),
+        source: table.source || 'local'
       })),
-      ...files.filter((file: any) => file !== null).map((file: any) => ({
+      ...localFiles.filter((file: any) => file !== null).map((file: any) => ({
         id: file.id || file.backendId || `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         name: file.name || (file.file && file.file.name) || 'Processed Document',
         type: file.file && file.file.type && file.file.type.includes('image') ? 'image' : 'document',
-        extractedAt: file.extractedAt || new Date().toISOString()
+        extractedAt: file.extractedAt || new Date().toISOString(),
+        source: 'local'
       }))
     ];
     
@@ -143,12 +186,33 @@ export const getProcessedDocuments = (): Document[] => {
 };
 
 /**
- * Get document data by ID
+ * Get document data by ID from localStorage or Supabase
  */
-export const getDocumentDataById = (documentId: string) => {
+export const getDocumentDataById = async (documentId: string) => {
   try {
     console.log('Getting document data for ID:', documentId);
     
+    // First try Supabase
+    if (documentId.includes('table-') || documentId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      try {
+        const supabaseTable = await getTableById(documentId);
+        if (supabaseTable) {
+          console.log('Found table in Supabase:', supabaseTable);
+          return {
+            id: supabaseTable.id,
+            name: supabaseTable.title,
+            headers: supabaseTable.headers,
+            rows: supabaseTable.rows,
+            confidence: supabaseTable.confidence,
+            extractedAt: supabaseTable.created_at
+          };
+        }
+      } catch (e) {
+        console.error("Error getting table from Supabase:", e);
+      }
+    }
+    
+    // Fall back to localStorage
     const tablesStr = localStorage.getItem('processedTables');
     const filesStr = localStorage.getItem('processedFiles');
     
@@ -189,8 +253,9 @@ export const getDocumentDataById = (documentId: string) => {
 };
 
 /**
- * Check if a document ID exists in localStorage
+ * Check if a document ID exists in localStorage or Supabase
  */
-export const documentExists = (documentId: string): boolean => {
-  return getDocumentDataById(documentId) !== null;
+export const documentExists = async (documentId: string): Promise<boolean> => {
+  const result = await getDocumentDataById(documentId);
+  return result !== null;
 };

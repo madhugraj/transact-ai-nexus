@@ -1,14 +1,28 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card } from "@/components/ui/card";
-import ProcessingTab from "@/components/processing/ProcessingTab";
-import TableExtraction from "@/components/ingestion/GeminiVisionTest";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table } from "lucide-react";
+import ProcessingTab from "@/components/processing/ProcessingTab";
+import TableExtractionPage from "@/components/ingestion/TableExtractionPage";
+import { syncLocalStorageWithSupabase } from "@/services/supabaseService";
 
 const Documents = () => {
   const [activeTab, setActiveTab] = useState<string>("tableExtraction");
+  
+  // Sync local storage tables with Supabase on load
+  useEffect(() => {
+    const syncData = async () => {
+      try {
+        await syncLocalStorageWithSupabase();
+      } catch (error) {
+        console.error('Error syncing with Supabase:', error);
+      }
+    };
+    
+    syncData();
+  }, []);
   
   return (
     <AppLayout>
@@ -35,7 +49,7 @@ const Documents = () => {
           </TabsContent>
           
           <TabsContent value="tableExtraction" className="mt-4">
-            <TableExtraction />
+            <TableExtractionPage />
           </TabsContent>
         </Tabs>
       </div>
