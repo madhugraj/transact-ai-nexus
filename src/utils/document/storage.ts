@@ -1,6 +1,6 @@
 
 import { Document } from "@/components/assistant/DocumentSelector";
-import { getExtractedTables, getTableById } from "@/services/supabaseService";
+import { getExtractedTables, getTableById } from "@/services/supabase/tableService";
 
 /**
  * Get all processed documents from localStorage and Supabase

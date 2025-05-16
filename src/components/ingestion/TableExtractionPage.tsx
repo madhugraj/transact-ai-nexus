@@ -8,7 +8,8 @@ import { Loader2, Upload, ImageIcon, FileIcon, Table, AlertTriangle } from 'luci
 import DocumentPreview from './DocumentPreview';
 import EnhancedTablePreview from './EnhancedTablePreview';
 import { extractTablesFromImageWithGemini, fileToBase64 } from '@/services/api';
-import { uploadFileToStorage, saveExtractedTable, checkFileProcessed, ensureStorageBucketExists } from '@/services/supabaseService';
+import { uploadFileToStorage, checkFileProcessed, ensureStorageBucketExists } from '@/services/supabase/fileService';
+import { saveExtractedTable } from '@/services/supabase/tableService';
 import { saveProcessedTables } from '@/utils/documentStorage';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -324,8 +325,17 @@ const TableExtractionPage: React.FC = () => {
           onClick={() => fileInputRef.current?.click()}
           className="flex items-center gap-2"
           size="lg"
+          disabled={initializingStorage}
         >
-          <Upload className="h-4 w-4" /> Select file
+          {initializingStorage ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> Initializing...
+            </>
+          ) : (
+            <>
+              <Upload className="h-4 w-4" /> Select file
+            </>
+          )}
         </Button>
         <p className="text-xs text-muted-foreground">
           Supported formats: JPEG, PNG, PDF
@@ -349,7 +359,7 @@ const TableExtractionPage: React.FC = () => {
           <Button onClick={handleNewUpload} variant="outline">
             Choose different file
           </Button>
-          <Button onClick={handleExtractTable} disabled={!file}>
+          <Button onClick={handleExtractTable} disabled={!file || initializingStorage}>
             <Table className="h-4 w-4 mr-2" /> Extract Tables
           </Button>
         </div>

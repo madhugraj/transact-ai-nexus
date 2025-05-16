@@ -32,8 +32,14 @@ export const ensureStorageBucketExists = async () => {
       
       if (error) {
         console.error('Error creating storage bucket:', error);
+        // Check for more specific error types and provide better feedback
+        if (error.message.includes('duplicate key value')) {
+          console.log('Bucket already exists (race condition). Continuing...');
+          return true;
+        }
+        
         if (error.message.includes('row-level security')) {
-          console.error('This appears to be a permissions error. Make sure you have the correct permissions.');
+          console.error('This appears to be a permissions error. RLS policies may need to be configured.');
         }
         return false;
       }
