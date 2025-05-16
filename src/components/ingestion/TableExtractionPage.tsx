@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -21,20 +21,41 @@ const TableExtractionPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('upload');
   const [error, setError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [initializingStorage, setInitializingStorage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   // Check storage bucket exists on component mount
-  React.useEffect(() => {
+  useEffect(() => {
     const checkStorageBucket = async () => {
-      const exists = await ensureStorageBucketExists();
-      if (!exists) {
-        setUploadError('Failed to initialize storage. Please try again later.');
+      setInitializingStorage(true);
+      setUploadError(null);
+      
+      try {
+        console.log("Checking storage bucket existence...");
+        const exists = await ensureStorageBucketExists();
+        
+        if (!exists) {
+          console.error("Failed to initialize storage bucket");
+          setUploadError('Failed to initialize storage. Please try again later.');
+          toast({
+            title: "Storage Error",
+            description: "Failed to initialize storage. Please check your permissions or try again later.",
+            variant: "destructive",
+          });
+        } else {
+          console.log("Storage bucket exists and is ready for use");
+        }
+      } catch (err) {
+        console.error("Error checking storage bucket:", err);
+        setUploadError('Error connecting to storage. Please try again later.');
+      } finally {
+        setInitializingStorage(false);
       }
     };
     
     checkStorageBucket();
-  }, []);
+  }, [toast]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -250,6 +271,33 @@ const TableExtractionPage: React.FC = () => {
     }
   };
   
+  const handleRetryStorageInit = async () => {
+    setInitializingStorage(true);
+    setUploadError(null);
+    
+    try {
+      const exists = await ensureStorageBucketExists();
+      
+      if (!exists) {
+        setUploadError('Still unable to initialize storage. Please try again later.');
+        toast({
+          title: "Storage Error Persists",
+          description: "We're still having trouble with storage. Please try again later.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Storage Connected",
+          description: "Storage system is now ready to use.",
+        });
+      }
+    } catch (error) {
+      setUploadError('Failed to connect to storage. Please try again later.');
+    } finally {
+      setInitializingStorage(false);
+    }
+  };
+  
   const renderUploadTab = () => (
     <div className="flex flex-col items-center justify-center py-10 px-6 space-y-6">
       <div className="rounded-full bg-primary/10 p-6">
@@ -381,28 +429,46 @@ const TableExtractionPage: React.FC = () => {
       <CardContent>
         {uploadError && (
           <div className="bg-destructive/10 text-destructive border border-destructive/20 rounded-md p-4 mb-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-destructive mt-0.5" />
-              <div>
-                <p className="font-medium">Storage Error</p>
-                <p className="text-sm">{uploadError}</p>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-destructive mt-0.5" />
+                <div>
+                  <p className="font-medium">Storage Error</p>
+                  <p className="text-sm">{uploadError}</p>
+                </div>
               </div>
+              
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="ml-8 w-fit" 
+                onClick={handleRetryStorageInit}
+                disabled={initializingStorage}
+              >
+                {initializingStorage ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Connecting...
+                  </>
+                ) : (
+                  <>Retry Connection</>
+                )}
+              </Button>
             </div>
           </div>
         )}
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid grid-cols-4 w-full">
-            <TabsTrigger value="upload" disabled={isProcessing}>
+            <TabsTrigger value="upload" disabled={isProcessing || initializingStorage}>
               <Upload className="h-4 w-4 mr-2" /> Upload
             </TabsTrigger>
-            <TabsTrigger value="preview" disabled={!file || isProcessing}>
+            <TabsTrigger value="preview" disabled={!file || isProcessing || initializingStorage}>
               <FileIcon className="h-4 w-4 mr-2" /> Preview
             </TabsTrigger>
-            <TabsTrigger value="processing" disabled={!isProcessing}>
+            <TabsTrigger value="processing" disabled={!isProcessing || initializingStorage}>
               <Loader2 className="h-4 w-4 mr-2" /> Processing
             </TabsTrigger>
-            <TabsTrigger value="results" disabled={!extractedData || isProcessing}>
+            <TabsTrigger value="results" disabled={!extractedData || isProcessing || initializingStorage}>
               <Table className="h-4 w-4 mr-2" /> Results
             </TabsTrigger>
           </TabsList>
