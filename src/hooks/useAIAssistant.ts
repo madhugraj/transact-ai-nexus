@@ -39,7 +39,18 @@ export const useAIAssistant = () => {
       try {
         console.log("Fetching processed documents...");
         const docs = getProcessedDocuments();
-        console.log(`Fetched ${docs.length} processed documents`);
+        console.log(`Fetched ${docs.length} processed documents:`, docs);
+        
+        if (docs.length > 0) {
+          docs.forEach((doc, index) => {
+            console.log(`Document ${index + 1}:`, {
+              id: doc.id,
+              name: doc.name,
+              type: doc.type
+            });
+          });
+        }
+        
         setProcessedDocuments(docs);
         
         if (docs.length === 0) {
@@ -96,6 +107,10 @@ export const useAIAssistant = () => {
     const documentData = selectedDocument ? getDocumentDataById(selectedDocument) : null;
     const doc = processedDocuments.find(d => d.id === selectedDocument);
 
+    console.log("Selected document:", selectedDocument);
+    console.log("Document data:", documentData);
+    console.log("Found document in processed documents:", doc);
+
     try {
       let responseContent = '';
       
@@ -119,6 +134,8 @@ export const useAIAssistant = () => {
           tableContext = JSON.stringify(documentData, null, 2);
         }
         
+        console.log("Table context prepared:", tableContext.substring(0, 100) + "...");
+        
         // Prepare prompt with context and user query
         const analysisPrompt = `${BUSINESS_ANALYST_PROMPT}
         
@@ -128,8 +145,11 @@ ${tableContext}
 User query:
 ${message}`;
         
+        console.log("Calling Gemini API with prompt length:", analysisPrompt.length);
+        
         // Call Gemini API
         const response = await generateInsightsWithGemini(tableContext, analysisPrompt);
+        console.log("Gemini API response:", response);
         
         if (response.success && response.data) {
           responseContent = response.data.insights || response.data.summary || "I've analyzed the data but don't have specific insights to share.";
@@ -179,8 +199,10 @@ ${message}`;
 
   const handleDocumentChange = (value: string) => {
     setSelectedDocument(value);
+    console.log("Document selected:", value);
     
     const doc = processedDocuments.find(d => d.id === value);
+    console.log("Selected document details:", doc);
     
     if (doc) {
       const aiMessage: Message = {

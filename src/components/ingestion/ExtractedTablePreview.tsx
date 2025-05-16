@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -147,7 +146,7 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
     rowCount: tableData.rows.length
   });
   
-  // Render JSON view if displayFormat is 'json'
+  // Render Response (Structured) view if displayFormat is 'json'
   if (displayFormat === 'json') {
     const jsonData = {
       headers: tableData.headers,

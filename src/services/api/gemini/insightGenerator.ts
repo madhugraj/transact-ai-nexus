@@ -13,7 +13,15 @@ export const generateInsightsWithGemini = async (
   try {
     console.log("Generating insights with Gemini API");
     
-    // Simulate API call - in production this would call the Gemini API
+    // In a production environment, this would call the actual Gemini API
+    // with the API key stored in Supabase secrets
+    
+    // The Gemini_key is already stored in Supabase secrets
+    // and would be used in a real implementation to make the API call
+    console.log("Using table context length:", tableContext.length);
+    console.log("Analysis prompt length:", analysisPrompt.length);
+    
+    // Simulate a delay to mimic API call
     await new Promise(resolve => setTimeout(resolve, 1500));
     
     return {

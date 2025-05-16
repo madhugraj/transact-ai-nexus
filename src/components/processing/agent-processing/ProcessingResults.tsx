@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -104,7 +103,7 @@ export const ProcessingResults = ({
                     size="sm"
                     onClick={() => setDisplayFormat('json')}
                   >
-                    JSON View
+                    Response (Structured)
                   </Button>
                 </div>
               </div>
@@ -138,7 +137,7 @@ export const ProcessingResults = ({
                     size="sm"
                     onClick={() => setDisplayFormat('json')}
                   >
-                    JSON View
+                    Response (Structured)
                   </Button>
                 </div>
               </div>
