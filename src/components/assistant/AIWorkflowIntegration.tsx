@@ -1,11 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileText, Table, Sparkles, Eye, ArrowRight, Database } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { getExtractedTables } from '@/services/supabaseService';
+import { getProcessedDocuments } from '@/utils/documentStorage';
 
 interface RecentDocument {
   id: string;
@@ -17,32 +19,67 @@ interface RecentDocument {
 
 const AIWorkflowIntegration: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'recent' | 'suggestions'>('recent');
+  const [recentDocuments, setRecentDocuments] = useState<RecentDocument[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const recentDocuments: RecentDocument[] = [
-    {
-      id: '1',
-      name: 'Invoice_ABC_Corp_May2023.pdf',
-      type: 'invoice',
-      processedAt: new Date('2023-05-15T14:32:00'),
-      path: '/documents?id=1'
-    },
-    {
-      id: '2',
-      name: 'Quarterly_Sales_Report',
-      type: 'table',
-      processedAt: new Date('2023-05-14T10:15:00'),
-      path: '/database?table=quarterly_sales'
-    },
-    {
-      id: '3',
-      name: 'Statement_XYZ_April.pdf',
-      type: 'statement',
-      processedAt: new Date('2023-05-12T16:20:00'),
-      path: '/documents?id=4'
-    }
-  ];
+  // Load real extracted tables when component mounts
+  useEffect(() => {
+    const loadRecentDocuments = async () => {
+      setIsLoading(true);
+      try {
+        // Get data from Supabase
+        const tables = await getExtractedTables();
+        
+        // Get data from localStorage
+        const localDocuments = await getProcessedDocuments();
+        
+        // Combine and format the data
+        const formattedDocuments: RecentDocument[] = [
+          ...tables.map(table => ({
+            id: table.id,
+            name: table.title || 'Extracted Table',
+            type: 'table' as const,
+            processedAt: new Date(table.created_at),
+            path: `/assistant?tableId=${table.id}`
+          })),
+          ...localDocuments
+            .filter(doc => !tables.some(table => table.id === doc.id)) // Avoid duplicates
+            .map(doc => ({
+              id: doc.id,
+              name: doc.name || 'Document',
+              type: (doc.type as 'table' | 'document' | 'invoice' | 'statement') || 'document',
+              processedAt: new Date(doc.extractedAt || Date.now()),
+              path: `/assistant?docId=${doc.id}`
+            }))
+        ];
+        
+        // Sort by processed date, most recent first
+        formattedDocuments.sort((a, b) => b.processedAt.getTime() - a.processedAt.getTime());
+        
+        // Take only the 5 most recent documents
+        setRecentDocuments(formattedDocuments.slice(0, 5));
+      } catch (error) {
+        console.error('Error loading recent documents:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadRecentDocuments();
+    
+    // Set up event listener for document processed events
+    const handleDocumentProcessed = () => {
+      loadRecentDocuments();
+    };
+    
+    window.addEventListener('documentProcessed', handleDocumentProcessed);
+    
+    return () => {
+      window.removeEventListener('documentProcessed', handleDocumentProcessed);
+    };
+  }, []);
 
   // Format relative time
   const formatRelativeTime = (date: Date) => {
@@ -121,7 +158,11 @@ const AIWorkflowIntegration: React.FC = () => {
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">Recently processed documents:</p>
             
-            {recentDocuments.length > 0 ? (
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+              </div>
+            ) : recentDocuments.length > 0 ? (
               <div className="divide-y">
                 {recentDocuments.map((doc) => (
                   <div 

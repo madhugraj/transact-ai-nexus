@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload, ImageIcon, FileIcon, Table, AlertTriangle } from 'lucide-react';
+import { Loader2, Upload, FileIcon, Table, AlertTriangle, BrainCircuit } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import DocumentPreview from './DocumentPreview';
 import EnhancedTablePreview from './EnhancedTablePreview';
 import { extractTablesFromImageWithGemini, fileToBase64 } from '@/services/api';
@@ -23,8 +24,10 @@ const TableExtractionPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [initializingStorage, setInitializingStorage] = useState(false);
+  const [extractedTableId, setExtractedTableId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Check storage bucket exists on component mount
   useEffect(() => {
@@ -97,6 +100,7 @@ const TableExtractionPage: React.FC = () => {
     
     // Clear previous extraction data
     setExtractedData(null);
+    setExtractedTableId(null);
     
     // Switch to the preview tab
     setActiveTab('preview');
@@ -214,6 +218,7 @@ const TableExtractionPage: React.FC = () => {
             // Include the Supabase IDs in the extracted data
             firstTable.id = tableId;
             firstTable.fileId = storageResult.fileId;
+            setExtractedTableId(tableId);
           }
         }
         
@@ -239,6 +244,9 @@ const TableExtractionPage: React.FC = () => {
             sourceFile: file.name
           }
         });
+        
+        // Dispatch event to notify other components
+        window.dispatchEvent(new CustomEvent('documentProcessed'));
         
         // Switch to the results tab
         setActiveTab('results');
@@ -287,6 +295,7 @@ const TableExtractionPage: React.FC = () => {
     setUploadError(null);
     setActiveTab('upload');
     setProcessingProgress(0);
+    setExtractedTableId(null);
     
     // Clear the file input
     if (fileInputRef.current) {
@@ -294,6 +303,21 @@ const TableExtractionPage: React.FC = () => {
     }
   };
   
+  const handleAnalyzeWithAI = () => {
+    // Navigate to assistant page with tableId parameter
+    if (extractedTableId) {
+      navigate(`/assistant?tableId=${extractedTableId}`);
+    } else {
+      // If no tableId (e.g., using local storage), create a parameter based on available data
+      navigate(`/assistant?docId=latest`);
+    }
+    
+    toast({
+      title: "Opening AI Assistant",
+      description: "Loading table data for analysis",
+    });
+  };
+
   const handleRetryStorageInit = async () => {
     setInitializingStorage(true);
     setUploadError(null);
@@ -440,8 +464,23 @@ const TableExtractionPage: React.FC = () => {
         </div>
       </div>
       
-      <div className="flex justify-center mt-6">
-        <Button onClick={handleNewUpload}>Process another document</Button>
+      <div className="flex flex-col items-center gap-4 mt-6">
+        <Button 
+          onClick={handleAnalyzeWithAI} 
+          className="w-full md:w-auto flex items-center gap-2"
+          variant="default"
+        >
+          <BrainCircuit className="h-4 w-4" /> 
+          Analyze with AI Assistant
+        </Button>
+        
+        <Button 
+          onClick={handleNewUpload} 
+          variant="outline"
+          className="w-full md:w-auto"
+        >
+          Process another document
+        </Button>
       </div>
     </div>
   );

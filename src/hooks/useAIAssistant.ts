@@ -6,18 +6,27 @@ import { Document } from '@/components/assistant/DocumentSelector';
 import { getProcessedDocuments, getDocumentDataById } from '@/utils/documentStorage';
 import { generateInsightsWithGemini } from '@/services/api/gemini/insightGenerator';
 import { getExtractedTables, getTableById } from '@/services/supabaseService';
+import { useSearchParams } from 'react-router-dom';
 
-// Business analyst prompt template
+// Enhanced business analyst prompt template with specific instructions for table analysis
 const BUSINESS_ANALYST_PROMPT = `You are a business data analyst. Given the table data and user query, find the answer from the provided table only.
 
 Analyze the output and the original intent to provide a clear explanation and prescriptive business insights.
 
 Instructions:
 - Identify patterns, outliers, or anomalies using actual values from the data.
+- Perform calculations when appropriate (sums, averages, percentages, growth rates).
 - Explain what the result reveals in business terms.
-- Recommend 3-5 specific business actions. Be precise.
-- Use professional, clear language.
-- Output plain text only. No markdown or code formatting.`;
+- Recommend 3-5 specific business actions based on the data analysis. Be precise.
+- Suggest KPIs or metrics to track going forward.
+- Use professional, clear language suitable for business stakeholders.
+- Output plain text only. No markdown or code formatting.
+
+Always structure your response with these sections:
+1. Summary of findings
+2. Key insights (with supporting data points)
+3. Business implications
+4. Recommended actions`;
 
 export const useAIAssistant = () => {
   const [message, setMessage] = useState('');
@@ -32,6 +41,7 @@ export const useAIAssistant = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<string | null>(null);
   const [processedDocuments, setProcessedDocuments] = useState<Document[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
 
   // Load processed documents from localStorage and Supabase
@@ -52,6 +62,16 @@ export const useAIAssistant = () => {
           try {
             const tables = await getExtractedTables();
             console.log("Supabase tables:", tables);
+            
+            if (tables.length > 0) {
+              const formattedTables = tables.map(table => ({
+                id: table.id,
+                name: table.title || 'Extracted Table',
+                type: 'table',
+                extractedAt: table.created_at
+              }));
+              setProcessedDocuments(formattedTables);
+            }
           } catch (error) {
             console.error("Error fetching from Supabase:", error);
           }
@@ -85,6 +105,28 @@ export const useAIAssistant = () => {
       clearInterval(intervalId);
     };
   }, [toast]);
+
+  // Check URL parameters for auto-selecting a document
+  useEffect(() => {
+    const tableId = searchParams.get('tableId');
+    const docId = searchParams.get('docId');
+    
+    if (tableId || docId) {
+      const documentId = tableId || docId;
+      console.log("Auto-selecting document from URL params:", documentId);
+      setSelectedDocument(documentId);
+      
+      // Remove the parameter after processing to avoid reloading the selection
+      searchParams.delete('tableId');
+      searchParams.delete('docId');
+      setSearchParams(searchParams);
+      
+      // Fetch and load the document data
+      if (documentId) {
+        handleDocumentChange(documentId);
+      }
+    }
+  }, [searchParams]);
 
   // Add a system message to the chat
   const addSystemMessage = (content: string) => {
