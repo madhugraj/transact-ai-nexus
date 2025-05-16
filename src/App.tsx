@@ -11,7 +11,6 @@ import Index from './pages/Index';
 import NotFound from './pages/NotFound';
 import EmailConnector from './pages/EmailConnector';
 import SapData from './pages/SapData';
-
 import { Toaster } from './components/ui/toaster';
 
 function App() {
@@ -33,7 +32,6 @@ function App() {
         <Route path="/index" element={<Index />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
-
       <Toaster />
     </Router>
   );
