@@ -12,6 +12,7 @@ const AIAssistant: React.FC = () => {
     setMessage,
     messages,
     isProcessing,
+    selectedDocument,
     processedDocuments,
     handleSendMessage,
     handleDocumentChange
@@ -41,6 +42,8 @@ const AIAssistant: React.FC = () => {
           setMessage={setMessage}
           handleSendMessage={handleSendMessage}
           isProcessing={isProcessing}
+          hasDocuments={processedDocuments.length > 0}
+          isDocumentSelected={!!selectedDocument}
         />
       </CardFooter>
     </Card>

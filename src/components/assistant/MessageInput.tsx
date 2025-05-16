@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, InfoIcon } from 'lucide-react';
+import { Send, InfoIcon, AlertCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface MessageInputProps {
@@ -10,13 +10,17 @@ interface MessageInputProps {
   setMessage: (message: string) => void;
   handleSendMessage: () => void;
   isProcessing: boolean;
+  hasDocuments?: boolean;
+  isDocumentSelected?: boolean;
 }
 
 const MessageInput: React.FC<MessageInputProps> = ({ 
   message, 
   setMessage, 
   handleSendMessage, 
-  isProcessing 
+  isProcessing,
+  hasDocuments = true,
+  isDocumentSelected = false
 }) => {
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -25,30 +29,46 @@ const MessageInput: React.FC<MessageInputProps> = ({
     }
   };
 
+  // Show different tooltips based on state
+  const tooltipContent = !hasDocuments 
+    ? "Process documents in the Documents section first to use the AI Assistant"
+    : !isDocumentSelected
+    ? "Select a document from the dropdown above to ask questions about it"
+    : "Ask analytical questions about the selected document";
+
+  const tooltipIcon = !hasDocuments || !isDocumentSelected
+    ? <AlertCircle className="h-4 w-4 text-amber-500" />
+    : <InfoIcon className="h-4 w-4 text-muted-foreground" />;
+
   return (
     <div className="w-full flex gap-2">
       <div className="relative w-full">
         <Textarea
-          placeholder="Ask a question about your processed documents..."
+          placeholder={
+            !hasDocuments 
+              ? "Process documents first to use the AI Assistant..." 
+              : !isDocumentSelected
+              ? "Select a document above before asking questions..."
+              : "Ask a question about your processed documents..."
+          }
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyPress}
           className="resize-none pr-10"
           rows={1}
           maxLength={500}
-          disabled={isProcessing}
+          disabled={isProcessing || !hasDocuments || !isDocumentSelected}
         />
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground">
-                <InfoIcon className="h-4 w-4" />
+              <span className="absolute right-2 top-1/2 -translate-y-1/2">
+                {tooltipIcon}
               </span>
             </TooltipTrigger>
             <TooltipContent>
               <p className="text-sm max-w-[250px]">
-                First select a document from the dropdown above,
-                then ask questions about the data to get insights.
+                {tooltipContent}
               </p>
             </TooltipContent>
           </Tooltip>
@@ -56,7 +76,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
       </div>
       <Button 
         onClick={handleSendMessage} 
-        disabled={!message.trim() || isProcessing}
+        disabled={!message.trim() || isProcessing || !hasDocuments || !isDocumentSelected}
         size="icon"
         className="shrink-0"
       >

@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { Edit, Download, Loader, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import * as api from '@/services/api';
@@ -30,6 +32,10 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
   const [loading, setLoading] = useState(isLoading);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const rowsPerPage = 10;
 
   console.log("ExtractedTablePreview - Received data:", {
     fileId,
@@ -100,6 +106,11 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
     fetchTableData();
   }, [fileId, initialData]);
 
+  // Reset pagination when data changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [tableData]);
+
   // Loading state
   if (loading) {
     return (
@@ -146,6 +157,13 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
     rowCount: tableData.rows.length
   });
   
+  // Calculate pagination
+  const totalPages = Math.ceil(tableData.rows.length / rowsPerPage);
+  const paginatedRows = tableData.rows.slice(
+    (currentPage - 1) * rowsPerPage,
+    currentPage * rowsPerPage
+  );
+  
   // Render Response (Structured) view if displayFormat is 'json'
   if (displayFormat === 'json') {
     const jsonData = {
@@ -160,23 +178,29 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
             {JSON.stringify(jsonData, null, 2)}
           </pre>
           
-          <div className="p-4 flex justify-end space-x-2 border-t mt-4">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={onEdit}
-              disabled={!onEdit}
-            >
-              <Edit className="h-4 w-4 mr-1" /> Edit Data
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => fileId && api.exportTableData(fileId, 'csv')}
-              disabled={!fileId}
-            >
-              <Download className="h-4 w-4 mr-1" /> Export CSV
-            </Button>
+          <div className="p-4 flex justify-between items-center border-t mt-4">
+            <div className="text-sm text-muted-foreground">
+              {tableData.rows.length} rows, {tableData.headers.length} columns
+            </div>
+            
+            <div className="flex space-x-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onEdit}
+                disabled={!onEdit}
+              >
+                <Edit className="h-4 w-4 mr-1" /> Edit Data
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => fileId && api.exportTableData(fileId, 'csv')}
+                disabled={!fileId}
+              >
+                <Download className="h-4 w-4 mr-1" /> Export CSV
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -199,7 +223,7 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {tableData.rows.map((row, rowIndex) => (
+              {paginatedRows.map((row, rowIndex) => (
                 <TableRow key={rowIndex}>
                   {row.map((cell, cellIndex) => (
                     <TableCell key={cellIndex}>{cell}</TableCell>
@@ -210,23 +234,75 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
           </Table>
         </div>
         
-        <div className="p-4 flex justify-end space-x-2 border-t">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={onEdit}
-            disabled={!onEdit}
-          >
-            <Edit className="h-4 w-4 mr-1" /> Edit Data
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => fileId && api.exportTableData(fileId, 'csv')}
-            disabled={!fileId}
-          >
-            <Download className="h-4 w-4 mr-1" /> Export CSV
-          </Button>
+        {/* Pagination */}
+        {tableData.rows.length > rowsPerPage && (
+          <div className="py-4 border-t">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+                
+                {/* Page numbers */}
+                {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
+                  // For simplicity, show first 5 pages
+                  const pageNumber = i + 1;
+                  return (
+                    <PaginationItem key={pageNumber}>
+                      <PaginationLink
+                        isActive={pageNumber === currentPage}
+                        onClick={() => setCurrentPage(pageNumber)}
+                      >
+                        {pageNumber}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                
+                {/* Show ellipsis if there are more pages */}
+                {totalPages > 5 && (
+                  <PaginationItem>
+                    <span className="px-2">...</span>
+                  </PaginationItem>
+                )}
+                
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
+        
+        <div className="p-4 flex justify-between items-center border-t">
+          <div className="text-sm text-muted-foreground">
+            {tableData.rows.length} rows, {tableData.headers.length} columns
+          </div>
+          
+          <div className="flex space-x-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onEdit}
+              disabled={!onEdit}
+            >
+              <Edit className="h-4 w-4 mr-1" /> Edit Data
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => fileId && api.exportTableData(fileId, 'csv')}
+              disabled={!fileId}
+            >
+              <Download className="h-4 w-4 mr-1" /> Export CSV
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

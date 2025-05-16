@@ -13,28 +13,67 @@ export const generateInsightsWithGemini = async (
   try {
     console.log("Generating insights with Gemini API");
     
-    // In a production environment, this would call the actual Gemini API
-    // with the API key stored in Supabase secrets
+    // Get the API key from Supabase secrets
+    const geminiApiKey = Deno.env.get('Gemini_key') || process.env.Gemini_key;
     
-    // The Gemini_key is already stored in Supabase secrets
-    // and would be used in a real implementation to make the API call
+    if (!geminiApiKey) {
+      console.error("Gemini API key not found");
+      return {
+        success: false,
+        error: "Gemini API key not configured"
+      };
+    }
+    
     console.log("Using table context length:", tableContext.length);
     console.log("Analysis prompt length:", analysisPrompt.length);
     
-    // Simulate a delay to mimic API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Call the Gemini API
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: analysisPrompt }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 4096
+          }
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Gemini API error:", errorText);
+      return {
+        success: false,
+        error: `Gemini API error: ${response.status} ${errorText}`
+      };
+    }
+
+    const data = await response.json();
+    const insights = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!insights) {
+      return {
+        success: false,
+        error: "No insights were generated from Gemini"
+      };
+    }
     
     return {
       success: true,
       data: {
-        insights: "Based on the provided data, here are key insights:\n\n" +
-                 "1. The table contains important financial information that could be used for business analysis.\n\n" +
-                 "2. Several patterns in the data suggest opportunities for optimization in your business processes.\n\n" +
-                 "3. There appear to be some outliers in the data that merit further investigation.\n\n" +
-                 "Recommended actions:\n" +
-                 "- Review the highlighted transactions for accuracy\n" +
-                 "- Consider segmenting your data by date ranges for better trend analysis\n" +
-                 "- Implement regular monitoring of the key metrics identified in this analysis"
+        insights: insights
       }
     };
   } catch (error) {

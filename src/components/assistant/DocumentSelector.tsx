@@ -1,14 +1,16 @@
 
 import React from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TableIcon, FileText, Database } from 'lucide-react';
+import { TableIcon, FileText, Database, AlertCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
 
 export interface Document {
   id: string;
   name: string;
   type: 'table' | 'document' | 'image';
   extractedAt: string;
+  source?: 'supabase' | 'localStorage';
 }
 
 interface DocumentSelectorProps {
@@ -24,7 +26,7 @@ const DocumentSelector: React.FC<DocumentSelectorProps> = ({ documents, onDocume
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="flex items-center text-amber-500 cursor-help">
-                <Database className="h-4 w-4 mr-1" />
+                <AlertCircle className="h-4 w-4 mr-1" />
                 <span className="text-xs">No data</span>
               </div>
             </TooltipTrigger>
@@ -54,7 +56,10 @@ const DocumentSelector: React.FC<DocumentSelectorProps> = ({ documents, onDocume
                   ) : (
                     <FileText className="h-4 w-4 mr-2 text-blue-500" />
                   )}
-                  {doc.name}
+                  <span className="truncate max-w-[160px]">{doc.name}</span>
+                  {doc.source === 'supabase' && (
+                    <Badge variant="outline" className="ml-2 text-[10px] py-0">DB</Badge>
+                  )}
                 </div>
               </SelectItem>
             ))
