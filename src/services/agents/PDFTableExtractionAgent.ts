@@ -1,11 +1,11 @@
-
 import { Agent, ProcessingContext } from "./types";
 import * as api from '@/services/api';
+import { PDFDocument } from 'pdf-lib';
 
 export class PDFTableExtractionAgent implements Agent {
   id: string = "PDFTableExtraction";
   name: string = "PDF Table Extraction Agent";
-  description: string = "Extracts tables from PDF documents";
+  description: string = "Extracts tables from PDF documents page by page";
   
   async process(data: any, context?: ProcessingContext): Promise<any> {
     console.log("🤖 PDFTableExtractionAgent processing with data:", {
@@ -41,69 +41,121 @@ export class PDFTableExtractionAgent implements Agent {
       try {
         console.log(`Processing PDF: ${pdfFile.name}`);
         
-        // Use the extracted text content if available
-        const extractedText = data.extractedTextContent || "";
+        // Convert PDF to ArrayBuffer for processing with pdf-lib
+        const pdfArrayBuffer = await this.fileToArrayBuffer(pdfFile);
         
-        if (extractedText) {
-          console.log("Using extracted text to identify tables in PDF");
+        // Load the PDF document
+        const pdfDoc = await PDFDocument.load(pdfArrayBuffer);
+        const pageCount = pdfDoc.getPageCount();
+        
+        console.log(`PDF has ${pageCount} pages, processing each page individually`);
+        
+        // Process each page separately
+        for (let pageIndex = 0; pageIndex < pageCount; pageIndex++) {
+          console.log(`Processing page ${pageIndex + 1} of ${pageCount}`);
           
-          // Use Gemini to identify and extract tables from the text
-          const tablePrompt = "Identify any tables in this text and format them with proper column headers and rows. Maintain the original structure.";
-          
-          // Convert PDF to base64 for Gemini processing if needed
-          const base64Data = await api.fileToBase64(pdfFile);
-          const response = await api.processImageWithGemini(tablePrompt, base64Data, pdfFile.type);
-          
-          if (response.success && response.data) {
-            console.log("Successfully extracted table content from PDF using Gemini");
+          try {
+            // Create a new document with just this page
+            const singlePageDoc = await PDFDocument.create();
+            const [copiedPage] = await singlePageDoc.copyPages(pdfDoc, [pageIndex]);
+            singlePageDoc.addPage(copiedPage);
             
-            // Parse the table data from the text response
-            const tableData = await this.parseTableFromText(response.data);
+            // Convert single page PDF to base64
+            const singlePageBytes = await singlePageDoc.save();
+            const base64Data = this.arrayBufferToBase64(singlePageBytes);
             
-            if (tableData) {
-              extractedTables.push({
-                tableId: `pdf-table-${extractedTables.length + 1}`,
-                source: pdfFile.name,
-                title: `Table from ${pdfFile.name}`,
-                headers: tableData.headers,
-                rows: tableData.rows,
-                confidence: 0.9
-              });
+            // Use custom prompt template for better table extraction
+            const tablePrompt = `You are an expert in extracting tables from scanned images.
+If the image has Checks, Mention that it is a check image and extract the values accordingly.
+- Give appropriate title for the image according to the type of image.
+Instructions:
+- Extract all clear tabular structures from the image.
+- Extract all possible tabular structures with data from the image
+- Avoid any logos or text not part of a structured table.
+- Output JSON only in the format:
+
+\`\`\`json
+{
+  "tables": [
+    {
+      "title": "optional title",
+      "headers": ["Column A", "Column B"],
+      "rows": [
+        ["value1", "value2"],
+        ...
+      ]
+    }
+  ]
+}
+\`\`\``;
+            
+            // Process each page with Gemini Vision
+            const response = await api.processImageWithGemini(
+              tablePrompt,
+              base64Data,
+              'application/pdf'
+            );
+            
+            if (response.success && response.data) {
+              console.log(`Successfully extracted content from page ${pageIndex + 1}`);
+              
+              // Try to extract JSON from the response
+              try {
+                const jsonMatch = response.data.match(/```json\s*(\{[\s\S]*?\})\s*```/) || 
+                                 response.data.match(/\{[\s\S]*"tables"[\s\S]*\}/);
+                                 
+                if (jsonMatch) {
+                  const jsonStr = jsonMatch[1] || jsonMatch[0];
+                  const parsedData = JSON.parse(jsonStr);
+                  
+                  if (parsedData.tables && Array.isArray(parsedData.tables)) {
+                    console.log(`Found ${parsedData.tables.length} tables in page ${pageIndex + 1}`);
+                    
+                    // Add page number to title for better identification
+                    parsedData.tables.forEach((table, tableIndex) => {
+                      // Ensure we have a title
+                      const baseTitle = table.title || `Table from ${pdfFile.name}`;
+                      table.title = `${baseTitle} (Page ${pageIndex + 1}, Table ${tableIndex + 1})`;
+                      
+                      // Add to extracted tables
+                      extractedTables.push({
+                        tableId: `pdf-table-p${pageIndex + 1}-t${tableIndex + 1}`,
+                        source: `${pdfFile.name} (Page ${pageIndex + 1})`,
+                        title: table.title,
+                        headers: table.headers,
+                        rows: table.rows,
+                        confidence: 0.9
+                      });
+                    });
+                  }
+                } else {
+                  console.log(`No valid JSON found in response for page ${pageIndex + 1}`);
+                  // Try direct text-based table extraction as fallback
+                  const extractedTable = await this.extractTableFromText(response.data);
+                  if (extractedTable) {
+                    extractedTables.push({
+                      tableId: `pdf-table-p${pageIndex + 1}-fallback`,
+                      source: `${pdfFile.name} (Page ${pageIndex + 1})`,
+                      title: `Extracted Table from ${pdfFile.name} (Page ${pageIndex + 1})`,
+                      headers: extractedTable.headers,
+                      rows: extractedTable.rows,
+                      confidence: 0.8
+                    });
+                  }
+                }
+              } catch (parseError) {
+                console.error(`Error parsing JSON from page ${pageIndex + 1}:`, parseError);
+                console.error("Raw response:", response.data.substring(0, 200) + "...");
+              }
+            } else {
+              console.error(`Failed to extract content from page ${pageIndex + 1}:`, response.error);
             }
-          } else {
-            console.error("Failed to extract table from PDF:", response.error);
-          }
-        } else {
-          console.log("No extracted text available, sending PDF directly to Gemini");
-          
-          // Direct PDF processing with Gemini Vision
-          const tablePrompt = "Extract all tables from this document. Format each table with proper column headers and rows.";
-          
-          const base64Data = await api.fileToBase64(pdfFile);
-          const response = await api.processImageWithGemini(tablePrompt, base64Data, pdfFile.type);
-          
-          if (response.success && response.data) {
-            console.log("Successfully extracted table content from PDF using direct Gemini Vision");
-            
-            // Parse the table data from the text response
-            const tableData = await this.parseTableFromText(response.data);
-            
-            if (tableData) {
-              extractedTables.push({
-                tableId: `pdf-table-${extractedTables.length + 1}`,
-                source: pdfFile.name,
-                title: `Table from ${pdfFile.name}`,
-                headers: tableData.headers,
-                rows: tableData.rows,
-                confidence: 0.85
-              });
-            }
-          } else {
-            console.error("Failed to extract table from PDF using direct method:", response.error);
+          } catch (pageError) {
+            console.error(`Error processing page ${pageIndex + 1}:`, pageError);
           }
         }
-      } catch (error) {
-        console.error(`Error processing PDF file ${pdfFile.name}:`, error);
+      } catch (fileError) {
+        console.error(`Error processing PDF file ${pdfFile.name}:`, fileError);
       }
     }
     
@@ -118,7 +170,7 @@ export class PDFTableExtractionAgent implements Agent {
     };
   }
   
-  private async parseTableFromText(text: string): Promise<{ headers: string[], rows: string[][] } | null> {
+  private async extractTableFromText(text: string): Promise<{ headers: string[], rows: string[][] } | null> {
     try {
       // Use Gemini to parse text into a structured table
       const parsePrompt = `
@@ -183,6 +235,27 @@ ${text}`;
       console.error("Error parsing table from text:", error);
       return null;
     }
+  }
+  
+  private fileToArrayBuffer(file: File): Promise<ArrayBuffer> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as ArrayBuffer);
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  }
+  
+  private arrayBufferToBase64(buffer: ArrayBuffer): string {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    
+    return btoa(binary);
   }
   
   canProcess(data: any): boolean {

@@ -1,12 +1,12 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import DocumentSelector from './DocumentSelector';
 import useAIAssistant from '@/hooks/useAIAssistant';
-import { PieChart, BarChart3, Table } from 'lucide-react';
+import { PieChart, BarChart3, Table, BrainCircuit, MessagesSquare, FileDigit } from 'lucide-react';
 
 const AIAssistant: React.FC = () => {
   const {
@@ -22,37 +22,57 @@ const AIAssistant: React.FC = () => {
 
   const hasDocuments = processedDocuments.length > 0;
   const hasSelectedDocument = Boolean(selectedDocument);
-  const hasTableSelected = selectedDocument && processedDocuments.find(d => d.id === selectedDocument)?.type === 'table';
+  const selectedDocumentData = processedDocuments.find(d => d.id === selectedDocument);
+  const hasTableSelected = selectedDocumentData?.type === 'table';
 
   return (
-    <Card className="w-full h-[600px] flex flex-col">
-      <CardHeader className="border-b px-6 py-4">
-        <CardTitle className="text-lg flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            Document AI Assistant
-            {hasTableSelected && (
-              <Badge variant="secondary" className="ml-2 flex items-center gap-1">
-                <Table className="h-3 w-3" /> Table Analysis
-              </Badge>
-            )}
+    <Card className="w-full h-[650px] flex flex-col shadow-lg border-primary/10">
+      <CardHeader className="border-b px-6 py-4 bg-gradient-to-r from-primary/5 to-background">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <BrainCircuit className="h-5 w-5 text-primary" />
+              Financial Data Assistant
+            </CardTitle>
+            <CardDescription className="text-sm mt-1">
+              Ask questions about your documents and get AI-powered insights
+            </CardDescription>
           </div>
           <DocumentSelector 
             documents={processedDocuments} 
             onDocumentChange={handleDocumentChange}
             selectedDocumentId={selectedDocument}
           />
-        </CardTitle>
+        </div>
+        
+        {hasTableSelected && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Badge variant="outline" className="flex items-center gap-1 bg-primary/5">
+              <Table className="h-3 w-3" /> 
+              Table Analysis
+            </Badge>
+            <Badge variant="outline" className="flex items-center gap-1 bg-primary/5">
+              <FileDigit className="h-3 w-3" /> 
+              {selectedDocumentData?.name}
+            </Badge>
+          </div>
+        )}
       </CardHeader>
       
-      <CardContent className="p-0 flex-grow overflow-hidden">
+      <CardContent className="p-0 flex-grow overflow-hidden bg-gradient-to-b from-background to-muted/10">
         <MessageList messages={messages} isProcessing={isProcessing} />
       </CardContent>
       
-      <CardFooter className="p-4 border-t pt-4">
+      <CardFooter className="p-5 border-t pt-4 bg-background">
         {!hasDocuments && (
-          <div className="w-full bg-amber-50 border border-amber-200 rounded p-2 mb-3 text-amber-800 text-sm">
-            <p className="font-medium">No documents found</p>
-            <p className="text-xs mt-1">To get started, process documents in the Documents section first.</p>
+          <div className="w-full bg-amber-50 border border-amber-200 rounded-md p-3 mb-3 text-amber-800 text-sm">
+            <div className="flex items-start gap-2">
+              <MessagesSquare className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium">No documents found</p>
+                <p className="text-xs mt-1">To get started, process documents in the Documents section first.</p>
+              </div>
+            </div>
           </div>
         )}
         <MessageInput 
@@ -71,15 +91,15 @@ const AIAssistant: React.FC = () => {
       </CardFooter>
       
       {hasTableSelected && (
-        <div className="px-4 pb-3 flex items-center justify-center gap-4 text-xs text-muted-foreground">
+        <div className="px-5 pb-4 flex items-center justify-center gap-6 text-xs text-muted-foreground bg-background">
           <div className="flex items-center gap-1">
-            <PieChart className="h-3 w-3" /> Basic Charts
+            <PieChart className="h-3.5 w-3.5 text-primary/80" /> Basic Charts
           </div>
           <div className="flex items-center gap-1">
-            <BarChart3 className="h-3 w-3" /> Data Analysis
+            <BarChart3 className="h-3.5 w-3.5 text-primary/80" /> Data Analysis
           </div>
           <div className="flex items-center gap-1">
-            <Table className="h-3 w-3" /> Table Visualization
+            <Table className="h-3.5 w-3.5 text-primary/80" /> Table Visualization
           </div>
         </div>
       )}
