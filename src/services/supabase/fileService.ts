@@ -5,12 +5,48 @@ import { v4 as uuidv4 } from 'uuid';
 const STORAGE_BUCKET = 'document_files';
 
 /**
+ * Ensure storage bucket exists
+ */
+export const ensureStorageBucketExists = async () => {
+  try {
+    // Check if bucket exists
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const bucketExists = buckets?.some(bucket => bucket.name === STORAGE_BUCKET);
+
+    if (!bucketExists) {
+      console.log(`Storage bucket '${STORAGE_BUCKET}' does not exist. Creating it...`);
+      // Create the bucket with public access for simplicity
+      const { error } = await supabase.storage.createBucket(STORAGE_BUCKET, {
+        public: true
+      });
+      
+      if (error) {
+        console.error('Error creating storage bucket:', error);
+        return false;
+      }
+      console.log(`Storage bucket '${STORAGE_BUCKET}' created successfully`);
+    } else {
+      console.log(`Storage bucket '${STORAGE_BUCKET}' already exists`);
+    }
+    return true;
+  } catch (error) {
+    console.error('Error checking/creating storage bucket:', error);
+    return false;
+  }
+};
+
+/**
  * Upload a file to Supabase storage
  */
 export const uploadFileToStorage = async (file: File): Promise<{ path: string; fileId: string } | null> => {
   try {
+    // Ensure bucket exists before attempting upload
+    await ensureStorageBucketExists();
+
     const fileExt = file.name.split('.').pop();
     const filePath = `${uuidv4()}.${fileExt}`;
+    
+    console.log(`Uploading file ${file.name} to storage path ${filePath}`);
     
     const { data, error } = await supabase.storage
       .from(STORAGE_BUCKET)
@@ -20,6 +56,8 @@ export const uploadFileToStorage = async (file: File): Promise<{ path: string; f
       console.error('Error uploading file to storage:', error);
       return null;
     }
+    
+    console.log('File uploaded successfully:', data);
     
     // Create an entry in the uploaded_files table
     const { data: fileData, error: fileError } = await supabase
@@ -38,6 +76,7 @@ export const uploadFileToStorage = async (file: File): Promise<{ path: string; f
       return null;
     }
     
+    console.log('File record created:', fileData);
     return { path: data.path, fileId: fileData.id };
   } catch (error) {
     console.error('Error in uploadFileToStorage:', error);

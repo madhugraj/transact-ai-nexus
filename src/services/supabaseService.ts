@@ -1,5 +1,19 @@
 
-// Re-export functions from individual service files
-export * from './supabase/fileService';
-export * from './supabase/tableService';
-export * from './supabase/syncService';
+// Re-export all Supabase service functions
+export {
+  uploadFileToStorage,
+  getFileUrl,
+  checkFileProcessed,
+  ensureStorageBucketExists
+} from './supabase/fileService';
+
+export {
+  saveExtractedTable,
+  getExtractedTables,
+  getTableById,
+  deleteExtractedTable
+} from './supabase/tableService';
+
+export {
+  syncLocalStorageWithSupabase
+} from './supabase/syncService';

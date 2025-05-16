@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +8,7 @@ import { Loader2, Upload, ImageIcon, FileIcon, Table, AlertTriangle } from 'luci
 import DocumentPreview from './DocumentPreview';
 import EnhancedTablePreview from './EnhancedTablePreview';
 import { extractTablesFromImageWithGemini, fileToBase64 } from '@/services/api';
-import { uploadFileToStorage, saveExtractedTable, checkFileProcessed } from '@/services/supabaseService';
+import { uploadFileToStorage, saveExtractedTable, checkFileProcessed, ensureStorageBucketExists } from '@/services/supabaseService';
 import { saveProcessedTables } from '@/utils/documentStorage';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -21,12 +20,29 @@ const TableExtractionPage: React.FC = () => {
   const [extractedData, setExtractedData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('upload');
   const [error, setError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  // Check storage bucket exists on component mount
+  React.useEffect(() => {
+    const checkStorageBucket = async () => {
+      const exists = await ensureStorageBucketExists();
+      if (!exists) {
+        setUploadError('Failed to initialize storage. Please try again later.');
+      }
+    };
+    
+    checkStorageBucket();
+  }, []);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (!selectedFile) return;
+    
+    // Reset any previous errors
+    setError(null);
+    setUploadError(null);
     
     // Validate file type (images and PDFs)
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
@@ -52,7 +68,6 @@ const TableExtractionPage: React.FC = () => {
     
     setFile(selectedFile);
     setFileUrl(URL.createObjectURL(selectedFile));
-    setError(null);
     
     // Clear previous extraction data
     setExtractedData(null);
@@ -91,33 +106,47 @@ const TableExtractionPage: React.FC = () => {
       setIsProcessing(true);
       setActiveTab('processing');
       setError(null);
+      setUploadError(null);
       
       // Start progress simulation
       const stopProgress = simulateProgress();
+      
+      console.log("Starting table extraction process");
       
       // Check if this file has been processed before
       const existingFile = await checkFileProcessed(file.name, file.size);
       
       if (existingFile && existingFile.processed) {
+        console.log("File already processed, using cached data:", existingFile);
         toast({
           title: "File already processed",
           description: "This file was previously processed. Using cached data.",
         });
       }
       
+      console.log("Uploading file to storage...");
       // Upload file to Supabase storage
       const storageResult = await uploadFileToStorage(file);
       
       if (!storageResult) {
+        setUploadError("Failed to upload file to storage. Please try again.");
+        console.error("Failed to upload file to storage");
         throw new Error("Failed to upload file to storage");
       }
       
+      console.log("File uploaded successfully, extracting tables...");
+      toast({
+        title: "Upload successful",
+        description: "Now extracting tables from document...",
+      });
+      
       // Use Gemini Vision to extract tables from image
       const base64File = await fileToBase64(file);
+      console.log("File converted to base64, sending to Gemini...");
+      
       const extractResult = await extractTablesFromImageWithGemini(
         base64File,
-        file.type,
-        "Extract all tables from this document using markdown table format. Include all headers and rows. Be precise and don't miss any data."
+        file.type
       );
       
       // Stop progress simulation
@@ -125,11 +154,12 @@ const TableExtractionPage: React.FC = () => {
       setProcessingProgress(100);
       
       if (!extractResult.success || !extractResult.data?.tables || extractResult.data.tables.length === 0) {
-        setError(extractResult.error || "No tables found in the image. Try with another image that contains clear tabular data.");
+        const errorMessage = extractResult.error || "No tables found in the image. Try with another image that contains clear tabular data.";
+        setError(errorMessage);
         setIsProcessing(false);
         toast({
           title: "Extraction failed",
-          description: extractResult.error || "No tables found in the image",
+          description: errorMessage,
           variant: "destructive",
         });
         return;
@@ -142,6 +172,7 @@ const TableExtractionPage: React.FC = () => {
       
       // Save to Supabase
       if (storageResult.fileId) {
+        console.log("Saving extracted table to Supabase...");
         const tableId = await saveExtractedTable(
           storageResult.fileId,
           firstTable.title || `Table from ${file.name}`,
@@ -209,6 +240,7 @@ const TableExtractionPage: React.FC = () => {
     setFileUrl(null);
     setExtractedData(null);
     setError(null);
+    setUploadError(null);
     setActiveTab('upload');
     setProcessingProgress(0);
     
@@ -347,6 +379,18 @@ const TableExtractionPage: React.FC = () => {
       </CardHeader>
       
       <CardContent>
+        {uploadError && (
+          <div className="bg-destructive/10 text-destructive border border-destructive/20 rounded-md p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-destructive mt-0.5" />
+              <div>
+                <p className="font-medium">Storage Error</p>
+                <p className="text-sm">{uploadError}</p>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid grid-cols-4 w-full">
             <TabsTrigger value="upload" disabled={isProcessing}>
