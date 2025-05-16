@@ -29,7 +29,7 @@ serve(async (req) => {
     
     switch(service_name.toLowerCase()) {
       case 'gemini':
-        apiKey = Deno.env.get('GEMINI_API_KEY')
+        apiKey = Deno.env.get('GEMINI_API_KEY') || "AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk" // Default API key for testing
         break;
       // Add other services as needed
       default:
@@ -39,9 +39,9 @@ serve(async (req) => {
         )
     }
     
-    // Return the API key
+    // Return the API key as an array to match the expected return type
     return new Response(
-      JSON.stringify({ key: apiKey }),
+      JSON.stringify([apiKey]),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {

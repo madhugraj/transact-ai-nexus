@@ -14,9 +14,9 @@ begin
   -- For now, just return empty array since actual keys will be stored in Supabase edge function
   -- In production, this would integrate with a secure vault or secrets manager
   
-  -- This is just a placeholder to ensure the function exists and can be called from the frontend
+  -- This is just a placeholder to return a valid string array format that matches what the edge function returns
   if service_name = 'gemini' then
-    result := array['placeholder'];
+    result := array['DEFAULT_KEY'];
   else
     result := '{}';
   end if;

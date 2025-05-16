@@ -70,8 +70,8 @@ export const useAIGeneration = () => {
     const checkGeminiConfig = async () => {
       try {
         const { data } = await supabase.rpc('get_service_key', { service_name: 'gemini' });
-        // Properly type and handle the response
-        const apiKeys = data as string[] | null;
+        // Explicitly cast the response to the correct type
+        const apiKeys = data as unknown as string[];
         const hasValidKey = apiKeys && Array.isArray(apiKeys) && apiKeys.length > 0;
         setIsGeminiConfigured(hasValidKey);
       } catch (error) {

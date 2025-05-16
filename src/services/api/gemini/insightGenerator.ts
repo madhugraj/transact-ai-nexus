@@ -18,10 +18,10 @@ export const generateInsightsWithGemini = async (
     console.log(`Table context (sample): ${tableContext.substring(0, 100)}...`);
     console.log(`Analysis prompt (sample): ${analysisPrompt.substring(0, 100)}...`);
     
-    // Check if we have the Gemini API key configured
-    const { data: secrets } = await supabase.rpc('get_service_key', { service_name: 'gemini' });
-    // Properly type and handle the response
-    const apiKeys = secrets as string[] | null;
+    // Check if we have the Gemini API key configured - using proper typing
+    const { data: secretData } = await supabase.rpc('get_service_key', { service_name: 'gemini' });
+    // Explicitly cast the response to the correct type
+    const apiKeys = secretData as unknown as string[];
     const apiKey = apiKeys && apiKeys.length > 0 ? apiKeys[0] : null;
     const hasValidKey = !!apiKey;
     
