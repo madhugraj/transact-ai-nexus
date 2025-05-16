@@ -69,13 +69,15 @@ export const useAIGeneration = () => {
   useEffect(() => {
     const checkGeminiConfig = async () => {
       try {
-        // Use explicit typing for the RPC call to ensure TypeScript correctness
-        const { data } = await supabase.rpc<string[]>('get_service_key', { 
+        // Properly call the RPC function with type casting for the response
+        const { data, error } = await supabase.rpc('get_service_key', { 
           service_name: 'gemini' 
         });
         
-        // Handle the response with proper typing
-        const apiKeys = data || [];
+        if (error) throw error;
+        
+        // Cast the returned data to string array and handle it properly
+        const apiKeys = data as string[] || [];
         const hasValidKey = apiKeys.length > 0;
         setIsGeminiConfigured(hasValidKey);
       } catch (error) {
@@ -177,4 +179,3 @@ ${userMessage}`;
     generateDocumentWelcomeMessage
   };
 };
-
