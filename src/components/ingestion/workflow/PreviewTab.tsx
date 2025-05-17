@@ -73,3 +73,5 @@ export const PreviewTab: React.FC<PreviewTabProps> = ({
     </div>
   );
 };
+
+export default PreviewTab;

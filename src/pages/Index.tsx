@@ -1,7 +1,9 @@
+
 import { useAuth } from "@/components/auth/UserAuthContext";
 import LoginForm from "@/components/auth/LoginForm";
 import AppLayout from "@/components/layout/AppLayout";
 import Dashboard from "./Dashboard";
+import { Tabs } from "@/components/ui/tabs";
 
 // Main app entry point
 const Index = () => {
@@ -11,7 +13,10 @@ const Index = () => {
   if (isAuthenticated) {
     return (
       <AppLayout>
-        <Dashboard />
+        {/* Wrap Dashboard in Tabs so TabsContent components have a Tabs parent */}
+        <Tabs defaultValue="overview">
+          <Dashboard />
+        </Tabs>
       </AppLayout>
     );
   }
