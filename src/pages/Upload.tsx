@@ -1,4 +1,5 @@
 
+import { Tabs } from "@/components/ui/tabs";
 import FileUpload from "@/components/ingestion/FileUpload";
 import AppLayout from "@/components/layout/AppLayout";
 
@@ -13,7 +14,10 @@ const Upload = () => {
           </p>
         </div>
         
-        <FileUpload />
+        {/* Wrap FileUpload in a Tabs component to ensure TabsContent always has a Tabs parent */}
+        <Tabs defaultValue="upload">
+          <FileUpload />
+        </Tabs>
       </div>
     </AppLayout>
   );
