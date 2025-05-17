@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -8,7 +7,7 @@ import GeminiInsightsPanel from '../GeminiInsightsPanel';
 import { saveProcessedTables } from '@/utils/documentStorage';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { FileJson, FileCsv } from 'lucide-react';
+import { FileJson, Files } from 'lucide-react';
 
 interface ProcessingResultsProps {
   processingResults: any;
@@ -395,7 +394,7 @@ export const ProcessingResults = ({
                     size="sm"
                     onClick={handleExportCSV}
                   >
-                    <FileCsv className="h-4 w-4 mr-1" /> Export CSV
+                    <Files className="h-4 w-4 mr-1" /> Export CSV
                   </Button>
                   <Button
                     variant="outline"
@@ -444,7 +443,7 @@ export const ProcessingResults = ({
                     size="sm"
                     onClick={handleExportCSV}
                   >
-                    <FileCsv className="h-4 w-4 mr-1" /> Export CSV
+                    <Files className="h-4 w-4 mr-1" /> Export CSV
                   </Button>
                   <Button
                     variant="outline"

@@ -1,4 +1,3 @@
-
 /**
  * Table extraction service using Gemini Vision
  */
@@ -9,31 +8,26 @@ import { processImageWithGemini } from './visionService';
  * Default prompt template for table extraction
  */
 export const DEFAULT_TABLE_EXTRACTION_PROMPT = `
-You're an OCR assistant. Read this scanned document image and extract clean, structured text.
-You are also an expert in extracting tables from scanned images.
-If the image has Checks, Mention that it is a check image and extract the values accordingly.
-- Give appropriate title for the image according to the type of image.
-Instructions:
-- Extract all clear tabular structures from the image.
-- Extract all possible tabular structures with data from the image
-- Extract the Headings of the table {extracted heading}
-- Avoid any logos or text not part of a structured table.
-- Output JSON only in the format:
-
-\`\`\`json
-{
-  "tables": [
+  Extract all tables from this document and convert to structured data.
+  Return a clean JSON array of table objects with this structure:
+  [
     {
-      "title": "extracted heading",
-      "headers": ["Column A", "Column B"],
+      "title": "Table title if present",
+      "headers": ["Header1", "Header2", ...],
       "rows": [
-        ["value1", "value2"],
+        ["row1col1", "row1col2", ...],
+        ["row2col1", "row2col2", ...],
         ...
       ]
+    },
+    {
+      "title": "Second table title",
+      "headers": [...],
+      "rows": [...]
     }
   ]
-}
-\`\`\``;
+  ONLY return the JSON array. No explanation text.
+`;
 
 /**
  * Extract tables from an image using Gemini Vision with custom prompt

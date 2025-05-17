@@ -1,4 +1,3 @@
-
 /**
  * Gemini Vision API service for image and document processing
  */
@@ -129,7 +128,7 @@ export const extractTablesFromImageWithGemini = async (
     const response = await processImageWithGemini(tableExtractionPrompt, base64Image, mimeType);
     
     if (!response.success) {
-      return response;
+      return response as ApiResponse<{tables: any[]}>;
     }
     
     // Try to parse the JSON response

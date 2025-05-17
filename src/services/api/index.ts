@@ -6,6 +6,8 @@ export * from './tableService';
 export * from './processService';
 export * from './gemini/visionService';
 export * from './gemini/insightGenerator';
+export * from './gemini/tableExtractor';
+import { ApiResponse } from './types';
 
 /**
  * Convert a file to base64

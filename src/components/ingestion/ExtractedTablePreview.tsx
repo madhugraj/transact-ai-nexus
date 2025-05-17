@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
-import { Edit, Download, Loader, AlertCircle, FileJson, FileCsv } from 'lucide-react';
+import { Edit, Download, Loader, AlertCircle, FileJson, Files } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import * as api from '@/services/api';
 
@@ -279,7 +278,7 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
                 size="sm" 
                 onClick={handleExportCSV}
               >
-                <FileCsv className="h-4 w-4 mr-1" /> Export CSV
+                <Files className="h-4 w-4 mr-1" /> Export CSV
               </Button>
             </div>
           </div>
@@ -387,7 +386,7 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
               size="sm" 
               onClick={handleExportCSV}
             >
-              <FileCsv className="h-4 w-4 mr-1" /> Export CSV
+              <Files className="h-4 w-4 mr-1" /> Export CSV
             </Button>
           </div>
         </div>
