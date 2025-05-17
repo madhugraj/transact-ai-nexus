@@ -63,4 +63,4 @@ export const processFile = async (
 /**
  * Extract tables from an image using Gemini
  */
-export { extractTablesFromImageWithGemini } from './gemini/visionService';
+export { extractTablesFromImageWithGemini, DEFAULT_TABLE_EXTRACTION_PROMPT } from './gemini/visionService';

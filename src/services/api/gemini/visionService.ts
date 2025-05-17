@@ -1,8 +1,34 @@
+
 /**
  * Gemini Vision API service for image and document processing
  */
 import { ApiResponse } from '../types';
 import { supabase } from '@/integrations/supabase/client';
+
+/**
+ * Default prompt template for table extraction
+ */
+export const DEFAULT_TABLE_EXTRACTION_PROMPT = `
+  Extract all tables from this document and convert to structured data.
+  Return a clean JSON array of table objects with this structure:
+  [
+    {
+      "title": "Table title if present",
+      "headers": ["Header1", "Header2", ...],
+      "rows": [
+        ["row1col1", "row1col2", ...],
+        ["row2col1", "row2col2", ...],
+        ...
+      ]
+    },
+    {
+      "title": "Second table title",
+      "headers": [...],
+      "rows": [...]
+    }
+  ]
+  ONLY return the JSON array. No explanation text.
+`;
 
 /**
  * Process an image with Gemini Vision API
@@ -102,33 +128,17 @@ export const extractTablesFromImageWithGemini = async (
   mimeType: string,
   customPrompt?: string
 ): Promise<ApiResponse<{tables: any[]}>> => {
-  const tableExtractionPrompt = customPrompt || `
-    Extract all tables from this document and convert to structured data.
-    Return a clean JSON array of table objects with this structure:
-    [
-      {
-        "title": "Table title if present",
-        "headers": ["Header1", "Header2", ...],
-        "rows": [
-          ["row1col1", "row1col2", ...],
-          ["row2col1", "row2col2", ...],
-          ...
-        ]
-      },
-      {
-        "title": "Second table title",
-        "headers": [...],
-        "rows": [...]
-      }
-    ]
-    ONLY return the JSON array. No explanation text.
-  `;
+  const tableExtractionPrompt = customPrompt || DEFAULT_TABLE_EXTRACTION_PROMPT;
   
   try {
     const response = await processImageWithGemini(tableExtractionPrompt, base64Image, mimeType);
     
     if (!response.success) {
-      return response as ApiResponse<{tables: any[]}>;
+      // Type-safe conversion for error response
+      return {
+        success: false,
+        error: response.error
+      };
     }
     
     // Try to parse the JSON response
