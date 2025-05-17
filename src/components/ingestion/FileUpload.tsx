@@ -1,6 +1,7 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -274,14 +275,18 @@ const FileUpload = () => {
         />
       ) : (
         <div className="space-y-4">
-          {/* Upload tabs - Note: Parent Tabs component is now in Upload.tsx */}
+          {/* Upload tabs - Note that the parent Tabs component is in Upload.tsx */}
           <Card className="shadow-sm">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-4">
-                <TabsList className="grid w-full max-w-md grid-cols-2">
-                  <TabsTrigger value="upload">Local Upload</TabsTrigger>
-                  <TabsTrigger value="cloud">Cloud Storage</TabsTrigger>
-                </TabsList>
+                {/* We need to use a Tabs component here since the parent Tabs in Upload.tsx doesn't properly 
+                   wrap this TabsList due to how React component nesting works */}
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-md">
+                  <TabsList className="grid grid-cols-2">
+                    <TabsTrigger value="upload">Local Upload</TabsTrigger>
+                    <TabsTrigger value="cloud">Cloud Storage</TabsTrigger>
+                  </TabsList>
+                </Tabs>
                 
                 <div className="flex items-center space-x-2">
                   <Switch

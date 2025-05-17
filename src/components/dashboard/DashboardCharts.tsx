@@ -68,15 +68,13 @@ const DashboardCharts = () => {
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">Analytics</h2>
         {/* Fixed: Self-contained Tabs component with proper TabsContent */}
-        <div className="w-auto">
-          <Tabs defaultValue={timeRange} onValueChange={(v) => setTimeRange(v as any)} className="w-auto">
-            <TabsList>
-              <TabsTrigger value="week">Week</TabsTrigger>
-              <TabsTrigger value="month">Month</TabsTrigger>
-              <TabsTrigger value="quarter">Quarter</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
+        <Tabs defaultValue={timeRange} onValueChange={(v) => setTimeRange(v as any)} className="w-auto">
+          <TabsList>
+            <TabsTrigger value="week">Week</TabsTrigger>
+            <TabsTrigger value="month">Month</TabsTrigger>
+            <TabsTrigger value="quarter">Quarter</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
