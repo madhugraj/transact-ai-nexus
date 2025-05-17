@@ -2,15 +2,16 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Upload, FileText, FileImage, File, CheckCircle2, Loader } from 'lucide-react';
+import { FileText, Check, Loader } from 'lucide-react';
 import { DocumentClassificationType } from '@/types/cloudStorage';
 import { toast } from '@/hooks/use-toast';
 import * as api from '@/services/api';
 import { cn } from '@/lib/utils';
+import DocumentPreview from './DocumentPreview';
 
 interface DocumentClassificationProps {
   files: { id: string, file: File, documentType?: DocumentClassificationType }[];
@@ -23,6 +24,7 @@ const DocumentClassificationComponent: React.FC<DocumentClassificationProps> = (
 }) => {
   const [autoClassify, setAutoClassify] = useState(true);
   const [isClassifying, setIsClassifying] = useState(false);
+  const [selectedFileIndex, setSelectedFileIndex] = useState(0);
   const [classifiedFiles, setClassifiedFiles] = useState<{ 
     id: string, 
     file: File, 
@@ -87,18 +89,6 @@ const DocumentClassificationComponent: React.FC<DocumentClassificationProps> = (
       setIsClassifying(false);
     }
   };
-
-  // Get appropriate icon based on file type
-  const getFileIcon = (file: File) => {
-    if (file.type.startsWith('image/')) {
-      return <FileImage size={20} className="text-blue-500" />;
-    } else if (file.type === 'application/pdf') {
-      return <FileText size={20} className="text-red-500" />;
-    } else if (file.type.includes('excel') || file.type.includes('spreadsheet') || file.type === 'text/csv') {
-      return <FileText size={20} className="text-green-500" />;
-    }
-    return <File size={20} className="text-gray-500" />;
-  };
   
   // Complete classification and pass back to parent
   const completeClassification = () => {
@@ -117,8 +107,35 @@ const DocumentClassificationComponent: React.FC<DocumentClassificationProps> = (
     }
   }, []);
 
+  // Get selected file
+  const selectedFile = classifiedFiles[selectedFileIndex];
+  
+  // Get document type label
+  const getDocumentTypeLabel = (type: DocumentClassificationType) => {
+    switch(type) {
+      case 'invoice': return 'Invoice';
+      case 'purchase_order': return 'Purchase Order';
+      case 'receipt': return 'Receipt';
+      case 'bill': return 'Bill';
+      case 'email': return 'Email';
+      case 'contract': return 'Contract';
+      case 'report': return 'Report';
+      default: return 'Other';
+    }
+  };
+
+  if (files.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-center text-muted-foreground">
+          No files to classify
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card>
+    <Card className="shadow-sm">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Document Classification</CardTitle>
@@ -138,75 +155,97 @@ const DocumentClassificationComponent: React.FC<DocumentClassificationProps> = (
         </CardDescription>
       </CardHeader>
       
-      <CardContent className="space-y-4">
-        <div className="max-h-[400px] overflow-y-auto space-y-2 pr-2">
-          {classifiedFiles.map((file) => (
-            <div 
-              key={file.id}
-              className={cn(
-                "flex items-center justify-between p-3 border rounded-md transition-all",
-                file.confidence && file.confidence > 0.8 ? "bg-green-50/50" : "bg-orange-50/30"
-              )}
-            >
-              <div className="flex items-center gap-3 flex-1">
-                <div className="bg-muted/30 w-10 h-10 rounded-md flex items-center justify-center">
-                  {getFileIcon(file.file)}
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium truncate max-w-[200px]">
-                    {file.file.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {(file.file.size / 1024).toFixed(1)} KB
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                {file.confidence && (
+      <CardContent>
+        <div className="grid md:grid-cols-5 gap-6">
+          {/* File list (left sidebar) */}
+          <div className="md:col-span-2">
+            <div className="space-y-1 max-h-[400px] overflow-y-auto pr-2">
+              {classifiedFiles.map((file, index) => (
+                <div
+                  key={file.id}
+                  onClick={() => setSelectedFileIndex(index)}
+                  className={cn(
+                    "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors",
+                    selectedFileIndex === index ? "bg-primary/10" : "hover:bg-muted/40"
+                  )}
+                >
+                  <FileText className={cn(
+                    "h-4 w-4",
+                    file.confidence && file.confidence > 0.8 ? "text-primary" : "text-muted-foreground"
+                  )} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{file.file.name}</p>
+                  </div>
                   <Badge
                     variant="outline"
                     className={cn(
                       "text-xs",
-                      file.confidence > 0.9 ? "bg-green-50 text-green-700" :
-                      file.confidence > 0.7 ? "bg-blue-50 text-blue-700" :
+                      file.confidence && file.confidence > 0.9 ? "bg-green-50 text-green-700" :
+                      file.confidence && file.confidence > 0.7 ? "bg-blue-50 text-blue-700" :
                       "bg-orange-50 text-orange-700"
                     )}
                   >
-                    {(file.confidence * 100).toFixed(0)}% confidence
+                    {getDocumentTypeLabel(file.documentType).substring(0, 3)}
                   </Badge>
-                )}
-                
-                <Select
-                  value={file.documentType}
-                  onValueChange={(value) => handleClassificationChange(file.id, value as DocumentClassificationType)}
-                >
-                  <SelectTrigger className="w-[160px]">
-                    <SelectValue placeholder="Document type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectLabel>Document Type</SelectLabel>
-                      <SelectItem value="invoice">Invoice</SelectItem>
-                      <SelectItem value="purchase_order">Purchase Order</SelectItem>
-                      <SelectItem value="receipt">Receipt</SelectItem>
-                      <SelectItem value="bill">Bill</SelectItem>
-                      <SelectItem value="email">Email</SelectItem>
-                      <SelectItem value="contract">Contract</SelectItem>
-                      <SelectItem value="report">Report</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
           
-          {classifiedFiles.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              No files to classify
-            </div>
-          )}
+          {/* Document preview and classification (right side) */}
+          <div className="md:col-span-3">
+            {selectedFile && (
+              <div className="space-y-4">
+                <DocumentPreview 
+                  fileUrl={selectedFile ? URL.createObjectURL(selectedFile.file) : null}
+                  fileName={selectedFile?.file.name}
+                  fileType={selectedFile?.file.type}
+                  maxHeight="300px"
+                />
+                
+                <div className="space-y-4 pt-2">
+                  {selectedFile.confidence && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Confidence:</span>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-xs",
+                          selectedFile.confidence > 0.9 ? "bg-green-50 text-green-700" :
+                          selectedFile.confidence > 0.7 ? "bg-blue-50 text-blue-700" :
+                          "bg-orange-50 text-orange-700"
+                        )}
+                      >
+                        {(selectedFile.confidence * 100).toFixed(0)}%
+                      </Badge>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="document-type">Document Type:</Label>
+                    <Select
+                      value={selectedFile.documentType}
+                      onValueChange={(value) => handleClassificationChange(selectedFile.id, value as DocumentClassificationType)}
+                    >
+                      <SelectTrigger id="document-type" className="w-[180px]">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="invoice">Invoice</SelectItem>
+                        <SelectItem value="purchase_order">Purchase Order</SelectItem>
+                        <SelectItem value="receipt">Receipt</SelectItem>
+                        <SelectItem value="bill">Bill</SelectItem>
+                        <SelectItem value="email">Email</SelectItem>
+                        <SelectItem value="contract">Contract</SelectItem>
+                        <SelectItem value="report">Report</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </CardContent>
       
@@ -214,7 +253,7 @@ const DocumentClassificationComponent: React.FC<DocumentClassificationProps> = (
         <Button 
           variant="outline" 
           onClick={runAutoClassification}
-          disabled={isClassifying || files.length === 0}
+          disabled={isClassifying}
         >
           {isClassifying ? (
             <>
@@ -222,18 +261,16 @@ const DocumentClassificationComponent: React.FC<DocumentClassificationProps> = (
               Classifying...
             </>
           ) : (
-            <>
-              Run Auto-Classification
-            </>
+            <>Run Auto-Classification</>
           )}
         </Button>
         
         <Button 
           onClick={completeClassification}
-          disabled={isClassifying || files.length === 0}
+          disabled={isClassifying}
         >
-          <CheckCircle2 className="mr-2 h-4 w-4" />
-          Complete & Process Files
+          <Check className="mr-2 h-4 w-4" />
+          Complete & Process
         </Button>
       </CardFooter>
     </Card>

@@ -53,9 +53,9 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   // No file provided
   if (!fileUrl) {
     return (
-      <Card className="flex items-center justify-center bg-muted/20" style={styleProps}>
+      <Card className="flex items-center justify-center bg-muted/10 border-dashed" style={styleProps}>
         <div className="text-center p-6">
-          <File className="mx-auto h-10 w-10 text-muted-foreground/60 mb-2" />
+          <File className="mx-auto h-10 w-10 text-muted-foreground/40 mb-2" />
           <p className="text-sm text-muted-foreground">No document to preview</p>
         </div>
       </Card>
@@ -63,12 +63,12 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   }
 
   return (
-    <Card className="overflow-hidden border-muted/40 shadow-sm">
+    <Card className="overflow-hidden border-muted/30 shadow-sm">
       <div className="relative" style={styleProps}>
         {/* Loading indicator */}
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
-            <Loader className="h-6 w-6 animate-spin text-muted-foreground" />
+            <Loader className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         )}
         
@@ -83,7 +83,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
         
         {/* Image preview */}
         {isImage && (
-          <div className="h-full flex items-center justify-center bg-muted/10">
+          <div className="h-full flex items-center justify-center bg-muted/5">
             <img 
               src={fileUrl} 
               alt={fileName || 'Document preview'} 
@@ -106,12 +106,12 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
         
         {/* Fallback for other file types */}
         {!isImage && !isPdf && (
-          <div className="h-full flex items-center justify-center bg-muted/10">
+          <div className="h-full flex items-center justify-center bg-muted/5">
             <div className="text-center p-6">
-              <FileText className="mx-auto h-12 w-12 text-primary/60 mb-2" />
+              <FileText className="mx-auto h-10 w-10 text-primary/50 mb-2" />
               <p className="text-sm font-medium">{fileName || 'Document'}</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Preview not available for this file type
+                Preview not available
               </p>
             </div>
           </div>
@@ -120,7 +120,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
       
       {/* File name caption */}
       {fileName && (
-        <div className="p-2 text-xs text-center text-muted-foreground border-t truncate">
+        <div className="p-2 text-xs text-center text-muted-foreground border-t border-muted/20 truncate">
           {fileName}
         </div>
       )}

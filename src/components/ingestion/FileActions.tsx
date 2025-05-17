@@ -25,37 +25,58 @@ const FileActions = ({
   const processedCount = files.filter(f => f.processed).length;
 
   return (
-    <div className="flex flex-col md:flex-row md:justify-between gap-4 mb-4">
+    <div className="flex flex-col sm:flex-row sm:justify-between gap-3 mb-4">
       <div>
-        <h3 className="font-medium flex items-center">
+        <h3 className="font-medium flex items-center text-sm">
           Files
-          <Badge variant="outline" className="ml-2">{files.length}</Badge>
+          <Badge variant="outline" className="ml-2 text-xs">{files.length}</Badge>
         </h3>
-        <div className="flex gap-2 mt-1 text-sm text-muted-foreground">
-          <span>{idleCount} waiting</span> • 
-          <span>{successCount} uploaded</span> • 
-          <span>{processedCount} processed</span>
+        <div className="flex gap-2 mt-1 text-xs text-muted-foreground">
+          <span>{idleCount} pending</span>
+          <span className="mx-1">•</span>
+          <span>{successCount} uploaded</span>
+          {processedCount > 0 && (
+            <>
+              <span className="mx-1">•</span>
+              <span>{processedCount} processed</span>
+            </>
+          )}
         </div>
       </div>
       
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {hasIdleFiles && (
-          <Button size="sm" onClick={uploadAllFiles} className="transition-all duration-200 hover:scale-105">
-            <Upload className="mr-2 h-4 w-4" />
+          <Button 
+            size="sm" 
+            variant="outline"
+            onClick={uploadAllFiles}
+            className="h-8 text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200"
+          >
+            <Upload className="mr-1 h-3 w-3" />
             Upload All
           </Button>
         )}
         {hasUnprocessedFiles && (
-          <Button size="sm" variant="secondary" onClick={onProcessDataFiles} className="transition-all duration-200 hover:scale-105">
-            <TableIcon className="mr-2 h-4 w-4" />
-            Process Data Files
-          </Button>
-        )}
-        {hasUnprocessedFiles && (
-          <Button size="sm" variant="secondary" onClick={onProcessDocuments} className="transition-all duration-200 hover:scale-105">
-            <FileText className="mr-2 h-4 w-4" />
-            Process Documents
-          </Button>
+          <>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={onProcessDataFiles}
+              className="h-8 text-xs bg-green-50 hover:bg-green-100 text-green-600 border-green-200"
+            >
+              <TableIcon className="mr-1 h-3 w-3" />
+              Process Data
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={onProcessDocuments}
+              className="h-8 text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200"
+            >
+              <FileText className="mr-1 h-3 w-3" />
+              Process Docs
+            </Button>
+          </>
         )}
       </div>
     </div>

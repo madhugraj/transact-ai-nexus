@@ -13,7 +13,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAgentProcessing } from '@/hooks/useAgentProcessing';
 import { useToast } from '@/hooks/use-toast';
 import { fileToBase64, extractTablesFromImageWithGemini, DEFAULT_TABLE_EXTRACTION_PROMPT } from '@/services/api';
-import FileUploadActions from './FileUploadActions';
 import CloudStorageConnector from './CloudStorageConnector';
 import DocumentClassificationComponent from './DocumentClassificationComponent';
 import { DocumentClassificationType } from '@/types/cloudStorage';
@@ -26,6 +25,7 @@ const FileUpload = () => {
   const [classifiedFiles, setClassifiedFiles] = useState<{id: string, file: File, documentType: DocumentClassificationType}[]>([]);
   const { toast } = useToast();
   
+  // Use file processing hook
   const {
     files,
     selectedFileIds,
@@ -92,39 +92,24 @@ const FileUpload = () => {
     setIsLoading(true);
     setShowProcessingDialog(false);
     
-    console.log("Processing files with agents:", files.filter(file => selectedFileIds.includes(file.id)));
-    console.log("Current action:", currentAction);
-    console.log("Processing options:", processingOptions);
-
     try {
       // Use agent processing system instead of regular processing
       const selectedFiles = files.filter(file => selectedFileIds.includes(file.id));
       
-      // Log available files for debugging
-      console.log("Selected files for processing:", selectedFiles);
-      
       // For table extraction, use the specialized table extraction function with the dynamic prompt
       if (currentAction === 'table_extraction' && selectedFiles.length > 0) {
-        console.log("Using specialized table extraction for files with dynamic prompt");
-        
         const results = [];
         let tableData = null;
         
         // Get the custom prompt if specified or use default
         const tableExtractionPrompt = processingOptions.ocrSettings?.customPrompt || DEFAULT_TABLE_EXTRACTION_PROMPT;
         
-        console.log("Using table extraction prompt:", tableExtractionPrompt);
-        
         let extractedFiles = [];
         
         for (const file of selectedFiles) {
           if (file.file && (file.file.type.startsWith('image/') || file.file.type === 'application/pdf')) {
-            console.log(`Processing ${file.file.name} for table extraction`);
-            
             const base64Image = await fileToBase64(file.file);
             const tableResponse = await extractTablesFromImageWithGemini(base64Image, file.file.type, tableExtractionPrompt);
-            
-            console.log(`Table extraction response for ${file.file.name}:`, tableResponse);
             
             if (tableResponse.success && tableResponse.data) {
               extractedFiles.push(file.file);
@@ -145,8 +130,6 @@ const FileUpload = () => {
                     totalRows: tableResponse.data.tables[0].rows.length
                   }
                 };
-                
-                console.log("Extracted table data:", tableData);
               }
             } else {
               results.push({
@@ -154,8 +137,6 @@ const FileUpload = () => {
                 error: tableResponse.error || "Failed to extract tables",
                 success: false
               });
-              
-              console.error(`Failed to extract tables from ${file.file.name}:`, tableResponse.error);
             }
           }
         }
@@ -176,8 +157,6 @@ const FileUpload = () => {
             extractionComplete: true,
             processingComplete: true
           };
-          
-          console.log("Setting processing results:", processedResults);
           
           // Process with agents
           await processWithAgents(selectedFiles, {
@@ -201,14 +180,11 @@ const FileUpload = () => {
         useGemini: true // Enable Gemini processing
       });
       
-      console.log("Agent processing complete, results:", processingResults);
-      
       toast({
         title: "Processing complete",
         description: "Your files have been processed successfully."
       });
     } catch (error) {
-      console.error("Error processing files:", error);
       toast({
         title: "Processing error",
         description: error instanceof Error ? error.message : "An unknown error occurred during processing",
@@ -261,10 +237,11 @@ const FileUpload = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold mb-2">Document Upload</h2>
-        <p className="text-muted-foreground">
-          Upload financial documents for processing. Supported formats: PDF, images, Excel, and CSV.
+      {/* Header section */}
+      <div className="space-y-1">
+        <h2 className="text-xl font-semibold">Document Processing</h2>
+        <p className="text-muted-foreground text-sm">
+          Upload documents from your computer or cloud storage
         </p>
       </div>
       
@@ -287,9 +264,10 @@ const FileUpload = () => {
           onClassificationComplete={handleClassificationComplete}
         />
       ) : (
-        <>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid grid-cols-2 w-full">
+        <div className="space-y-6">
+          {/* Upload tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="w-full max-w-md grid grid-cols-2">
               <TabsTrigger value="upload">Local Upload</TabsTrigger>
               <TabsTrigger value="cloud">Cloud Storage</TabsTrigger>
             </TabsList>
@@ -303,15 +281,15 @@ const FileUpload = () => {
             </TabsContent>
           </Tabs>
 
+          {/* Files list and actions */}
           {isLoading ? (
             <Card className="shadow-sm">
               <CardContent className="p-6 space-y-4">
                 <div className="flex items-center justify-between">
-                  <Skeleton className="h-8 w-1/3" />
-                  <Skeleton className="h-8 w-1/4" />
+                  <Skeleton className="h-8 w-[120px]" />
+                  <Skeleton className="h-8 w-[100px]" />
                 </div>
                 <div className="space-y-2">
-                  <Skeleton className="h-12 w-full" />
                   <Skeleton className="h-12 w-full" />
                   <Skeleton className="h-12 w-full" />
                 </div>
@@ -319,8 +297,8 @@ const FileUpload = () => {
             </Card>
           ) : (
             files.length > 0 && !processingComplete && !agentsProcessingComplete && (
-              <Card className="shadow-sm hover:shadow-md transition-all duration-200">
-                <CardContent className="p-6">
+              <Card className="shadow-sm">
+                <CardContent className="p-4 md:p-6">
                   {/* File actions */}
                   <FileActions
                     files={files}
@@ -346,30 +324,30 @@ const FileUpload = () => {
                     }}
                   />
                   
-                  {/* Additional file upload actions */}
+                  {/* Action buttons */}
                   <div className="flex flex-wrap gap-2 mt-6">
                     <Button 
-                      onClick={() => setShowProcessingDialog(true)}
+                      onClick={startClassification}
                       disabled={isLoading || files.length === 0}
-                      className="bg-blue-600 hover:bg-blue-700"
+                      className="bg-blue-600 hover:bg-blue-700 transition-all duration-200"
                     >
-                      Process Files
+                      Classify & Process
                     </Button>
                     
                     <Button 
                       variant="outline"
-                      onClick={startClassification}
+                      onClick={() => setShowProcessingDialog(true)}
                       disabled={isLoading || files.length === 0}
                       className="border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700"
                     >
-                      Classify Documents
+                      Advanced Processing
                     </Button>
                   </div>
                 </CardContent>
               </Card>
             )
           )}
-        </>
+        </div>
       )}
 
       {/* Processing dialog */}
