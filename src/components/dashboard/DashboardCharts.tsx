@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -67,7 +68,7 @@ const DashboardCharts = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">Analytics</h2>
-        {/* Fixed: Self-contained Tabs component with proper TabsContent */}
+        {/* Fixed: Making sure Tabs component properly wraps TabsList and TabsContent */}
         <Tabs defaultValue={timeRange} onValueChange={(v) => setTimeRange(v as any)} className="w-auto">
           <TabsList>
             <TabsTrigger value="week">Week</TabsTrigger>

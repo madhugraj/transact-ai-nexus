@@ -18,6 +18,7 @@ import { fileToBase64, extractTablesFromImageWithGemini, DEFAULT_TABLE_EXTRACTIO
 import CloudStorageConnector from './CloudStorageConnector';
 import DocumentClassificationComponent from './DocumentClassificationComponent';
 import { DocumentClassificationType } from '@/types/cloudStorage';
+import UploadTabs from './UploadTabs';
 
 const FileUpload = () => {
   const [showProcessingDialog, setShowProcessingDialog] = useState(false);
@@ -275,17 +276,24 @@ const FileUpload = () => {
         />
       ) : (
         <div className="space-y-4">
-          {/* Upload tabs - Note that the parent Tabs component is in Upload.tsx */}
+          {/* Upload tabs - using properly wrapped Tabs components */}
           <Card className="shadow-sm">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-4">
-                {/* We need to use a Tabs component here since the parent Tabs in Upload.tsx doesn't properly 
-                   wrap this TabsList due to how React component nesting works */}
+                {/* Fixed: Make sure TabsList is inside a Tabs component */}
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-md">
                   <TabsList className="grid grid-cols-2">
                     <TabsTrigger value="upload">Local Upload</TabsTrigger>
                     <TabsTrigger value="cloud">Cloud Storage</TabsTrigger>
                   </TabsList>
+                
+                  <TabsContent value="upload" className="mt-0 pt-0">
+                    <DropZone onFilesSelected={addFiles} />
+                  </TabsContent>
+                  
+                  <TabsContent value="cloud" className="mt-0 pt-0">
+                    <CloudStorageConnector onFilesSelected={handleCloudFilesSelected} />
+                  </TabsContent>
                 </Tabs>
                 
                 <div className="flex items-center space-x-2">
@@ -297,14 +305,6 @@ const FileUpload = () => {
                   <Label htmlFor="auto-sync">Auto Sync</Label>
                 </div>
               </div>
-              
-              <TabsContent value="upload" className="mt-0 pt-0">
-                <DropZone onFilesSelected={addFiles} />
-              </TabsContent>
-              
-              <TabsContent value="cloud" className="mt-0 pt-0">
-                <CloudStorageConnector onFilesSelected={handleCloudFilesSelected} />
-              </TabsContent>
             </CardContent>
           </Card>
 
