@@ -3,6 +3,7 @@
  * Gemini Vision API service for image and document processing
  */
 import { ApiResponse } from '../types';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Process an image with Gemini Vision API
@@ -15,16 +16,18 @@ export const processImageWithGemini = async (
   console.log(`Processing image with Gemini API, prompt length: ${prompt.length}, image length: ${base64Image.length}`);
   
   try {
-    // Use the Gemini API key from Supabase secrets (environment variables)
-    const geminiApiKey = process.env.GEMINI_API_KEY || 
-                         localStorage.getItem('Gemini_key') || 
-                         'AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk'; // Fallback to hardcoded key only as last resort
+    // Get the Gemini API key from Supabase secrets
+    const { data: secretData, error: secretError } = await supabase
+      .rpc('get_secret', { secret_name: 'Gemini_key' });
+    
+    const geminiApiKey = secretData || 
+                         localStorage.getItem('Gemini_key');
     
     if (!geminiApiKey) {
-      console.error("Gemini API key not found");
+      console.error("Gemini API key not found in Supabase secrets or localStorage");
       return {
         success: false,
-        error: "Gemini API key not configured"
+        error: "Gemini API key not configured. Please add it to Supabase secrets."
       };
     }
     
@@ -52,7 +55,7 @@ export const processImageWithGemini = async (
           ],
           generationConfig: {
             temperature: 0.1,
-            maxOutputTokens: 4096
+            maxOutputTokens: 8192 // Increase for larger JSON responses
           }
         })
       }
@@ -88,6 +91,89 @@ export const processImageWithGemini = async (
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
+};
+
+/**
+ * Extract tables from an image using Gemini Vision
+ */
+export const extractTablesFromImageWithGemini = async (
+  base64Image: string,
+  mimeType: string,
+  customPrompt?: string
+): Promise<ApiResponse<{tables: any[]}>> => {
+  const tableExtractionPrompt = customPrompt || `
+    Extract all tables from this document and convert to structured data.
+    Return a clean JSON array of table objects with this structure:
+    [
+      {
+        "title": "Table title if present",
+        "headers": ["Header1", "Header2", ...],
+        "rows": [
+          ["row1col1", "row1col2", ...],
+          ["row2col1", "row2col2", ...],
+          ...
+        ]
+      },
+      {
+        "title": "Second table title",
+        "headers": [...],
+        "rows": [...]
+      }
+    ]
+    ONLY return the JSON array. No explanation text.
+  `;
+  
+  try {
+    const response = await processImageWithGemini(tableExtractionPrompt, base64Image, mimeType);
+    
+    if (!response.success) {
+      return response;
+    }
+    
+    // Try to parse the JSON response
+    try {
+      // Look for JSON in the response
+      const jsonMatch = response.data.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        console.error("No valid JSON array found in the response");
+        return {
+          success: false,
+          error: "Failed to extract table JSON from response"
+        };
+      }
+      
+      const tables = JSON.parse(jsonMatch[0]);
+      
+      if (!Array.isArray(tables)) {
+        console.error("Extracted data is not an array:", tables);
+        return {
+          success: false,
+          error: "Extracted table data is not in the expected format"
+        };
+      }
+      
+      console.log(`Successfully extracted ${tables.length} tables from the image`);
+      
+      return {
+        success: true,
+        data: {
+          tables: tables
+        }
+      };
+    } catch (parseError) {
+      console.error("Error parsing JSON from Gemini response:", parseError);
+      return {
+        success: false,
+        error: "Failed to parse table data from Gemini response"
+      };
+    }
+  } catch (error) {
+    console.error("Error extracting tables:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error occurred"
     };
   }
 };

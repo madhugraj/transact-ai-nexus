@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -7,6 +8,7 @@ import GeminiInsightsPanel from '../GeminiInsightsPanel';
 import { saveProcessedTables } from '@/utils/documentStorage';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { FileJson, FileCsv } from 'lucide-react';
 
 interface ProcessingResultsProps {
   processingResults: any;
@@ -30,47 +32,251 @@ export const ProcessingResults = ({
       ? processingResults.tables 
       : [processingResults.tables]
     : [];
+  
+  // If we have extractedTables, use those instead
+  const extractedTables = processingResults?.extractedTables || [];
+  const allTables = extractedTables.length > 0 ? extractedTables : tablesData;
+  
+  // Export to CSV
+  const handleExportCSV = () => {
+    if (!allTables || allTables.length === 0) {
+      if (!processingResults?.tableData) {
+        toast({
+          title: "Export failed",
+          description: "No table data available to export",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Use tableData instead
+      try {
+        // Create CSV content
+        let csvContent = '';
+        
+        // Add headers
+        csvContent += processingResults.tableData.headers.map((h: string) => `"${h}"`).join(',') + '\n';
+        
+        // Add rows
+        csvContent += processingResults.tableData.rows.map((row: string[]) => 
+          row.map(cell => `"${cell}"`).join(',')
+        ).join('\n');
+        
+        // Create and download the file
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `extracted_table.csv`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        
+        toast({
+          title: "Export successful",
+          description: "Table exported as CSV",
+        });
+      } catch (error) {
+        toast({
+          title: "Export failed",
+          description: error instanceof Error ? error.message : "Unknown error during export",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+    
+    // Export the first table in the array
+    const tableToExport = allTables[0];
+    
+    try {
+      // Create CSV content
+      let csvContent = '';
+      
+      // Add headers
+      csvContent += tableToExport.headers.map((h: string) => `"${h}"`).join(',') + '\n';
+      
+      // Add rows
+      csvContent += tableToExport.rows.map((row: string[]) => 
+        row.map(cell => `"${cell}"`).join(',')
+      ).join('\n');
+      
+      // Create and download the file
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${tableToExport.title || 'extracted_table'}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      toast({
+        title: "Export successful",
+        description: "Table exported as CSV",
+      });
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: error instanceof Error ? error.message : "Unknown error during export",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Export to JSON
+  const handleExportJSON = () => {
+    if (!allTables || allTables.length === 0) {
+      if (!processingResults?.tableData) {
+        toast({
+          title: "Export failed",
+          description: "No table data available to export",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Use tableData instead
+      try {
+        const jsonData = {
+          headers: processingResults.tableData.headers,
+          rows: processingResults.tableData.rows
+        };
+        
+        // Create and download the file
+        const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `extracted_table.json`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        
+        toast({
+          title: "Export successful",
+          description: "Table exported as JSON",
+        });
+      } catch (error) {
+        toast({
+          title: "Export failed",
+          description: error instanceof Error ? error.message : "Unknown error during export",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+    
+    // Check if there's a consolidated JSON available
+    if (processingResults.consolidatedJson) {
+      try {
+        // Create and download the file
+        const blob = new Blob([processingResults.consolidatedJson], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `extracted_tables.json`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        
+        toast({
+          title: "Export successful",
+          description: "All tables exported as JSON",
+        });
+        return;
+      } catch (error) {
+        console.error("Error exporting consolidated JSON:", error);
+        // Fall back to exporting individual tables
+      }
+    }
+    
+    // Export all tables in the array
+    try {
+      const jsonData = allTables.map(table => ({
+        title: table.title || "Extracted Table",
+        headers: table.headers,
+        rows: table.rows
+      }));
+      
+      // Create and download the file
+      const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `extracted_tables.json`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      toast({
+        title: "Export successful",
+        description: "Tables exported as JSON",
+      });
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: error instanceof Error ? error.message : "Unknown error during export",
+        variant: "destructive",
+      });
+    }
+  };
     
   // Save extracted tables to Supabase and localStorage
   useEffect(() => {
     const saveToSupabase = async () => {
+      // Skip if no processing results
+      if (!processingResults) return;
+      
       let dataToSave = [];
       
-      // Check for tables array
-      if (tablesData.length > 0) {
-        console.log("Saving extracted tables to Supabase:", tablesData);
-        dataToSave = tablesData.map(table => ({
-          title: table.title || 'Extracted Table',
-          headers: table.headers,
-          rows: table.rows,
-          confidence: table.confidence || 0.9,
-          file_id: processingResults?.fileId
-        }));
-      }
-      
-      // Check for tableData in processingResults
-      if (processingResults?.tableData && processingResults.tableData.headers) {
-        console.log("Saving table data to Supabase:", processingResults.tableData);
+      // Prepare data from tables array or consolidatedJson
+      if (processingResults.consolidatedJson) {
+        console.log("Using consolidated JSON for Supabase storage");
+        const fileName = files.length > 0 ? files[0].name : "extracted-data";
+        
         dataToSave.push({
-          title: 'Extracted Table Data',
-          headers: processingResults.tableData.headers,
-          rows: processingResults.tableData.rows,
-          confidence: processingResults.tableData.metadata?.confidence || 0.9,
+          title: fileName,
+          headers: ['extracted_data'],
+          rows: [[processingResults.consolidatedJson]],
+          confidence: 0.9,
+          file_id: processingResults?.fileId
+        });
+      } 
+      // Check for tables array
+      else if (allTables.length > 0) {
+        console.log("No consolidated JSON, using extracted tables for Supabase storage");
+        
+        // Just store consolidated format instead of individual tables
+        const tableJson = JSON.stringify(allTables);
+        const fileName = files.length > 0 ? files[0].name : "extracted-data";
+        
+        dataToSave.push({
+          title: fileName,
+          headers: ['extracted_data'],
+          rows: [[tableJson]],
+          confidence: 0.9,
           file_id: processingResults?.fileId
         });
       }
-      
-      // Check for extractedTables in processingResults
-      if (processingResults?.extractedTables && processingResults.extractedTables.length > 0) {
-        console.log("Saving extracted tables array to Supabase:", processingResults.extractedTables);
-        const extractedTableData = processingResults.extractedTables.map(table => ({
-          title: table.title || 'Extracted Table',
-          headers: table.headers,
-          rows: table.rows,
-          confidence: table.confidence || 0.9,
+      // Check for tableData in processingResults
+      else if (processingResults?.tableData && processingResults.tableData.headers) {
+        console.log("No tables array, using tableData for Supabase storage");
+        const tableJson = JSON.stringify([{
+          title: 'Extracted Table Data',
+          headers: processingResults.tableData.headers,
+          rows: processingResults.tableData.rows
+        }]);
+        
+        const fileName = files.length > 0 ? files[0].name : "extracted-data";
+        
+        dataToSave.push({
+          title: fileName,
+          headers: ['extracted_data'],
+          rows: [[tableJson]],
+          confidence: processingResults.tableData.metadata?.confidence || 0.9,
           file_id: processingResults?.fileId
-        }));
-        dataToSave = [...dataToSave, ...extractedTableData];
+        });
       }
       
       // Insert data into Supabase if we have any
@@ -117,17 +323,17 @@ export const ProcessingResults = ({
     // Function to save to localStorage as fallback
     const fallbackToLocalStorage = () => {
       // Store tables in localStorage for AI Assistant
-      if (tablesData.length > 0) {
+      if (allTables.length > 0) {
         try {
-          console.log("Saving extracted tables to localStorage:", tablesData);
-          saveProcessedTables(tablesData, processingResults?.processingId);
+          console.log("Saving extracted tables to localStorage:", allTables);
+          saveProcessedTables(allTables, processingResults?.processingId);
         } catch (error) {
           console.error("Error saving processed tables to localStorage:", error);
         }
       }
       
       // Check for tableData in processingResults and save if available
-      if (processingResults?.tableData) {
+      if (processingResults?.tableData && processingResults.tableData.headers) {
         try {
           console.log("Saving table data to localStorage:", processingResults.tableData);
           const tableDataToSave = {
@@ -146,16 +352,6 @@ export const ProcessingResults = ({
         }
       }
       
-      // Check for extractedTables in processingResults and save if available
-      if (processingResults?.extractedTables && processingResults.extractedTables.length > 0) {
-        try {
-          console.log("Saving extracted tables array to localStorage:", processingResults.extractedTables);
-          saveProcessedTables(processingResults.extractedTables, processingResults?.processingId);
-        } catch (error) {
-          console.error("Error saving extracted tables array to localStorage:", error);
-        }
-      }
-      
       // Dispatch event to notify components that new tables are processed
       window.dispatchEvent(new CustomEvent('documentProcessed'));
     };
@@ -164,7 +360,7 @@ export const ProcessingResults = ({
     if (processingResults) {
       saveToSupabase();
     }
-  }, [processingResults, toast]);
+  }, [processingResults, toast, allTables, files]);
   
   return (
     <div className="space-y-4">
@@ -175,7 +371,7 @@ export const ProcessingResults = ({
         </TabsList>
         
         <TabsContent value="results" className="border rounded-md p-4">
-          {tablesData.length > 0 ? (
+          {allTables.length > 0 ? (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-medium">Extracted Table Data</h3>
@@ -194,10 +390,24 @@ export const ProcessingResults = ({
                   >
                     Response (Structured)
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportCSV}
+                  >
+                    <FileCsv className="h-4 w-4 mr-1" /> Export CSV
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportJSON}
+                  >
+                    <FileJson className="h-4 w-4 mr-1" /> Export JSON
+                  </Button>
                 </div>
               </div>
               
-              {tablesData.map((tableData: any, index: number) => (
+              {allTables.map((tableData: any, index: number) => (
                 <div key={index} className="border rounded p-2">
                   <ExtractedTablePreview
                     initialData={{
@@ -205,6 +415,7 @@ export const ProcessingResults = ({
                       rows: tableData.rows
                     }}
                     displayFormat={displayFormat}
+                    tableName={tableData.title || `Table ${index + 1}`}
                   />
                 </div>
               ))}
@@ -228,6 +439,20 @@ export const ProcessingResults = ({
                   >
                     Response (Structured)
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportCSV}
+                  >
+                    <FileCsv className="h-4 w-4 mr-1" /> Export CSV
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportJSON}
+                  >
+                    <FileJson className="h-4 w-4 mr-1" /> Export JSON
+                  </Button>
                 </div>
               </div>
               
@@ -238,6 +463,7 @@ export const ProcessingResults = ({
                     rows: processingResults.tableData.rows
                   }}
                   displayFormat={displayFormat}
+                  tableName="Extracted Table"
                 />
               </div>
             </div>

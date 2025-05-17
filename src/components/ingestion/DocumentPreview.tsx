@@ -58,68 +58,78 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
     );
   }
 
-  return (
-    <Card className="overflow-hidden border-muted/40 shadow-sm">
-      <div className="relative" style={{ height }}>
-        {/* Loading indicator */}
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
-            <Loader className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        )}
-        
-        {/* Error state */}
-        {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/90 z-10">
-            <div className="text-center p-6">
-              <p className="text-sm text-red-500">{error}</p>
+  // Loading state
+  if (loading && !isImage) {
+    return (
+      <Card className="w-full flex flex-col items-center justify-center bg-muted/20" style={{ height }}>
+        <Loader className="h-8 w-8 text-muted-foreground/60 animate-spin mb-2" />
+        <p className="text-sm text-muted-foreground">Loading document preview...</p>
+      </Card>
+    );
+  }
+
+  // Image preview
+  if (isImage) {
+    return (
+      <Card className="overflow-hidden">
+        <div className="relative">
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-muted/20">
+              <Loader className="h-8 w-8 text-muted-foreground/60 animate-spin" />
             </div>
-          </div>
-        )}
-        
-        {/* Image preview */}
-        {isImage && (
-          <div className="h-full flex items-center justify-center bg-muted/10">
-            <img 
-              src={fileUrl} 
-              alt={fileName || 'Document preview'} 
-              className="max-h-full max-w-full object-contain"
+          )}
+          <AspectRatio ratio={16 / 9} className="bg-muted">
+            <img
+              src={fileUrl}
+              alt={fileName || 'Document preview'}
+              className="object-contain w-full h-full"
               onLoad={handleImageLoaded}
               onError={handleImageError}
+              style={{ display: loading ? 'none' : 'block' }}
             />
-          </div>
-        )}
-        
-        {/* PDF preview */}
-        {isPdf && (
-          <iframe 
-            src={`${fileUrl}#toolbar=0`}
-            title={fileName || 'PDF Document'}
-            className="w-full h-full"
-            onLoad={() => setLoading(false)}
-          />
-        )}
-        
-        {/* Fallback for other file types */}
-        {!isImage && !isPdf && (
-          <div className="h-full flex items-center justify-center bg-muted/10">
-            <div className="text-center p-6">
-              <FileText className="mx-auto h-12 w-12 text-primary/60 mb-2" />
-              <p className="text-sm font-medium">{fileName || 'Document'}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Preview not available for this file type
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-      
-      {/* File name caption */}
-      {fileName && (
-        <div className="p-2 text-xs text-center text-muted-foreground border-t truncate">
-          {fileName}
+          </AspectRatio>
         </div>
-      )}
+        {fileName && (
+          <div className="p-2 text-center text-sm text-muted-foreground border-t">
+            <Image className="inline-block w-4 h-4 mr-1" />
+            <span>{fileName}</span>
+          </div>
+        )}
+      </Card>
+    );
+  }
+
+  // PDF preview
+  if (isPdf) {
+    return (
+      <Card className="overflow-hidden">
+        <iframe
+          src={fileUrl}
+          title={fileName || 'PDF Document'}
+          className="w-full"
+          style={{ height }}
+          onLoad={() => setLoading(false)}
+        />
+        {fileName && (
+          <div className="p-2 text-center text-sm text-muted-foreground border-t">
+            <FileText className="inline-block w-4 h-4 mr-1" />
+            <span>{fileName}</span>
+          </div>
+        )}
+      </Card>
+    );
+  }
+
+  // Generic file preview (non-image, non-PDF)
+  return (
+    <Card className="flex flex-col items-center justify-center bg-muted/20" style={{ height }}>
+      <div className="text-center p-6">
+        <FileText className="mx-auto h-10 w-10 text-muted-foreground/60 mb-2" />
+        <p className="text-sm font-medium mb-1">{fileName || 'Unknown document'}</p>
+        <p className="text-xs text-muted-foreground">
+          {fileType || 'This document type cannot be previewed'}
+        </p>
+      </div>
     </Card>
   );
 };
