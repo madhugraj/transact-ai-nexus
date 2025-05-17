@@ -1,7 +1,6 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
 import { useFileProcessing } from '@/hooks/useFileProcessing';
 import { FileProcessingDialog } from './dialog/FileProcessingDialog';
 import { FileList } from './FileList';
@@ -13,15 +12,10 @@ import { useAgentProcessing } from '@/hooks/useAgentProcessing';
 import { useToast } from '@/hooks/use-toast';
 import { fileToBase64, extractTablesFromImageWithGemini, DEFAULT_TABLE_EXTRACTION_PROMPT } from '@/services/api';
 import FileUploadActions from './FileUploadActions';
-import CloudStorageConnector from './CloudStorageConnector';
-import DocumentClassificationComponent from './DocumentClassification';
-import { DocumentClassification } from '@/services/api/fileClassificationService';
 
 const FileUpload = () => {
   const [showProcessingDialog, setShowProcessingDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('upload');
-  const [fileClassifications, setFileClassifications] = useState<Record<string, DocumentClassification>>({});
   const { toast } = useToast();
   
   const {
@@ -54,18 +48,6 @@ const FileUpload = () => {
     resetProcessing: resetAgentProcessing
   } = useAgentProcessing();
 
-  // Handle file classification
-  const handleClassify = (fileId: string, classification: DocumentClassification) => {
-    setFileClassifications(prev => ({
-      ...prev,
-      [fileId]: classification
-    }));
-  };
-
-  const handleBatchClassify = (classifications: Record<string, DocumentClassification>) => {
-    setFileClassifications(classifications);
-  };
-
   // Handle file processing with loading state and agent processing
   const handleProcessFiles = async () => {
     setIsLoading(true);
@@ -74,7 +56,6 @@ const FileUpload = () => {
     console.log("Processing files with agents:", files.filter(file => selectedFileIds.includes(file.id)));
     console.log("Current action:", currentAction);
     console.log("Processing options:", processingOptions);
-    console.log("File classifications:", fileClassifications);
 
     try {
       // Use agent processing system instead of regular processing
@@ -163,8 +144,7 @@ const FileUpload = () => {
           await processWithAgents(selectedFiles, {
             ...processingOptions,
             useGemini: true,
-            extractedResults: processedResults,
-            fileClassifications
+            extractedResults: processedResults
           });
           
           toast({
@@ -179,8 +159,7 @@ const FileUpload = () => {
       // Process with agents for other actions
       await processWithAgents(selectedFiles, {
         ...processingOptions,
-        useGemini: true, // Enable Gemini processing
-        fileClassifications
+        useGemini: true // Enable Gemini processing
       });
       
       console.log("Agent processing complete, results:", processingResults);
@@ -209,6 +188,13 @@ const FileUpload = () => {
     return selectedFile?.backendId;
   };
 
+  // Log processing results for debugging
+  useEffect(() => {
+    if (processingResults) {
+      console.log("Processing results updated:", processingResults);
+    }
+  }, [processingResults]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -230,121 +216,65 @@ const FileUpload = () => {
         />
       )}
       
-      {/* File upload tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3 mb-6">
-          <TabsTrigger value="upload">Local Upload</TabsTrigger>
-          <TabsTrigger value="cloud">Cloud Storage</TabsTrigger>
-          <TabsTrigger value="classify">Classification</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="upload" className="mt-0">
-          {/* File drop zone */}
-          <DropZone onFilesSelected={addFiles} />
-          
-          {isLoading ? (
-            <Card className="shadow-sm">
-              <CardContent className="p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <Skeleton className="h-8 w-1/3" />
-                  <Skeleton className="h-8 w-1/4" />
-                </div>
-                <div className="space-y-2">
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            files.length > 0 && !processingComplete && !agentsProcessingComplete && (
-              <Card className="shadow-sm hover:shadow-md transition-all duration-200">
-                <CardContent className="p-6">
-                  {/* File actions */}
-                  <FileActions
-                    files={files}
-                    uploadAllFiles={uploadAllFiles}
-                    onProcessDocuments={() => {
-                      const result = selectByType('document');
-                      if (result) setShowProcessingDialog(true);
-                    }}
-                    onProcessDataFiles={() => {
-                      const result = selectByType('data');
-                      if (result) setShowProcessingDialog(true);
-                    }}
-                  />
-                  
-                  {/* File list */}
-                  <FileList 
-                    files={files}
-                    onRemove={removeFile}
-                    onUpload={uploadFile}
-                    onProcess={(id) => {
-                      selectFilesForProcessing([id]);
-                      setShowProcessingDialog(true);
-                    }}
-                  />
-                  
-                  {/* Additional file upload actions */}
-                  <FileUploadActions
-                    files={files}
-                    isLoading={isLoading}
-                    handleProcessFiles={handleProcessFiles}
-                    selectFilesForProcessing={selectFilesForProcessing}
-                    selectByType={selectByType}
-                    setShowProcessingDialog={setShowProcessingDialog}
-                  />
-                </CardContent>
-              </Card>
-            )
-          )}
-        </TabsContent>
-        
-        <TabsContent value="cloud" className="mt-0">
-          <CloudStorageConnector onFilesSelected={addFiles} />
-          
-          {/* Show file list if there are files */}
-          {files.length > 0 && !isLoading && (
-            <Card className="shadow-sm mt-6">
-              <CardContent className="p-6">
-                <FileList 
-                  files={files}
-                  onRemove={removeFile}
-                  onUpload={uploadFile}
-                  onProcess={(id) => {
-                    selectFilesForProcessing([id]);
-                    setShowProcessingDialog(true);
-                  }}
-                />
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-        
-        <TabsContent value="classify" className="mt-0">
-          <DocumentClassificationComponent 
-            files={files}
-            onClassify={handleClassify}
-            onBatchClassify={handleBatchClassify}
-          />
-          
-          {/* Process button for classified files */}
-          {files.length > 0 && Object.keys(fileClassifications).length > 0 && (
-            <div className="mt-4">
-              <Button 
-                onClick={() => {
-                  // Select all classified files for processing
-                  selectFilesForProcessing(Object.keys(fileClassifications));
+      {/* File drop zone */}
+      <DropZone onFilesSelected={addFiles} />
+      
+      {isLoading ? (
+        <Card className="shadow-sm">
+          <CardContent className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-8 w-1/3" />
+              <Skeleton className="h-8 w-1/4" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        files.length > 0 && !processingComplete && !agentsProcessingComplete && (
+          <Card className="shadow-sm hover:shadow-md transition-all duration-200">
+            <CardContent className="p-6">
+              {/* File actions */}
+              <FileActions
+                files={files}
+                uploadAllFiles={uploadAllFiles}
+                onProcessDocuments={() => {
+                  const result = selectByType('document');
+                  if (result) setShowProcessingDialog(true);
+                }}
+                onProcessDataFiles={() => {
+                  const result = selectByType('data');
+                  if (result) setShowProcessingDialog(true);
+                }}
+              />
+              
+              {/* File list */}
+              <FileList 
+                files={files}
+                onRemove={removeFile}
+                onUpload={uploadFile}
+                onProcess={(id) => {
+                  selectFilesForProcessing([id]);
                   setShowProcessingDialog(true);
                 }}
-                className="w-full"
-              >
-                Process Classified Documents
-              </Button>
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+              />
+              
+              {/* Additional file upload actions */}
+              <FileUploadActions
+                files={files}
+                isLoading={isLoading}
+                handleProcessFiles={handleProcessFiles}
+                selectFilesForProcessing={selectFilesForProcessing}
+                selectByType={selectByType}
+                setShowProcessingDialog={setShowProcessingDialog}
+              />
+            </CardContent>
+          </Card>
+        )
+      )}
 
       {/* Processing dialog */}
       <FileProcessingDialog

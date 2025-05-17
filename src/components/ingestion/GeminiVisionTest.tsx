@@ -189,7 +189,7 @@ const TableExtraction: React.FC = () => {
                   fileUrl={filePreviewUrl}
                   fileName={selectedFile?.name}
                   fileType={selectedFile?.type}
-                  maxHeight="300px" 
+                  height="300px"
                 />
               </div>
             </div>

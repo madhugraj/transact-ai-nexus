@@ -50,30 +50,27 @@ export class DynamicTableDetectionAgent implements Agent {
         }
       };
       
-      // Prepare consolidated JSON for storage
-      const consolidatedJson = JSON.stringify(extractedTables.length > 0 ? extractedTables : [tableData]);
-      
-      // Try to save to Supabase
-      try {
-        const fileName = fileObjects.length > 0 ? fileObjects[0].name : "unknown-file";
-        
-        const { error } = await supabase
-          .from('extracted_tables')
-          .insert({
-            title: fileName,
-            headers: ['extracted_data'],
-            rows: [[consolidatedJson]],
-            confidence: 0.9,
-            file_id: data.fileIds && data.fileIds.length > 0 ? data.fileIds[0] : null
-          });
-          
-        if (error) {
-          console.error("Error saving consolidated table to Supabase:", error);
-        } else {
-          console.log("Successfully saved consolidated table to Supabase");
+      // Try to save to Supabase if we have valid data
+      if (tableData && tableData.headers && tableData.rows) {
+        try {
+          const { error } = await supabase
+            .from('extracted_tables')
+            .insert({
+              title: tableData.metadata?.title || "Extracted Table",
+              headers: tableData.headers,
+              rows: tableData.rows,
+              confidence: tableData.metadata?.confidence || 0.9,
+              file_id: data.fileIds && data.fileIds.length > 0 ? data.fileIds[0] : null
+            });
+            
+          if (error) {
+            console.error("Error saving table to Supabase:", error);
+          } else {
+            console.log("Successfully saved table to Supabase");
+          }
+        } catch (err) {
+          console.error("Exception saving table to Supabase:", err);
         }
-      } catch (err) {
-        console.error("Exception saving table to Supabase:", err);
       }
       
       return {
@@ -83,8 +80,7 @@ export class DynamicTableDetectionAgent implements Agent {
         tableData: tableData,
         tableCount: extractedTables.length || 1,
         extractionComplete: true,
-        processedBy: 'DynamicTableDetectionAgent',
-        consolidatedJson
+        processedBy: 'DynamicTableDetectionAgent'
       };
     }
     
@@ -124,17 +120,14 @@ export class DynamicTableDetectionAgent implements Agent {
                   }
                 };
                 
-                // Prepare consolidated JSON for storage
-                const consolidatedJson = JSON.stringify(tableResponse.data.tables);
-                
                 // Try to save to Supabase
                 try {
                   const { error } = await supabase
                     .from('extracted_tables')
                     .insert({
-                      title: file.name,
-                      headers: ['extracted_data'],
-                      rows: [[consolidatedJson]],
+                      title: extractedTable.title || `Table from ${file.name}`,
+                      headers: extractedTable.headers,
+                      rows: extractedTable.rows,
                       confidence: 0.9,
                       file_id: data.fileIds && data.fileIds.length > 0 ? data.fileIds[0] : null
                     });
@@ -159,11 +152,17 @@ export class DynamicTableDetectionAgent implements Agent {
                   fileObjects, // PRESERVE FILE OBJECTS for document preview
                   dynamicTableDetection: true,
                   tableData: tableData,
-                  extractedTables: tableResponse.data.tables,
-                  tableCount: tableResponse.data.tables.length,
+                  extractedTables: [{
+                    tableId: `extracted-table-${file.name}`,
+                    title: extractedTable.title || `Table from ${file.name}`,
+                    headers: extractedTable.headers,
+                    rows: extractedTable.rows,
+                    confidence: 0.9,
+                    source: file.name
+                  }],
+                  tableCount: 1,
                   extractionComplete: true,
-                  processedBy: 'DynamicTableDetectionAgent',
-                  consolidatedJson
+                  processedBy: 'DynamicTableDetectionAgent'
                 };
               }
             } else {
@@ -184,23 +183,14 @@ export class DynamicTableDetectionAgent implements Agent {
       if (tableStructure && tableStructure.headers.length > 0) {
         console.log("Successfully extracted table structure from text");
         
-        // Prepare table as JSON for storage
-        const tableJson = JSON.stringify([{
-          title: "Extracted Table from Text",
-          headers: tableStructure.headers,
-          rows: tableStructure.rows
-        }]);
-        
         // Try to save to Supabase
         try {
-          const fileName = fileObjects.length > 0 ? fileObjects[0].name : "text-extracted-table";
-          
           const { error } = await supabase
             .from('extracted_tables')
             .insert({
-              title: fileName,
-              headers: ['extracted_data'],
-              rows: [[tableJson]],
+              title: "Extracted Table from Text",
+              headers: tableStructure.headers,
+              rows: tableStructure.rows,
               confidence: 0.8,
               file_id: data.fileIds && data.fileIds.length > 0 ? data.fileIds[0] : null
             });
@@ -221,15 +211,13 @@ export class DynamicTableDetectionAgent implements Agent {
           tableData: tableStructure,
           extractedTables: [{
             tableId: "table-text-extracted-1",
-            title: "Extracted Table from Text",
             headers: tableStructure.headers,
             rows: tableStructure.rows,
             confidence: 0.8
           }],
           tableCount: 1,
           extractionComplete: true,
-          processedBy: 'DynamicTableDetectionAgent',
-          consolidatedJson: tableJson
+          processedBy: 'DynamicTableDetectionAgent'
         };
       }
     }

@@ -1,21 +1,16 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
-import { Edit, Download, Loader, AlertCircle, FileJson, Files } from 'lucide-react';
+import { Edit, Download, Loader, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import * as api from '@/services/api';
 
 interface TableData {
   headers: string[];
   rows: string[][];
-  metadata?: {
-    totalRows?: number;
-    confidence?: number;
-    sourceFile?: string;
-    title?: string;
-  };
 }
 
 interface ExtractedTablePreviewProps {
@@ -24,7 +19,6 @@ interface ExtractedTablePreviewProps {
   isLoading?: boolean;
   onEdit?: () => void;
   displayFormat?: 'table' | 'json';
-  tableName?: string;
 }
 
 const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
@@ -32,8 +26,7 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
   initialData,
   isLoading = false,
   onEdit,
-  displayFormat = 'table',
-  tableName = 'extracted_table'
+  displayFormat = 'table'
 }) => {
   const [tableData, setTableData] = useState<TableData | null>(initialData || null);
   const [loading, setLoading] = useState(isLoading);
@@ -111,84 +104,12 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
     };
     
     fetchTableData();
-  }, [fileId, initialData, toast]);
+  }, [fileId, initialData]);
 
   // Reset pagination when data changes
   useEffect(() => {
     setCurrentPage(1);
   }, [tableData]);
-
-  // Handle export functionality
-  const handleExportCSV = () => {
-    if (!tableData) return;
-    
-    try {
-      // Create CSV content
-      let csvContent = '';
-      
-      // Add headers
-      csvContent += tableData.headers.map(h => `"${h}"`).join(',') + '\n';
-      
-      // Add rows
-      csvContent += tableData.rows.map(row => 
-        row.map(cell => `"${cell}"`).join(',')
-      ).join('\n');
-      
-      // Create and download the file
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `${tableName || 'extracted_table'}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      
-      toast({
-        title: "Export successful",
-        description: "Table exported as CSV",
-      });
-    } catch (error) {
-      toast({
-        title: "Export failed",
-        description: error instanceof Error ? error.message : "Unknown error during export",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Handle JSON export
-  const handleExportJSON = () => {
-    if (!tableData) return;
-    
-    try {
-      const jsonData = {
-        headers: tableData.headers,
-        rows: tableData.rows
-      };
-      
-      // Create and download the file
-      const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `${tableName || 'extracted_table'}.json`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      
-      toast({
-        title: "Export successful",
-        description: "Table exported as JSON",
-      });
-    } catch (error) {
-      toast({
-        title: "Export failed",
-        description: error instanceof Error ? error.message : "Unknown error during export",
-        variant: "destructive",
-      });
-    }
-  };
 
   // Loading state
   if (loading) {
@@ -231,6 +152,11 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
     );
   }
   
+  console.log("Rendering table with data:", {
+    headers: tableData.headers,
+    rowCount: tableData.rows.length
+  });
+  
   // Calculate pagination
   const totalPages = Math.ceil(tableData.rows.length / rowsPerPage);
   const paginatedRows = tableData.rows.slice(
@@ -238,7 +164,7 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
     currentPage * rowsPerPage
   );
   
-  // Render Response (JSON) view if displayFormat is 'json'
+  // Render Response (Structured) view if displayFormat is 'json'
   if (displayFormat === 'json') {
     const jsonData = {
       headers: tableData.headers,
@@ -248,7 +174,7 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
     return (
       <Card className="border-muted/40">
         <CardContent className="p-4">
-          <pre className="bg-gray-50 p-4 rounded-md overflow-x-auto text-xs max-h-[500px]">
+          <pre className="bg-gray-50 p-4 rounded-md overflow-x-auto text-xs">
             {JSON.stringify(jsonData, null, 2)}
           </pre>
           
@@ -269,16 +195,10 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={handleExportJSON}
+                onClick={() => fileId && api.exportTableData(fileId, 'csv')}
+                disabled={!fileId}
               >
-                <FileJson className="h-4 w-4 mr-1" /> Export JSON
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleExportCSV}
-              >
-                <Files className="h-4 w-4 mr-1" /> Export CSV
+                <Download className="h-4 w-4 mr-1" /> Export CSV
               </Button>
             </div>
           </div>
@@ -377,16 +297,10 @@ const ExtractedTablePreview: React.FC<ExtractedTablePreviewProps> = ({
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={handleExportJSON}
+              onClick={() => fileId && api.exportTableData(fileId, 'csv')}
+              disabled={!fileId}
             >
-              <FileJson className="h-4 w-4 mr-1" /> Export JSON
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleExportCSV}
-            >
-              <Files className="h-4 w-4 mr-1" /> Export CSV
+              <Download className="h-4 w-4 mr-1" /> Export CSV
             </Button>
           </div>
         </div>

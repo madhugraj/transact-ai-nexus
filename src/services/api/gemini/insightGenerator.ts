@@ -1,6 +1,5 @@
 
 import { ApiResponse } from '../types';
-import { supabase } from '@/integrations/supabase/client';
 
 interface GeminiInsightResponse {
   insights?: string;
@@ -14,18 +13,16 @@ export const generateInsightsWithGemini = async (
   try {
     console.log("Generating insights with Gemini API");
     
-    // Get the Gemini API key from Supabase secrets
-    const { data: secretData, error: secretError } = await supabase
-      .rpc('get_secret', { secret_name: 'Gemini_key' });
-    
-    const geminiApiKey = secretData || 
-                         localStorage.getItem('Gemini_key');
+    // Use the Gemini API key from Supabase secrets (environment variables)
+    const geminiApiKey = process.env.GEMINI_API_KEY || 
+                         localStorage.getItem('Gemini_key') || 
+                         'AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk'; // Fallback to hardcoded key only as last resort
     
     if (!geminiApiKey) {
-      console.error("Gemini API key not found in Supabase secrets or localStorage");
+      console.error("Gemini API key not found");
       return {
         success: false,
-        error: "Gemini API key not configured. Please add it to Supabase secrets."
+        error: "Gemini API key not configured"
       };
     }
     
@@ -50,7 +47,7 @@ export const generateInsightsWithGemini = async (
           ],
           generationConfig: {
             temperature: 0.2,
-            maxOutputTokens: 8192 // Increase the token limit for handling larger responses
+            maxOutputTokens: 4096
           }
         })
       }
