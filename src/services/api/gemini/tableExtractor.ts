@@ -1,33 +1,9 @@
+
 /**
  * Table extraction service using Gemini Vision
  */
 import { ApiResponse } from '../types';
-import { processImageWithGemini } from './visionService';
-
-/**
- * Default prompt template for table extraction
- */
-export const DEFAULT_TABLE_EXTRACTION_PROMPT = `
-  Extract all tables from this document and convert to structured data.
-  Return a clean JSON array of table objects with this structure:
-  [
-    {
-      "title": "Table title if present",
-      "headers": ["Header1", "Header2", ...],
-      "rows": [
-        ["row1col1", "row1col2", ...],
-        ["row2col1", "row2col2", ...],
-        ...
-      ]
-    },
-    {
-      "title": "Second table title",
-      "headers": [...],
-      "rows": [...]
-    }
-  ]
-  ONLY return the JSON array. No explanation text.
-`;
+import { processImageWithGemini, DEFAULT_TABLE_EXTRACTION_PROMPT } from './visionService';
 
 /**
  * Extract tables from an image using Gemini Vision with custom prompt
@@ -36,7 +12,7 @@ export const extractTablesFromImageWithGemini = async (
   base64Image: string,
   mimeType: string,
   customPrompt?: string
-): Promise<ApiResponse<any>> => {
+): Promise<ApiResponse<{tables: any[]}>> => {
   // Use custom prompt if provided, otherwise use default
   const tableExtractionPrompt = customPrompt || DEFAULT_TABLE_EXTRACTION_PROMPT;
 
@@ -45,7 +21,10 @@ export const extractTablesFromImageWithGemini = async (
   const response = await processImageWithGemini(tableExtractionPrompt, base64Image, mimeType);
   
   if (!response.success) {
-    return response;
+    return {
+      success: false,
+      error: response.error
+    };
   }
   
   // Try to extract JSON from the response
@@ -53,13 +32,10 @@ export const extractTablesFromImageWithGemini = async (
     // Enhanced JSON extraction pattern to handle different formats
     const jsonMatch = 
       // Look for JSON code blocks
-      response.data.match(/```json\s*(\{[\s\S]*?\})\s*```/) || 
-      // Look for JSON code blocks without the 'json' label
-      response.data.match(/```\s*(\{[\s\S]*?\})\s*```/) ||
-      // Look for JSON patterns
-      response.data.match(/\{[\s\S]*"tables"[\s\S]*\}/) ||
-      // Look for any object pattern
-      response.data.match(/\{[\s\S]*\}/);
+      response.data.match(/```json\s*(\[[\s\S]*?\])\s*```/) || 
+      response.data.match(/```\s*(\[[\s\S]*?\])\s*```/) ||
+      // Look for JSON array pattern directly
+      response.data.match(/\[\s*\{[\s\S]*?\}\s*\]/);
                      
     if (jsonMatch) {
       const jsonStr = jsonMatch[1] || jsonMatch[0];
@@ -68,33 +44,43 @@ export const extractTablesFromImageWithGemini = async (
         const parsedData = JSON.parse(jsonStr.trim());
         console.log("Successfully extracted table data:", parsedData);
         
-        // Validate the structure of the parsed data
-        if (!parsedData.tables || !Array.isArray(parsedData.tables)) {
-          console.error("Invalid table structure in extracted JSON, missing 'tables' array");
-          
-          // Try to construct a valid structure if possible
-          if (parsedData.headers && parsedData.rows) {
-            return {
-              success: true,
-              data: {
-                tables: [{
-                  title: "Extracted Table",
-                  headers: parsedData.headers,
-                  rows: parsedData.rows
-                }]
-              }
-            };
-          }
-          
+        // If parsedData is an array, assume it's an array of tables
+        if (Array.isArray(parsedData)) {
           return {
-            success: false,
-            error: "Invalid table structure in extracted JSON"
+            success: true,
+            data: {
+              tables: parsedData
+            }
+          };
+        }
+        
+        // Handle case where we got an object with tables property
+        if (parsedData.tables && Array.isArray(parsedData.tables)) {
+          return {
+            success: true,
+            data: {
+              tables: parsedData.tables
+            }
+          };
+        }
+        
+        // Try to construct a valid structure if possible (single table case)
+        if (parsedData.headers && parsedData.rows) {
+          return {
+            success: true,
+            data: {
+              tables: [{
+                title: "Extracted Table",
+                headers: parsedData.headers,
+                rows: parsedData.rows
+              }]
+            }
           };
         }
         
         return {
-          success: true,
-          data: parsedData
+          success: false,
+          error: "Invalid table structure in extracted JSON"
         };
       } catch (parseError) {
         console.error("Error parsing JSON:", parseError);

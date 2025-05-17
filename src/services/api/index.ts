@@ -4,9 +4,7 @@ export * from './uploadService';
 export * from './fileService';
 export * from './tableService';
 export * from './processService';
-export * from './gemini/visionService';
-export * from './gemini/insightGenerator';
-export * from './gemini/tableExtractor';
+export * from './geminiService';
 import { ApiResponse } from './types';
 
 /**
@@ -59,8 +57,3 @@ export const processFile = async (
     }, 1000);
   });
 };
-
-/**
- * Extract tables from an image using Gemini
- */
-export { extractTablesFromImageWithGemini, DEFAULT_TABLE_EXTRACTION_PROMPT } from './gemini/visionService';

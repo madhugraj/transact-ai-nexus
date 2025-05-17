@@ -26,6 +26,8 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
     if (fileUrl) {
       setLoading(true);
       setError(null);
+    } else {
+      setLoading(false);
     }
   }, [fileUrl]);
 

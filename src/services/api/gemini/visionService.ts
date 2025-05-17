@@ -122,6 +122,8 @@ export const processImageWithGemini = async (
 
 /**
  * Extract tables from an image using Gemini Vision
+ * This function is kept for backwards compatibility
+ * but is no longer used directly - the standalone implementation is used instead
  */
 export const extractTablesFromImageWithGemini = async (
   base64Image: string,
@@ -131,10 +133,11 @@ export const extractTablesFromImageWithGemini = async (
   const tableExtractionPrompt = customPrompt || DEFAULT_TABLE_EXTRACTION_PROMPT;
   
   try {
+    // Get the response from Gemini
     const response = await processImageWithGemini(tableExtractionPrompt, base64Image, mimeType);
     
     if (!response.success) {
-      // Type-safe conversion for error response
+      // Return the error directly with the correct type
       return {
         success: false,
         error: response.error
