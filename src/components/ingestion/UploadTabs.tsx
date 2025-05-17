@@ -18,17 +18,17 @@ const UploadTabs: React.FC<UploadTabsProps> = ({
   onCloudFilesSelected
 }) => {
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-md">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
       <TabsList className="grid grid-cols-2">
         <TabsTrigger value="upload">Local Upload</TabsTrigger>
         <TabsTrigger value="cloud">Cloud Storage</TabsTrigger>
       </TabsList>
       
-      <TabsContent value="upload" className="mt-0 pt-0">
+      <TabsContent value="upload" className="mt-4 pt-0">
         <DropZone onFilesSelected={onFilesSelected} />
       </TabsContent>
       
-      <TabsContent value="cloud" className="mt-0 pt-0">
+      <TabsContent value="cloud" className="mt-4 pt-0">
         <CloudStorageConnector onFilesSelected={onCloudFilesSelected} />
       </TabsContent>
     </Tabs>

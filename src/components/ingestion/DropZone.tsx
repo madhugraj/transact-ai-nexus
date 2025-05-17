@@ -86,13 +86,15 @@ const DropZone = ({ onFilesSelected }: DropZoneProps) => {
               accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.csv"
               onChange={handleFileChange}
             />
+            {/* Fix for the directory attribute warning */}
             <input
               id="folder-upload"
               type="file"
               multiple
               className="hidden"
-              webkitdirectory={true}
-              directory={true}
+              // Using data attribute instead of non-standard attributes
+              data-directory=""
+              data-webkitdirectory=""
               onChange={handleFileChange}
             />
           </div>

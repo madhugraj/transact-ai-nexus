@@ -1,24 +1,20 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useFileProcessing } from '@/hooks/useFileProcessing';
 import { FileProcessingDialog } from './dialog/FileProcessingDialog';
 import { FileList } from './FileList';
-import DropZone from './DropZone';
-import FileActions from './FileActions';
-import PostProcessingWorkflow from './PostProcessingWorkflow';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAgentProcessing } from '@/hooks/useAgentProcessing';
 import { useToast } from '@/hooks/use-toast';
 import { fileToBase64, extractTablesFromImageWithGemini, DEFAULT_TABLE_EXTRACTION_PROMPT } from '@/services/api';
-import CloudStorageConnector from './CloudStorageConnector';
-import DocumentClassificationComponent from './DocumentClassificationComponent';
 import { DocumentClassificationType } from '@/types/cloudStorage';
+import DocumentClassificationComponent from './DocumentClassificationComponent';
 import UploadTabs from './UploadTabs';
+import FileActions from './FileActions';
+import PostProcessingWorkflow from './PostProcessingWorkflow';
 
 const FileUpload = () => {
   const [showProcessingDialog, setShowProcessingDialog] = useState(false);
@@ -276,25 +272,16 @@ const FileUpload = () => {
         />
       ) : (
         <div className="space-y-4">
-          {/* Upload tabs - using properly wrapped Tabs components */}
+          {/* Upload tabs using the refactored component */}
           <Card className="shadow-sm">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-4">
-                {/* Fixed: Make sure TabsList is inside a Tabs component */}
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-md">
-                  <TabsList className="grid grid-cols-2">
-                    <TabsTrigger value="upload">Local Upload</TabsTrigger>
-                    <TabsTrigger value="cloud">Cloud Storage</TabsTrigger>
-                  </TabsList>
-                
-                  <TabsContent value="upload" className="mt-0 pt-0">
-                    <DropZone onFilesSelected={addFiles} />
-                  </TabsContent>
-                  
-                  <TabsContent value="cloud" className="mt-0 pt-0">
-                    <CloudStorageConnector onFilesSelected={handleCloudFilesSelected} />
-                  </TabsContent>
-                </Tabs>
+                <UploadTabs 
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                  onFilesSelected={addFiles}
+                  onCloudFilesSelected={handleCloudFilesSelected}
+                />
                 
                 <div className="flex items-center space-x-2">
                   <Switch

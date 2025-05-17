@@ -13,7 +13,7 @@ const Upload = () => {
           </p>
         </div>
         
-        {/* Component handles its own tabs internally */}
+        {/* Component handles uploading and processing */}
         <FileUpload />
       </div>
     </AppLayout>
