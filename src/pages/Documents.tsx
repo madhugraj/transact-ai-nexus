@@ -5,19 +5,44 @@ import { Card } from "@/components/ui/card";
 import ProcessingTab from "@/components/processing/ProcessingTab";
 import TableExtraction from "@/components/ingestion/GeminiVisionTest";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table } from "lucide-react";
+import { Table, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 const Documents = () => {
   const [activeTab, setActiveTab] = useState<string>("tableExtraction");
+  const { toast } = useToast();
+  
+  const handleDownload = () => {
+    // Placeholder for download functionality
+    toast({
+      title: "Download initiated",
+      description: "Your document is being prepared for download",
+    });
+    
+    // In a real implementation, this would trigger an actual download
+    // For demonstration purposes, we're just showing a toast
+  };
   
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex flex-col mb-6">
-          <h1 className="text-3xl font-semibold">Document Processing</h1>
-          <p className="text-muted-foreground mt-1">
-            Process and analyze financial documents using our agent system with Gemini AI
-          </p>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-semibold">Document Processing</h1>
+            <p className="text-muted-foreground mt-1">
+              Process and analyze financial documents using our agent system with Gemini AI
+            </p>
+          </div>
+          
+          <Button 
+            variant="outline" 
+            className="flex items-center gap-2"
+            onClick={handleDownload}
+          >
+            <Download className="h-4 w-4" />
+            Download Results
+          </Button>
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

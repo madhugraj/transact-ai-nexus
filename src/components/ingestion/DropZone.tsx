@@ -66,7 +66,7 @@ const DropZone = ({ onFilesSelected }: DropZoneProps) => {
               className="px-6 transition-all duration-300 hover:scale-105"
               onClick={() => document.getElementById('file-upload')?.click()}
             >
-              <Upload size={16} className="mr-2" />
+              <Upload className="mr-2 h-3 w-3" />
               Select Files
             </Button>
             <Button 
@@ -75,7 +75,7 @@ const DropZone = ({ onFilesSelected }: DropZoneProps) => {
               className="px-6 transition-all duration-300 hover:scale-105"
               onClick={() => document.getElementById('folder-upload')?.click()}
             >
-              <Upload size={16} className="mr-2" />
+              <Upload className="mr-2 h-3 w-3" />
               Select Folder
             </Button>
             <input
@@ -91,9 +91,9 @@ const DropZone = ({ onFilesSelected }: DropZoneProps) => {
               type="file"
               multiple
               className="hidden"
-              // Using webkitdirectory as a data attribute
-              data-directory=""
-              data-webkitdirectory=""
+              // For folder selection
+              webkitdirectory=""
+              directory=""
               onChange={handleFileChange}
             />
           </div>

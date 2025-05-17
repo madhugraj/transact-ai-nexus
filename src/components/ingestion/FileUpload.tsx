@@ -276,13 +276,7 @@ const FileUpload = () => {
           <Card className="shadow-sm">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-4">
-                <UploadTabs 
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
-                  onFilesSelected={addFiles}
-                  onCloudFilesSelected={handleCloudFilesSelected}
-                />
-                
+                <h2 className="text-lg font-medium">Upload Files</h2>
                 <div className="flex items-center space-x-2">
                   <Switch
                     id="auto-sync"
@@ -292,6 +286,14 @@ const FileUpload = () => {
                   <Label htmlFor="auto-sync">Auto Sync</Label>
                 </div>
               </div>
+              <UploadTabs 
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                onFilesSelected={addFiles}
+                onCloudFilesSelected={handleCloudFilesSelected}
+                autoSync={autoSync}
+                setAutoSync={setAutoSync}
+              />
             </CardContent>
           </Card>
 
