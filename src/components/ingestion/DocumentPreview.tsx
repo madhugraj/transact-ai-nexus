@@ -1,137 +1,126 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card } from '@/components/ui/card';
-import { AspectRatio } from '@/components/ui/aspect-ratio';
-import { Skeleton } from '@/components/ui/skeleton';
-import { FileText, Image, File, Loader } from 'lucide-react';
+import { FileText, FileImage, FileSpreadsheet, AlertCircle, Loader2 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 
 interface DocumentPreviewProps {
   fileUrl: string | null;
   fileName?: string;
   fileType?: string;
-  height?: string;
+  onLoad?: () => void;
+  onError?: (error: string) => void;
+  maxHeight?: string;
 }
 
 const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   fileUrl,
-  fileName,
+  fileName = 'Document',
   fileType,
-  height = '400px'
+  onLoad,
+  onError,
+  maxHeight = '600px'
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   useEffect(() => {
-    // Reset states when file URL changes
-    if (fileUrl) {
-      setLoading(true);
-      setError(null);
-    } else {
-      setLoading(false);
-    }
+    // Reset state when file URL changes
+    setLoading(true);
+    setError(null);
   }, [fileUrl]);
 
-  // Handle image load complete
-  const handleImageLoaded = () => {
+  const handleLoad = () => {
     setLoading(false);
+    if (onLoad) onLoad();
   };
 
-  // Handle image load error
-  const handleImageError = () => {
+  const handleError = () => {
     setLoading(false);
-    setError('Failed to load image');
+    const errorMsg = `Failed to load ${fileName || 'document'}`;
+    setError(errorMsg);
+    if (onError) onError(errorMsg);
   };
 
-  // Determine if the file is an image
-  const isImage = fileType?.startsWith('image/');
-  
-  // Determine if the file is a PDF
-  const isPdf = fileType === 'application/pdf';
+  const renderFileIcon = () => {
+    const size = 48;
+    
+    if (fileType?.startsWith('image/')) {
+      return <FileImage size={size} className="text-blue-500" />;
+    } else if (fileType === 'application/pdf') {
+      return <FileText size={size} className="text-red-500" />;
+    } else if (
+      fileType === 'application/vnd.ms-excel' || 
+      fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      fileType === 'text/csv'
+    ) {
+      return <FileSpreadsheet size={size} className="text-green-500" />;
+    } else {
+      return <FileText size={size} className="text-gray-500" />;
+    }
+  };
 
-  // No file provided
-  if (!fileUrl) {
-    return (
-      <Card className="flex items-center justify-center bg-muted/20" style={{ height }}>
-        <div className="text-center p-6">
-          <File className="mx-auto h-10 w-10 text-muted-foreground/60 mb-2" />
-          <p className="text-sm text-muted-foreground">No document to preview</p>
+  const renderPreview = () => {
+    if (loading) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+          <Loader2 className="h-10 w-10 animate-spin mb-4" />
+          <p>Loading document preview...</p>
         </div>
-      </Card>
-    );
-  }
+      );
+    }
 
-  // Loading state
-  if (loading && !isImage) {
-    return (
-      <Card className="w-full flex flex-col items-center justify-center bg-muted/20" style={{ height }}>
-        <Loader className="h-8 w-8 text-muted-foreground/60 animate-spin mb-2" />
-        <p className="text-sm text-muted-foreground">Loading document preview...</p>
-      </Card>
-    );
-  }
-
-  // Image preview
-  if (isImage) {
-    return (
-      <Card className="overflow-hidden">
-        <div className="relative">
-          {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-muted/20">
-              <Loader className="h-8 w-8 text-muted-foreground/60 animate-spin" />
-            </div>
-          )}
-          <AspectRatio ratio={16 / 9} className="bg-muted">
-            <img
-              src={fileUrl}
-              alt={fileName || 'Document preview'}
-              className="object-contain w-full h-full"
-              onLoad={handleImageLoaded}
-              onError={handleImageError}
-              style={{ display: loading ? 'none' : 'block' }}
-            />
-          </AspectRatio>
+    if (error || !fileUrl) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+          <AlertCircle className="h-10 w-10 mb-4 text-orange-500" />
+          <p>{error || 'No document available for preview'}</p>
         </div>
-        {fileName && (
-          <div className="p-2 text-center text-sm text-muted-foreground border-t">
-            <Image className="inline-block w-4 h-4 mr-1" />
-            <span>{fileName}</span>
-          </div>
-        )}
-      </Card>
-    );
-  }
+      );
+    }
 
-  // PDF preview
-  if (isPdf) {
-    return (
-      <Card className="overflow-hidden">
-        <iframe
-          src={fileUrl}
-          title={fileName || 'PDF Document'}
-          className="w-full"
-          style={{ height }}
-          onLoad={() => setLoading(false)}
-        />
-        {fileName && (
-          <div className="p-2 text-center text-sm text-muted-foreground border-t">
-            <FileText className="inline-block w-4 h-4 mr-1" />
-            <span>{fileName}</span>
+    if (fileType?.startsWith('image/')) {
+      return (
+        <div className="flex items-center justify-center overflow-hidden" style={{ maxHeight }}>
+          <img 
+            src={fileUrl} 
+            alt={fileName || 'Document preview'} 
+            className="max-w-full max-h-full object-contain rounded"
+            onLoad={handleLoad}
+            onError={handleError}
+          />
+        </div>
+      );
+    } else if (fileType === 'application/pdf') {
+      return (
+        <div className="w-full" style={{ height: maxHeight }}>
+          <iframe 
+            src={`${fileUrl}#toolbar=0`}
+            title={fileName || 'PDF Document'}
+            className="w-full h-full rounded border"
+            onLoad={handleLoad}
+            onError={handleError}
+          />
+        </div>
+      );
+    } else {
+      // For other file types, display a preview card with file info
+      return (
+        <div className="flex flex-col items-center justify-center py-10 border rounded">
+          {renderFileIcon()}
+          <div className="mt-4 text-center">
+            <h3 className="font-medium">{fileName || 'Document'}</h3>
+            <p className="text-sm text-muted-foreground">{fileType || 'Unknown file type'}</p>
           </div>
-        )}
-      </Card>
-    );
-  }
+        </div>
+      );
+    }
+  };
 
-  // Generic file preview (non-image, non-PDF)
   return (
-    <Card className="flex flex-col items-center justify-center bg-muted/20" style={{ height }}>
-      <div className="text-center p-6">
-        <FileText className="mx-auto h-10 w-10 text-muted-foreground/60 mb-2" />
-        <p className="text-sm font-medium mb-1">{fileName || 'Unknown document'}</p>
-        <p className="text-xs text-muted-foreground">
-          {fileType || 'This document type cannot be previewed'}
-        </p>
-      </div>
+    <Card className="shadow-sm">
+      <CardContent className="p-4">
+        {renderPreview()}
+      </CardContent>
     </Card>
   );
 };
