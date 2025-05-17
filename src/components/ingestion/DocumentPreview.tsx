@@ -54,8 +54,8 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   if (!fileUrl) {
     return (
       <Card className="flex items-center justify-center bg-muted/10 border-dashed" style={styleProps}>
-        <div className="text-center p-6">
-          <File className="mx-auto h-10 w-10 text-muted-foreground/40 mb-2" />
+        <div className="text-center p-4">
+          <File className="mx-auto h-8 w-8 text-muted-foreground/40 mb-2" />
           <p className="text-sm text-muted-foreground">No document to preview</p>
         </div>
       </Card>
@@ -63,7 +63,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   }
 
   return (
-    <Card className="overflow-hidden border-muted/30 shadow-sm">
+    <Card className="overflow-hidden border-muted/30">
       <div className="relative" style={styleProps}>
         {/* Loading indicator */}
         {loading && (
@@ -75,7 +75,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
         {/* Error state */}
         {error && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/90 z-10">
-            <div className="text-center p-6">
+            <div className="text-center p-4">
               <p className="text-sm text-red-500">{error}</p>
             </div>
           </div>
@@ -107,8 +107,8 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
         {/* Fallback for other file types */}
         {!isImage && !isPdf && (
           <div className="h-full flex items-center justify-center bg-muted/5">
-            <div className="text-center p-6">
-              <FileText className="mx-auto h-10 w-10 text-primary/50 mb-2" />
+            <div className="text-center p-4">
+              <FileText className="mx-auto h-8 w-8 text-primary/50 mb-2" />
               <p className="text-sm font-medium">{fileName || 'Document'}</p>
               <p className="text-xs text-muted-foreground mt-1">
                 Preview not available

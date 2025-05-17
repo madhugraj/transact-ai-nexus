@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { useFileProcessing } from '@/hooks/useFileProcessing';
 import { FileProcessingDialog } from './dialog/FileProcessingDialog';
 import { FileList } from './FileList';
@@ -22,6 +24,7 @@ const FileUpload = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('upload');
   const [classificationMode, setClassificationMode] = useState(false);
+  const [autoSync, setAutoSync] = useState(false);
   const [classifiedFiles, setClassifiedFiles] = useState<{id: string, file: File, documentType: DocumentClassificationType}[]>([]);
   const { toast } = useToast();
   
@@ -83,9 +86,18 @@ const FileUpload = () => {
       }
     }
     
-    // Start processing directly
-    handleProcessFiles();
+    // Start processing directly if auto-sync is enabled
+    if (autoSync) {
+      handleProcessFiles();
+    }
   };
+
+  // Auto-upload and process files when auto-sync is enabled
+  useEffect(() => {
+    if (autoSync && files.some(f => f.status === 'idle')) {
+      uploadAllFiles();
+    }
+  }, [files, autoSync]);
 
   // Handle file processing with loading state and agent processing
   const handleProcessFiles = async () => {
@@ -213,6 +225,12 @@ const FileUpload = () => {
         title: "Files imported",
         description: `Successfully imported ${cloudFiles.length} files from cloud storage`,
       });
+      
+      // Auto process if enabled
+      if (autoSync && cloudFiles.length > 0) {
+        // Start upload process
+        uploadAllFiles();
+      }
     }
   };
 
@@ -236,15 +254,7 @@ const FileUpload = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header section */}
-      <div className="space-y-1">
-        <h2 className="text-xl font-semibold">Document Processing</h2>
-        <p className="text-muted-foreground text-sm">
-          Upload documents from your computer or cloud storage
-        </p>
-      </div>
-      
+    <div className="space-y-4">
       {/* Post-processing workflow */}
       {(processingComplete || agentsProcessingComplete) && processingResults && (
         <PostProcessingWorkflow
@@ -264,27 +274,42 @@ const FileUpload = () => {
           onClassificationComplete={handleClassificationComplete}
         />
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Upload tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="w-full max-w-md grid grid-cols-2">
-              <TabsTrigger value="upload">Local Upload</TabsTrigger>
-              <TabsTrigger value="cloud">Cloud Storage</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="upload" className="mt-4">
-              <DropZone onFilesSelected={addFiles} />
-            </TabsContent>
-            
-            <TabsContent value="cloud" className="mt-4">
-              <CloudStorageConnector onFilesSelected={handleCloudFilesSelected} />
-            </TabsContent>
-          </Tabs>
+          <Card className="shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-md">
+                  <TabsList className="grid grid-cols-2">
+                    <TabsTrigger value="upload">Local Upload</TabsTrigger>
+                    <TabsTrigger value="cloud">Cloud Storage</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="auto-sync"
+                    checked={autoSync}
+                    onCheckedChange={setAutoSync}
+                  />
+                  <Label htmlFor="auto-sync">Auto Sync</Label>
+                </div>
+              </div>
+              
+              <TabsContent value="upload" className="mt-0 pt-0">
+                <DropZone onFilesSelected={addFiles} />
+              </TabsContent>
+              
+              <TabsContent value="cloud" className="mt-0 pt-0">
+                <CloudStorageConnector onFilesSelected={handleCloudFilesSelected} />
+              </TabsContent>
+            </CardContent>
+          </Card>
 
           {/* Files list and actions */}
           {isLoading ? (
             <Card className="shadow-sm">
-              <CardContent className="p-6 space-y-4">
+              <CardContent className="p-4 space-y-4">
                 <div className="flex items-center justify-between">
                   <Skeleton className="h-8 w-[120px]" />
                   <Skeleton className="h-8 w-[100px]" />
@@ -298,7 +323,7 @@ const FileUpload = () => {
           ) : (
             files.length > 0 && !processingComplete && !agentsProcessingComplete && (
               <Card className="shadow-sm">
-                <CardContent className="p-4 md:p-6">
+                <CardContent className="p-4">
                   {/* File actions */}
                   <FileActions
                     files={files}
@@ -324,23 +349,14 @@ const FileUpload = () => {
                     }}
                   />
                   
-                  {/* Action buttons */}
-                  <div className="flex flex-wrap gap-2 mt-6">
+                  {/* Classification button */}
+                  <div className="flex flex-wrap gap-2 mt-4">
                     <Button 
                       onClick={startClassification}
                       disabled={isLoading || files.length === 0}
                       className="bg-blue-600 hover:bg-blue-700 transition-all duration-200"
                     >
-                      Classify & Process
-                    </Button>
-                    
-                    <Button 
-                      variant="outline"
-                      onClick={() => setShowProcessingDialog(true)}
-                      disabled={isLoading || files.length === 0}
-                      className="border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700"
-                    >
-                      Advanced Processing
+                      Classify Documents
                     </Button>
                   </div>
                 </CardContent>

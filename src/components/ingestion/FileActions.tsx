@@ -25,7 +25,7 @@ const FileActions = ({
   const processedCount = files.filter(f => f.processed).length;
 
   return (
-    <div className="flex flex-col sm:flex-row sm:justify-between gap-3 mb-4">
+    <div className="flex flex-col sm:flex-row sm:justify-between gap-2 mb-3">
       <div>
         <h3 className="font-medium flex items-center text-sm">
           Files
@@ -33,8 +33,12 @@ const FileActions = ({
         </h3>
         <div className="flex gap-2 mt-1 text-xs text-muted-foreground">
           <span>{idleCount} pending</span>
-          <span className="mx-1">•</span>
-          <span>{successCount} uploaded</span>
+          {successCount > 0 && (
+            <>
+              <span className="mx-1">•</span>
+              <span>{successCount} uploaded</span>
+            </>
+          )}
           {processedCount > 0 && (
             <>
               <span className="mx-1">•</span>

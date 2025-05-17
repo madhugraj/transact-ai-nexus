@@ -1,17 +1,5 @@
 
-/**
- * Cloud storage integration types
- */
-
-export type CloudStorageProvider = 'google-drive' | 'onedrive' | 'sharepoint' | 'dropbox' | 'box';
-
-export interface CloudStorageConfig {
-  provider: CloudStorageProvider;
-  clientId?: string;
-  redirectUri?: string;
-  scopes?: string[];
-  customParams?: Record<string, string>;
-}
+export type CloudStorageProvider = 'google_drive' | 'onedrive' | 'sharepoint' | 'dropbox';
 
 export interface CloudFile {
   id: string;
@@ -19,21 +7,16 @@ export interface CloudFile {
   mimeType: string;
   size: number;
   lastModified: Date;
-  thumbnailUrl?: string;
   provider: CloudStorageProvider;
   parentId?: string;
-  path?: string;
   isFolder: boolean;
 }
 
 export interface CloudStorageAuthResult {
   provider: CloudStorageProvider;
   accessToken: string;
-  refreshToken?: string;
-  expiresAt?: Date;
-  userId?: string;
   success: boolean;
-  error?: string;
+  expiresAt: Date;
 }
 
 export type DocumentClassificationType = 
@@ -44,10 +27,6 @@ export type DocumentClassificationType =
   | 'email' 
   | 'contract' 
   | 'report' 
+  | 'work_order' 
+  | 'utility' 
   | 'other';
-
-export interface ClassificationResult {
-  documentType: DocumentClassificationType;
-  confidence: number;
-  alternativeTypes?: Array<{type: DocumentClassificationType, confidence: number}>;
-}
