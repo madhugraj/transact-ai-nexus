@@ -487,11 +487,11 @@ export const ProcessingResults = ({
               fileUrl={getFileUrl()} 
               fileName={files.length > 0 ? files[0].name : undefined}
               fileType={files.length > 0 ? files[0].type : undefined}
-              maxHeight="500px" // Changed height to maxHeight
+              maxHeight="500px"
             />
           ) : (
             <div className="p-8 text-center text-muted-foreground">
-              <p>No document preview available</p>
+              No document preview available
             </div>
           )}
         </TabsContent>

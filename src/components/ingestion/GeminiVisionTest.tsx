@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -188,7 +189,7 @@ const TableExtraction: React.FC = () => {
                   fileUrl={filePreviewUrl}
                   fileName={selectedFile?.name}
                   fileType={selectedFile?.type}
-                  maxHeight="300px" // Changed height to maxHeight
+                  maxHeight="300px" 
                 />
               </div>
             </div>
