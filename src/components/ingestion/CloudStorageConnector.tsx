@@ -4,8 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Google, Microsoft, SharePoint, Cloud, FileText } from 'lucide-react';
-import * as api from '@/services/api';
+import { Cloud, FileText, Download } from 'lucide-react';
+import * as api from '@/services/api/cloudStorageService';
 
 interface CloudStorageConnectorProps {
   onFilesSelected: (files: File[]) => void;
@@ -153,11 +153,11 @@ const CloudStorageConnector: React.FC<CloudStorageConnectorProps> = ({ onFilesSe
   const getProviderIcon = (provider: api.CloudStorageProvider) => {
     switch (provider) {
       case 'google-drive':
-        return <Google className="h-5 w-5" />;
+        return <Cloud className="h-5 w-5" />;
       case 'onedrive':
-        return <Microsoft className="h-5 w-5" />;
+        return <Cloud className="h-5 w-5" />;
       case 'sharepoint':
-        return <SharePoint className="h-5 w-5" />;
+        return <Cloud className="h-5 w-5" />;
       case 'local':
       default:
         return <Cloud className="h-5 w-5" />;
@@ -178,7 +178,7 @@ const CloudStorageConnector: React.FC<CloudStorageConnectorProps> = ({ onFilesSe
               onClick={() => connectToStorage('google-drive')}
               disabled={isConnecting}
             >
-              <Google className="h-8 w-8 text-blue-600" />
+              <Cloud className="h-8 w-8 text-blue-600" />
               <span>Google Drive</span>
             </Button>
             
@@ -188,7 +188,7 @@ const CloudStorageConnector: React.FC<CloudStorageConnectorProps> = ({ onFilesSe
               onClick={() => connectToStorage('onedrive')}
               disabled={isConnecting}
             >
-              <Microsoft className="h-8 w-8 text-blue-600" />
+              <Cloud className="h-8 w-8 text-blue-600" />
               <span>OneDrive</span>
             </Button>
             
@@ -198,7 +198,7 @@ const CloudStorageConnector: React.FC<CloudStorageConnectorProps> = ({ onFilesSe
               onClick={() => connectToStorage('sharepoint')}
               disabled={isConnecting}
             >
-              <SharePoint className="h-8 w-8 text-blue-600" />
+              <Cloud className="h-8 w-8 text-blue-600" />
               <span>SharePoint</span>
             </Button>
           </div>

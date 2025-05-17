@@ -5,6 +5,7 @@ export * from './fileService';
 export * from './tableService';
 export * from './processService';
 export * from './geminiService';
+export * from './cloudStorageService'; // Add this line to export the cloudStorageService
 import { ApiResponse } from './types';
 
 /**
