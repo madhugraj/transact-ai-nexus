@@ -1,15 +1,13 @@
 
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Loader2, Tag, Check } from 'lucide-react';
 import { UploadedFile } from '@/types/fileUpload';
-import { DocumentClassification, classifyFileWithAI } from '@/services/api/fileClassificationService';
 import { useToast } from '@/hooks/use-toast';
+import { Check, AlertCircle, FileText } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { classifyFileWithAI, DocumentClassification } from '@/services/api/fileClassificationService';
+import { Progress } from '@/components/ui/progress';
 
 interface DocumentClassificationProps {
   files: UploadedFile[];
@@ -17,164 +15,147 @@ interface DocumentClassificationProps {
   onBatchClassify: (classifications: Record<string, DocumentClassification>) => void;
 }
 
-const DocumentClassificationComponent: React.FC<DocumentClassificationProps> = ({ 
-  files, 
+const DocumentClassificationComponent: React.FC<DocumentClassificationProps> = ({
+  files,
   onClassify,
-  onBatchClassify 
+  onBatchClassify
 }) => {
-  const [autoClassify, setAutoClassify] = useState(true);
-  const [isClassifying, setIsClassifying] = useState(false);
+  const [isAutoClassifying, setIsAutoClassifying] = useState(false);
   const [classifications, setClassifications] = useState<Record<string, DocumentClassification>>({});
-  const [processing, setProcessing] = useState<Record<string, boolean>>({});
+  const [processedFiles, setProcessedFiles] = useState<Record<string, boolean>>({});
+  const [classificationProgress, setClassificationProgress] = useState(0);
   const { toast } = useToast();
 
-  const handleAutoClassifyToggle = (checked: boolean) => {
-    setAutoClassify(checked);
+  const uploadedFiles = files.filter(f => f.status === 'success');
+
+  const handleManualClassification = (fileId: string, value: DocumentClassification) => {
+    const newClassifications = {
+      ...classifications,
+      [fileId]: value
+    };
+    
+    setClassifications(newClassifications);
+    onClassify(fileId, value);
+    setProcessedFiles(prev => ({ ...prev, [fileId]: true }));
   };
 
-  const handleClassificationChange = (fileId: string, classification: DocumentClassification) => {
-    setClassifications(prev => ({
-      ...prev,
-      [fileId]: classification
-    }));
-    
-    onClassify(fileId, classification);
-  };
-  
-  const classifyFile = async (file: UploadedFile) => {
-    if (!file.file) return;
-    
-    setProcessing(prev => ({ ...prev, [file.id]: true }));
-    
-    try {
-      const response = await classifyFileWithAI(file.file);
-      
-      if (response.success && response.data) {
-        handleClassificationChange(file.id, response.data.classification);
-        
-        toast({
-          title: "Document classified",
-          description: `"${file.file.name}" classified as ${response.data.classification} (${Math.round(response.data.confidence * 100)}% confidence)`
-        });
-      } else {
-        toast({
-          title: "Classification failed",
-          description: response.error || "Failed to classify document",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
+  const runAutoClassification = async () => {
+    if (uploadedFiles.length === 0) {
       toast({
-        title: "Classification error",
-        description: error instanceof Error ? error.message : "An unknown error occurred",
-        variant: "destructive"
+        title: "No files to classify",
+        description: "You need to upload files first before classification.",
       });
-    } finally {
-      setProcessing(prev => ({ ...prev, [file.id]: false }));
+      return;
     }
-  };
-  
-  const handleBatchClassify = async () => {
-    setIsClassifying(true);
-    
+
+    setIsAutoClassifying(true);
+    setClassificationProgress(0);
+    const batchSize = uploadedFiles.length;
+    let completed = 0;
+    const newClassifications: Record<string, DocumentClassification> = { ...classifications };
+    const processed: Record<string, boolean> = { ...processedFiles };
+
     try {
-      // Process all files
-      for (const file of files) {
-        if (file.file) {
-          await classifyFile(file);
+      for (const file of uploadedFiles) {
+        if (processed[file.id]) continue;
+
+        try {
+          const result = await classifyFileWithAI(file.file);
+          
+          if (result.success && result.data) {
+            newClassifications[file.id] = result.data.classification;
+            processed[file.id] = true;
+          } else {
+            toast({
+              title: `Failed to classify ${file.file.name}`,
+              description: result.error || "Classification failed",
+              variant: "destructive",
+            });
+          }
+        } catch (error) {
+          console.error(`Error classifying ${file.file.name}:`, error);
         }
+        
+        completed++;
+        setClassificationProgress(Math.floor((completed / batchSize) * 100));
       }
       
-      // Save all classifications
-      onBatchClassify(classifications);
+      setClassifications(newClassifications);
+      setProcessedFiles(processed);
+      
+      // Notify parent component about batch classification
+      onBatchClassify(newClassifications);
       
       toast({
         title: "Classification complete",
-        description: `Classified ${Object.keys(classifications).length} documents`
+        description: `${completed} files have been classified`,
       });
     } catch (error) {
       toast({
-        title: "Classification error",
-        description: error instanceof Error ? error.message : "An error occurred during batch classification",
-        variant: "destructive"
+        title: "Classification failed",
+        description: error instanceof Error ? error.message : "An error occurred during classification",
+        variant: "destructive",
       });
     } finally {
-      setIsClassifying(false);
-    }
-  };
-  
-  const getClassificationLabel = (type: DocumentClassification): string => {
-    switch(type) {
-      case 'invoice': return 'Invoice';
-      case 'purchase_order': return 'Purchase Order';
-      case 'bill': return 'Bill';
-      case 'receipt': return 'Receipt';
-      case 'email': return 'Email';
-      case 'report': return 'Report';
-      default: return 'Other';
-    }
-  };
-  
-  const getClassificationColor = (type: DocumentClassification): string => {
-    switch(type) {
-      case 'invoice': return 'bg-blue-100 text-blue-800 hover:bg-blue-200';
-      case 'purchase_order': return 'bg-purple-100 text-purple-800 hover:bg-purple-200';
-      case 'bill': return 'bg-red-100 text-red-800 hover:bg-red-200';
-      case 'receipt': return 'bg-green-100 text-green-800 hover:bg-green-200';
-      case 'email': return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200';
-      case 'report': return 'bg-orange-100 text-orange-800 hover:bg-orange-200';
-      default: return 'bg-gray-100 text-gray-800 hover:bg-gray-200';
+      setIsAutoClassifying(false);
+      setClassificationProgress(100);
     }
   };
 
   return (
     <Card className="shadow-sm">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Document Classification</CardTitle>
-            <CardDescription>Categorize your documents for better organization</CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            <Label htmlFor="auto-classify" className="text-sm">Auto-classify</Label>
-            <Switch 
-              id="auto-classify" 
-              checked={autoClassify} 
-              onCheckedChange={handleAutoClassifyToggle} 
-            />
-          </div>
-        </div>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg">Document Classification</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {files.length === 0 ? (
-            <div className="text-center p-4 border rounded-md text-muted-foreground">
-              No files to classify. Upload files first.
+          {/* Auto Classification Button */}
+          <div className="flex justify-between items-center">
+            <Button 
+              onClick={runAutoClassification}
+              disabled={isAutoClassifying || uploadedFiles.length === 0}
+            >
+              Auto-Classify Documents
+            </Button>
+            
+            <span className="text-sm text-muted-foreground">
+              {uploadedFiles.length} document{uploadedFiles.length !== 1 ? 's' : ''} available
+            </span>
+          </div>
+          
+          {/* Classification Progress */}
+          {isAutoClassifying && (
+            <div className="space-y-1">
+              <div className="flex justify-between text-sm">
+                <span>Classifying documents...</span>
+                <span>{classificationProgress}%</span>
+              </div>
+              <Progress value={classificationProgress} />
             </div>
-          ) : (
-            <>
-              <div className="space-y-2">
-                {files.map((file) => (
-                  <div key={file.id} className="flex items-center justify-between p-3 border rounded-md">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <Tag className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium truncate">{file.file?.name}</span>
-                      {classifications[file.id] && (
-                        <Badge className={getClassificationColor(classifications[file.id])}>
-                          {getClassificationLabel(classifications[file.id])}
-                        </Badge>
-                      )}
-                    </div>
-                    
-                    {processing[file.id] ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Select 
-                        value={classifications[file.id] || ''} 
-                        onValueChange={(value) => handleClassificationChange(file.id, value as DocumentClassification)}
+          )}
+          
+          {/* Document List */}
+          {uploadedFiles.length > 0 ? (
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Document Classification</div>
+              <div className="border rounded-md divide-y">
+                {uploadedFiles.map(file => {
+                  const isClassified = processedFiles[file.id];
+                  
+                  return (
+                    <div key={file.id} className="p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        <span className="truncate max-w-[200px]">{file.file.name}</span>
+                        {isClassified && <Check className="h-4 w-4 text-green-500" />}
+                      </div>
+                      
+                      <Select
+                        value={classifications[file.id] || ""}
+                        onValueChange={(value) => handleManualClassification(file.id, value as DocumentClassification)}
                       >
-                        <SelectTrigger className="w-32 h-8">
-                          <SelectValue placeholder="Category" />
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Select type" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="invoice">Invoice</SelectItem>
@@ -186,31 +167,17 @@ const DocumentClassificationComponent: React.FC<DocumentClassificationProps> = (
                           <SelectItem value="other">Other</SelectItem>
                         </SelectContent>
                       </Select>
-                    )}
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
-              
-              {autoClassify && (
-                <Button 
-                  onClick={handleBatchClassify} 
-                  className="w-full flex items-center justify-center gap-1"
-                  disabled={isClassifying || files.length === 0}
-                >
-                  {isClassifying ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Classifying...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check className="h-4 w-4" />
-                      <span>Classify All Documents</span>
-                    </>
-                  )}
-                </Button>
-              )}
-            </>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">
+              <AlertCircle className="mx-auto h-10 w-10 text-muted-foreground/70 mb-2" />
+              <p>No files available for classification</p>
+              <p className="text-sm mt-1">Upload files first to classify them</p>
+            </div>
           )}
         </div>
       </CardContent>

@@ -10,7 +10,7 @@ interface DocumentPreviewProps {
   onLoad?: () => void;
   onError?: (error: string) => void;
   maxHeight?: string;
-  height?: string; // Added height prop
+  height?: string; // Add height prop
 }
 
 const DocumentPreview: React.FC<DocumentPreviewProps> = ({
@@ -20,7 +20,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   onLoad,
   onError,
   maxHeight = '600px',
-  height // Use height if provided
+  height
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
