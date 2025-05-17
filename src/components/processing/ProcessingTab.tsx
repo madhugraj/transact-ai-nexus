@@ -3,7 +3,7 @@ import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ProcessTransactions from './ProcessTransactions';
 import AgentProcessingSystem from './AgentProcessingSystem';
-import { FileStatus, UploadedFile } from '@/types/fileUpload';
+import { UploadedFile } from '@/types/fileUpload';
 import { ProcessingOptions } from '@/types/processing';
 
 interface ProcessingTabProps {

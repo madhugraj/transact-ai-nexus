@@ -68,7 +68,7 @@ const DashboardCharts = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">Analytics</h2>
-        <Tabs defaultValue="month" onValueChange={(v) => setTimeRange(v as any)}>
+        <Tabs defaultValue="month" onValueChange={(v) => setTimeRange(v as any)} className="w-auto">
           <TabsList>
             <TabsTrigger value="week">Week</TabsTrigger>
             <TabsTrigger value="month">Month</TabsTrigger>
