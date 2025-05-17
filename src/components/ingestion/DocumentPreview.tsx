@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FileText, Image, File, Loader } from 'lucide-react';
 
@@ -10,13 +9,15 @@ interface DocumentPreviewProps {
   fileName?: string;
   fileType?: string;
   height?: string;
+  maxHeight?: string;
 }
 
 const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   fileUrl,
   fileName,
   fileType,
-  height = '400px'
+  height = '400px',
+  maxHeight
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,10 +47,13 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   // Determine if the file is a PDF
   const isPdf = fileType === 'application/pdf';
 
+  // Use height or maxHeight prop correctly
+  const styleProps = maxHeight ? { maxHeight } : { height };
+
   // No file provided
   if (!fileUrl) {
     return (
-      <Card className="flex items-center justify-center bg-muted/20" style={{ height }}>
+      <Card className="flex items-center justify-center bg-muted/20" style={styleProps}>
         <div className="text-center p-6">
           <File className="mx-auto h-10 w-10 text-muted-foreground/60 mb-2" />
           <p className="text-sm text-muted-foreground">No document to preview</p>
@@ -60,7 +64,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
   return (
     <Card className="overflow-hidden border-muted/40 shadow-sm">
-      <div className="relative" style={{ height }}>
+      <div className="relative" style={styleProps}>
         {/* Loading indicator */}
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">

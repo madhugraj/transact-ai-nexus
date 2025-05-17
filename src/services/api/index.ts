@@ -5,6 +5,7 @@ export * from './processService';
 export * from './fileService';
 export * from './dataService';
 export * from './geminiService';  // Export all Gemini service functions
+export * from './cloudStorageService'; // Export cloud storage service
 
 // Export tableService with explicit naming to avoid conflicts
 export { 
