@@ -10,6 +10,7 @@ interface DocumentPreviewProps {
   onLoad?: () => void;
   onError?: (error: string) => void;
   maxHeight?: string;
+  height?: string; // Added height prop
 }
 
 const DocumentPreview: React.FC<DocumentPreviewProps> = ({
@@ -18,7 +19,8 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   fileType,
   onLoad,
   onError,
-  maxHeight = '600px'
+  maxHeight = '600px',
+  height // Use height if provided
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +62,9 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   };
 
   const renderPreview = () => {
+    // Use height prop if provided, otherwise use maxHeight
+    const containerStyle = height ? { height } : { maxHeight };
+    
     if (loading) {
       return (
         <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
@@ -80,7 +85,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
     if (fileType?.startsWith('image/')) {
       return (
-        <div className="flex items-center justify-center overflow-hidden" style={{ maxHeight }}>
+        <div className="flex items-center justify-center overflow-hidden" style={containerStyle}>
           <img 
             src={fileUrl} 
             alt={fileName || 'Document preview'} 
@@ -92,7 +97,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
       );
     } else if (fileType === 'application/pdf') {
       return (
-        <div className="w-full" style={{ height: maxHeight }}>
+        <div className="w-full" style={containerStyle}>
           <iframe 
             src={`${fileUrl}#toolbar=0`}
             title={fileName || 'PDF Document'}

@@ -1,7 +1,7 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { useFileProcessing } from '@/hooks/useFileProcessing';
 import { FileProcessingDialog } from './dialog/FileProcessingDialog';
 import { FileList } from './FileList';

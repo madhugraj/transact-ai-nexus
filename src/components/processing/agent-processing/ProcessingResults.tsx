@@ -487,7 +487,7 @@ export const ProcessingResults = ({
               fileUrl={getFileUrl()} 
               fileName={files.length > 0 ? files[0].name : undefined}
               fileType={files.length > 0 ? files[0].type : undefined}
-              height="500px"
+              maxHeight="500px" // Changed height to maxHeight
             />
           ) : (
             <div className="p-8 text-center text-muted-foreground">
