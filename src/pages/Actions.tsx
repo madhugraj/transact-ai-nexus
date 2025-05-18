@@ -1,8 +1,9 @@
+
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Send, Mail, MailPlus, Webhook, FileSearch, FileCheck, FileSpreadsheet, Database, Cloud } from "lucide-react";
+import { Send, Mail, MailPlus, Webhook, FileSearch, FileCheck, FileSpreadsheet, Database, Cloud, ArrowUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import WorkflowCreator from "@/components/actions/WorkflowCreator";
 

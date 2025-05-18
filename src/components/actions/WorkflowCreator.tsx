@@ -38,7 +38,8 @@ import {
   Mail, 
   Cloud, 
   FileSearch,
-  Settings
+  Settings,
+  FileIcon, // Changed from File to FileIcon
 } from "lucide-react";
 
 // Define workflow step types
@@ -148,7 +149,7 @@ const WorkflowCreator: React.FC = () => {
       case "comparison":
         return <FileSearch className="h-4 w-4" />;
       case "report-generation":
-        return <File className="h-4 w-4" />;
+        return <FileIcon className="h-4 w-4" />; // Changed from File to FileIcon
       case "notification":
         return <Mail className="h-4 w-4" />;
       case "data-storage":
@@ -241,7 +242,7 @@ const WorkflowCreator: React.FC = () => {
                     <span className="text-sm">2. Document Comparison (PO vs Invoice)</span>
                   </div>
                   <div className="flex items-center p-2 rounded-md bg-muted/50">
-                    <File className="h-4 w-4 mr-2 text-green-500" />
+                    <FileIcon className="h-4 w-4 mr-2 text-green-500" /> {/* Changed from File to FileIcon */}
                     <span className="text-sm">3. Report Generation (Dashboard)</span>
                   </div>
                   <div className="flex items-center p-2 rounded-md bg-muted/50">
