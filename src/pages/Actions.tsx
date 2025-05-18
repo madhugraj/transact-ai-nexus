@@ -140,7 +140,6 @@ const EmptyStateCard = () => (
       <p className="text-sm text-muted-foreground mb-4 max-w-sm">
         Create your first document processing workflow to automate comparing POs and invoices.
       </p>
-      {/* Removed the duplicate WorkflowBuilder button here */}
     </CardContent>
   </Card>
 );

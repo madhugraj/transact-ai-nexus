@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -8,7 +9,6 @@ import {
   File, 
   Upload, 
   Mail, 
-  MessageCircle, 
   Send, 
   BarChart, 
   Settings,
@@ -62,7 +62,6 @@ const AppSidebar = () => {
     { label: "Email Connector", icon: Mail, href: "/email-connector" },
     { label: "Upload", icon: Upload, href: "/upload" },
     { label: "Database", icon: Database, href: "/database" },
-    { label: "AI Assistant", icon: MessageCircle, href: "/assistant" },
     { label: "Actions", icon: Send, href: "/actions" },
     { label: "SAP Data", icon: File, href: "/sap-data" },
     { label: "Settings", icon: Settings, href: "/settings" },

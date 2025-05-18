@@ -451,12 +451,9 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
   };
 
   return (
-    <>
-      <Button onClick={() => setShowDialog(true)}>
-        <Plus className="mr-2 h-4 w-4" />
-        Create Workflow
-      </Button>
-      
+    <Button onClick={() => setShowDialog(true)}>
+      <Plus className="mr-2 h-4 w-4" />
+      Create Workflow
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className={isMobile ? "max-w-[95%] h-[80vh]" : "sm:max-w-[80%] h-[80vh]"}>
           <DialogHeader>
@@ -626,8 +623,9 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
         nodeType={selectedNode.type}
         nodeLabel={selectedNode.label}
       />
-    </>
+    </Button>
   );
 };
 
 export default WorkflowBuilder;
+
