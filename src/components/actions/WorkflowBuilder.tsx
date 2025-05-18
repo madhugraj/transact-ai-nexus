@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import { useForm } from "react-hook-form";
 import { Plus, Save } from "lucide-react";
 import { useWorkflow } from "@/hooks/useWorkflow";
-import { WorkflowConfig, WorkflowStep } from "@/types/workflow";
+import { WorkflowConfig, WorkflowStep, WorkflowStepType } from "@/types/workflow";
 import {
   ReactFlow,
   Background,
@@ -146,8 +145,8 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
   const generateWorkflowSteps = (): WorkflowStep[] => {
     return nodes.map((node, index) => ({
       id: node.id,
-      type: node.data.type,
-      name: node.data.label,
+      type: node.data.type as WorkflowStepType,  // Add explicit type cast here
+      name: node.data.label as string,  // Add explicit type cast here
       position: index + 1,
       config: {
         x: node.position.x,
