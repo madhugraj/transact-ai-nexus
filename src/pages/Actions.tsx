@@ -1,10 +1,10 @@
-
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Send, MailPlus, Webhook, FileCheck, Mail, FileSpreadsheet, ArrowUpDown } from "lucide-react";
+import { Send, Mail, MailPlus, Webhook, FileSearch, FileCheck, FileSpreadsheet, Database, Cloud } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import WorkflowCreator from "@/components/actions/WorkflowCreator";
 
 const Actions = () => {
   return (
@@ -12,10 +12,7 @@ const Actions = () => {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Action Workflows</h1>
-          <Button>
-            <Send className="mr-2 h-4 w-4" />
-            Create Workflow
-          </Button>
+          <WorkflowCreator />
         </div>
 
         <Tabs defaultValue="automated" className="space-y-4">
@@ -23,6 +20,7 @@ const Actions = () => {
             <TabsTrigger value="automated">Automated Actions</TabsTrigger>
             <TabsTrigger value="templates">Email Templates</TabsTrigger>
             <TabsTrigger value="history">Action History</TabsTrigger>
+            <TabsTrigger value="workflows">Workflow Pipelines</TabsTrigger>
           </TabsList>
           
           <TabsContent value="automated" className="space-y-4">
@@ -209,6 +207,159 @@ const Actions = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+          
+          <TabsContent value="workflows" className="space-y-4">
+            <Card>
+              <CardContent className="p-6">
+                <div className="mb-6">
+                  <h3 className="text-lg font-medium mb-2">Document Processing Pipeline</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Configure end-to-end document processing workflows from input to approval and storage
+                  </p>
+                  
+                  <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                    <Button variant="outline" className="flex items-center gap-2">
+                      <Cloud className="h-4 w-4" />
+                      <span>Configure Sources</span>
+                    </Button>
+                    
+                    <Button variant="outline" className="flex items-center gap-2">
+                      <FileSearch className="h-4 w-4" />
+                      <span>Comparison Rules</span>
+                    </Button>
+                    
+                    <Button variant="outline" className="flex items-center gap-2">
+                      <Mail className="h-4 w-4" />
+                      <span>Approval Flow</span>
+                    </Button>
+                    
+                    <Button variant="outline" className="flex items-center gap-2">
+                      <Database className="h-4 w-4" />
+                      <span>Storage Options</span>
+                    </Button>
+                  </div>
+                  
+                  <div className="bg-muted p-4 rounded-md">
+                    <h4 className="text-sm font-medium mb-3">Sample Workflow Pipeline</h4>
+                    
+                    <div className="relative">
+                      {/* Workflow steps with connector lines */}
+                      <div className="absolute top-0 left-6 w-[2px] h-full bg-muted-foreground/20"></div>
+                      
+                      <div className="space-y-6">
+                        <div className="flex relative">
+                          <div className="bg-blue-500 rounded-full h-3 w-3 mt-1 z-10"></div>
+                          <div className="ml-8">
+                            <div className="font-medium text-sm">Document Source</div>
+                            <div className="text-xs text-muted-foreground">
+                              Connect to Google Drive, Email or Database to import PO and Invoice documents
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex relative">
+                          <div className="bg-amber-500 rounded-full h-3 w-3 mt-1 z-10"></div>
+                          <div className="ml-8">
+                            <div className="font-medium text-sm">Document Comparison</div>
+                            <div className="text-xs text-muted-foreground">
+                              Automatically compare PO with Invoices to identify discrepancies
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex relative">
+                          <div className="bg-green-500 rounded-full h-3 w-3 mt-1 z-10"></div>
+                          <div className="ml-8">
+                            <div className="font-medium text-sm">Report Generation</div>
+                            <div className="text-xs text-muted-foreground">
+                              Create detailed reports and visualizations for the dashboard
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex relative">
+                          <div className="bg-purple-500 rounded-full h-3 w-3 mt-1 z-10"></div>
+                          <div className="ml-8">
+                            <div className="font-medium text-sm">Approval Notification</div>
+                            <div className="text-xs text-muted-foreground">
+                              Send email to appropriate authorities requesting approval
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex relative">
+                          <div className="bg-gray-500 rounded-full h-3 w-3 mt-1 z-10"></div>
+                          <div className="ml-8">
+                            <div className="font-medium text-sm">Database Storage</div>
+                            <div className="text-xs text-muted-foreground">
+                              Store processed documents and approvals in database for accounting
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader className="pb-2">
+                  <Badge className="w-fit mb-1">Active</Badge>
+                  <CardTitle className="text-base">PO-Invoice Approval Pipeline</CardTitle>
+                  <CardDescription className="text-xs">
+                    Automated workflow for processing and approving invoice payments
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="text-sm space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Source:</span>
+                    <span>Google Drive, Email</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Matching:</span>
+                    <span>90% threshold</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Approval:</span>
+                    <span>finance@example.com</span>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex justify-between">
+                  <Button variant="outline" size="sm">Edit</Button>
+                  <Button size="sm">Run Now</Button>
+                </CardFooter>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <Badge variant="outline" className="w-fit mb-1">Draft</Badge>
+                  <CardTitle className="text-base">Multi-vendor Invoice Processing</CardTitle>
+                  <CardDescription className="text-xs">
+                    Process invoices from multiple vendors against master agreements
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="text-sm space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Source:</span>
+                    <span>Email Connector</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Matching:</span>
+                    <span>Not configured</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Approval:</span>
+                    <span>Not configured</span>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex justify-end">
+                  <Button variant="default" size="sm">Configure</Button>
+                </CardFooter>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
