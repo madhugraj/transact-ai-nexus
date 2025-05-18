@@ -1,10 +1,10 @@
 
 import { useState } from "react";
 import UploadTabs from "./UploadTabs";
-import FileList from "./FileList";
+import { FileList } from "./FileList";
 import FileUploadActions from "./FileUploadActions";
 import { useFileProcessing } from "@/hooks/useFileProcessing";
-import FileProcessingDialog from "./dialog/FileProcessingDialog";
+import { FileProcessingDialog } from "./dialog/FileProcessingDialog";
 import PostProcessingWorkflow from "./PostProcessingWorkflow";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -26,7 +26,14 @@ const FileUpload = () => {
     selectFilesForProcessing,
     processFiles,
     processingComplete,
-    handleWorkflowComplete
+    handleWorkflowComplete,
+    isDocumentFile,
+    isDataFile,
+    selectByType,
+    processingOptions,
+    setProcessingOptions,
+    currentAction,
+    setCurrentAction
   } = useFileProcessing();
 
   // Handle when files are added
@@ -48,6 +55,12 @@ const FileUpload = () => {
     setTimeout(() => {
       uploadAllFiles();
     }, 500);
+  };
+
+  // Handle processing a single file
+  const handleProcessFile = (fileId: string) => {
+    selectFilesForProcessing([fileId]);
+    setShowProcessingDialog(true);
   };
 
   return (
@@ -75,30 +88,44 @@ const FileUpload = () => {
         setAutoSync={setAutoSync}
       />
       
-      <FileList files={files} onRemove={removeFile} onUpload={uploadFile} />
+      <FileList 
+        files={files} 
+        onRemove={removeFile} 
+        onUpload={uploadFile} 
+        onProcess={handleProcessFile}
+      />
       
       <FileUploadActions
         files={files}
-        onUploadAll={uploadAllFiles}
-        onProcess={() => setShowProcessingDialog(true)}
+        isLoading={false}
+        handleProcessFiles={() => setShowProcessingDialog(true)}
+        selectFilesForProcessing={selectFilesForProcessing}
+        selectByType={selectByType}
+        setShowProcessingDialog={setShowProcessingDialog}
       />
       
       {showProcessingDialog && (
         <FileProcessingDialog
           open={showProcessingDialog}
-          onClose={() => setShowProcessingDialog(false)}
-          onStart={(action, options) => {
+          onOpenChange={(open) => setShowProcessingDialog(open)}
+          selectedFileIds={selectedFileIds}
+          files={files}
+          currentAction={currentAction}
+          setCurrentAction={setCurrentAction}
+          processingOptions={processingOptions}
+          setProcessingOptions={setProcessingOptions}
+          onProcess={() => {
             processFiles();
             setShowProcessingDialog(false);
             setShowWorkflow(true);
-            return true;
           }}
+          isDocumentFile={isDocumentFile}
+          isDataFile={isDataFile}
         />
       )}
       
       {showWorkflow && processingComplete && (
         <PostProcessingWorkflow
-          open={showWorkflow}
           onClose={() => {
             handleWorkflowComplete();
             setShowWorkflow(false);
