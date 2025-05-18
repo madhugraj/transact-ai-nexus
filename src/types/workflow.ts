@@ -1,36 +1,39 @@
+// Define workflow step types
+export type WorkflowStepType = 
+  | "document-source" 
+  | "comparison" 
+  | "report-generation" 
+  | "notification" 
+  | "data-storage";
 
-export type DocumentSourceType = 'google_drive' | 'email' | 'local' | 'sharepoint' | 'database';
+// Define a workflow step interface
+export interface WorkflowStep {
+  id: string;
+  type: WorkflowStepType | string;
+  name: string;
+  position?: number;
+  config: Record<string, any>;
+}
 
-export type ComparisonType = 'po_invoice' | 'invoice_grn' | 'contract_invoice' | 'custom';
-
+// Define workflow interface
 export interface WorkflowConfig {
   id: string;
   name: string;
-  description?: string;
-  isActive: boolean;
+  description: string;
   steps: WorkflowStep[];
+  isActive: boolean;
   createdAt: Date;
   lastRun?: Date;
-  nextRun?: Date;
-  triggerType: 'manual' | 'scheduled' | 'event';
 }
 
-export interface WorkflowStep {
-  id: string;
-  name: string;
-  type: WorkflowStepType;
-  config: Record<string, any>;
-  position: number;
+// Define workflow execution result interface
+export interface WorkflowStepResult {
+  stepId: string;
+  startTime: Date;
+  endTime?: Date;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  result?: any;
 }
-
-export type WorkflowStepType = 
-  | 'document_source'
-  | 'document_parsing'
-  | 'document_comparison'
-  | 'report_generation'
-  | 'approval_notification'
-  | 'database_storage'
-  | 'email_notification';
 
 export interface WorkflowExecutionResult {
   workflowId: string;
@@ -38,13 +41,4 @@ export interface WorkflowExecutionResult {
   endTime?: Date;
   status: 'running' | 'completed' | 'failed';
   stepResults: WorkflowStepResult[];
-}
-
-export interface WorkflowStepResult {
-  stepId: string;
-  startTime: Date;
-  endTime?: Date;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  output?: any;
-  error?: string;
 }

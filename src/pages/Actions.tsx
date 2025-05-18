@@ -1,28 +1,376 @@
-
+import React, { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Send, Mail, MailPlus, Webhook, FileSearch, FileCheck, FileSpreadsheet, Database, Cloud, ArrowUpDown } from "lucide-react";
+import { 
+  Send, Mail, MailPlus, Webhook, FileSearch, FileCheck, 
+  FileSpreadsheet, Database, Cloud, ArrowUpDown,
+  CheckIcon, Sliders, History, Layout, FileIcon
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import WorkflowCreator from "@/components/actions/WorkflowCreator";
+import { 
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle
+} from "@/components/ui/resizable";
+import { Separator } from "@/components/ui/separator";
+import WorkflowDiagram from "@/components/actions/WorkflowDiagram";
+import { WorkflowStep } from "@/types/workflow";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+  DrawerFooter,
+} from "@/components/ui/drawer";
+import { useMediaQuery } from "@/hooks/use-mobile";
+
+// Sample workflow steps for visual demonstration
+const exampleWorkflowSteps: WorkflowStep[] = [
+  {
+    id: "step-1",
+    type: "document-source",
+    name: "Document Source",
+    position: 1,
+    config: {
+      sources: ["drive", "email"]
+    }
+  },
+  {
+    id: "step-2",
+    type: "comparison",
+    name: "Document Comparison",
+    position: 2,
+    config: {
+      comparisonType: "po-invoice"
+    }
+  },
+  {
+    id: "step-3",
+    type: "report-generation",
+    name: "Report Generation",
+    position: 3,
+    config: {
+      format: "pdf"
+    }
+  },
+  {
+    id: "step-4",
+    type: "notification",
+    name: "Approval Notification",
+    position: 4,
+    config: {
+      recipients: ["approver@example.com"]
+    }
+  },
+  {
+    id: "step-5",
+    type: "data-storage",
+    name: "Database Storage",
+    position: 5,
+    config: {
+      table: "processed_documents"
+    }
+  }
+];
 
 const Actions = () => {
+  const [activeTab, setActiveTab] = useState("workflows");
+  const [selectedStep, setSelectedStep] = useState<string | null>(null);
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  const [openDrawer, setOpenDrawer] = useState(false);
+
+  // Component to display step configuration
+  const StepConfig = ({ stepId }: { stepId: string }) => {
+    const step = exampleWorkflowSteps.find(s => s.id === stepId);
+    
+    if (!step) return null;
+    
+    return (
+      <div className="p-4">
+        <h3 className="text-lg font-medium mb-4">Configure: {step.name}</h3>
+        
+        {step.type === "document-source" && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <Button variant="outline" className="flex flex-col h-24 items-center justify-center">
+                <Cloud className="h-8 w-8 mb-2 text-blue-500" />
+                <span>Google Drive</span>
+              </Button>
+              <Button variant="outline" className="flex flex-col h-24 items-center justify-center">
+                <Mail className="h-8 w-8 mb-2 text-purple-500" />
+                <span>Email</span>
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Select document sources to monitor for new POs and invoices.
+            </p>
+          </div>
+        )}
+        
+        {step.type === "comparison" && (
+          <div className="space-y-4">
+            <div className="flex items-center p-4 border rounded-md">
+              <div className="flex-1">
+                <h4 className="text-sm font-medium">PO vs Invoice Comparison</h4>
+                <p className="text-xs text-muted-foreground">
+                  Automatically match line items and detect price discrepancies
+                </p>
+              </div>
+              <Badge>Active</Badge>
+            </div>
+            <div className="flex items-center p-4 border rounded-md">
+              <div className="flex-1">
+                <h4 className="text-sm font-medium">Tolerance Settings</h4>
+                <p className="text-xs text-muted-foreground">
+                  Allow up to 2% variance on line item prices
+                </p>
+              </div>
+              <Sliders className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </div>
+        )}
+        
+        {step.type === "report-generation" && (
+          <div className="space-y-4">
+            <div className="flex items-center p-4 border rounded-md">
+              <div className="flex-1">
+                <h4 className="text-sm font-medium">Dashboard Reports</h4>
+                <p className="text-xs text-muted-foreground">
+                  Generate visualizations for the dashboard
+                </p>
+              </div>
+              <Layout className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="flex items-center p-4 border rounded-md">
+              <div className="flex-1">
+                <h4 className="text-sm font-medium">PDF Export</h4>
+                <p className="text-xs text-muted-foreground">
+                  Create downloadable reports for stakeholders
+                </p>
+              </div>
+              <FileIcon className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </div>
+        )}
+        
+        {step.type === "notification" && (
+          <div className="space-y-4">
+            <div className="p-4 border rounded-md">
+              <h4 className="text-sm font-medium mb-2">Approval Recipients</h4>
+              <div className="space-y-2">
+                <div className="flex items-center p-2 bg-muted rounded-md">
+                  <Mail className="h-4 w-4 mr-2 text-blue-500" />
+                  <span className="text-sm">finance@example.com</span>
+                </div>
+                <div className="flex items-center p-2 bg-muted rounded-md">
+                  <Mail className="h-4 w-4 mr-2 text-blue-500" />
+                  <span className="text-sm">approvals@example.com</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {step.type === "data-storage" && (
+          <div className="space-y-4">
+            <div className="flex items-center p-4 border rounded-md">
+              <div className="flex-1">
+                <h4 className="text-sm font-medium">Database Storage</h4>
+                <p className="text-xs text-muted-foreground">
+                  Store processed documents in the processed_documents table
+                </p>
+              </div>
+              <Database className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="flex items-center p-4 border rounded-md">
+              <div className="flex-1">
+                <h4 className="text-sm font-medium">Archive Settings</h4>
+                <p className="text-xs text-muted-foreground">
+                  Archive documents after 90 days
+                </p>
+              </div>
+              <History className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </div>
+        )}
+        
+        <div className="mt-6 flex justify-end">
+          <Button>Save Configuration</Button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <AppLayout>
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Action Workflows</h1>
-          <WorkflowCreator />
+          {activeTab === "workflows" && (
+            <WorkflowCreator />
+          )}
         </div>
 
-        <Tabs defaultValue="automated" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList>
+            <TabsTrigger value="workflows">Workflow Pipelines</TabsTrigger>
             <TabsTrigger value="automated">Automated Actions</TabsTrigger>
             <TabsTrigger value="templates">Email Templates</TabsTrigger>
             <TabsTrigger value="history">Action History</TabsTrigger>
-            <TabsTrigger value="workflows">Workflow Pipelines</TabsTrigger>
           </TabsList>
+          
+          <TabsContent value="workflows" className="space-y-4">
+            {isMobile ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Document Processing Pipeline</CardTitle>
+                  <CardDescription>
+                    Configure each step of your document processing workflow
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <WorkflowDiagram 
+                    steps={exampleWorkflowSteps} 
+                    activeStepId={selectedStep || undefined}
+                    onStepClick={(stepId) => {
+                      setSelectedStep(stepId);
+                      setOpenDrawer(true);
+                    }}
+                  />
+                  
+                  <Drawer open={openDrawer} onOpenChange={setOpenDrawer}>
+                    <DrawerContent>
+                      <DrawerHeader>
+                        <DrawerTitle>Step Configuration</DrawerTitle>
+                        <DrawerDescription>
+                          Configure this workflow step
+                        </DrawerDescription>
+                      </DrawerHeader>
+                      {selectedStep && (
+                        <div className="px-4">
+                          <StepConfig stepId={selectedStep} />
+                        </div>
+                      )}
+                      <DrawerFooter>
+                        <Button onClick={() => setOpenDrawer(false)}>Close</Button>
+                      </DrawerFooter>
+                    </DrawerContent>
+                  </Drawer>
+                </CardContent>
+              </Card>
+            ) : (
+              <ResizablePanelGroup direction="horizontal">
+                <ResizablePanel defaultSize={60} minSize={40}>
+                  <Card className="h-[calc(100vh-200px)]">
+                    <CardHeader>
+                      <CardTitle className="text-lg">Document Processing Pipeline</CardTitle>
+                      <CardDescription>
+                        Configure each step of your document processing workflow
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <WorkflowDiagram 
+                        steps={exampleWorkflowSteps} 
+                        activeStepId={selectedStep || undefined}
+                        onStepClick={setSelectedStep}
+                      />
+                    </CardContent>
+                  </Card>
+                </ResizablePanel>
+                
+                <ResizableHandle withHandle />
+                
+                <ResizablePanel defaultSize={40} minSize={30}>
+                  <Card className="h-[calc(100vh-200px)] overflow-auto">
+                    <CardHeader>
+                      <CardTitle className="text-lg">Step Configuration</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {selectedStep ? (
+                        <StepConfig stepId={selectedStep} />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-center p-4">
+                          <div>
+                            <div className="rounded-full bg-muted w-12 h-12 mx-auto mb-4 flex items-center justify-center">
+                              <FileSearch className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                            <h3 className="font-medium mb-2">Select a workflow step</h3>
+                            <p className="text-sm text-muted-foreground">
+                              Click on a step in the workflow to configure its settings
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </ResizablePanel>
+              </ResizablePanelGroup>
+            )}
+            
+            <Separator />
+            
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader className="pb-2">
+                  <Badge className="w-fit mb-1">Active</Badge>
+                  <CardTitle className="text-base">PO-Invoice Approval Pipeline</CardTitle>
+                  <CardDescription className="text-xs">
+                    Automated workflow for processing and approving invoice payments
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="text-sm space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Source:</span>
+                    <span>Google Drive, Email</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Matching:</span>
+                    <span>90% threshold</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Approval:</span>
+                    <span>finance@example.com</span>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex justify-between">
+                  <Button variant="outline" size="sm">Edit</Button>
+                  <Button size="sm">Run Now</Button>
+                </CardFooter>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <Badge variant="outline" className="w-fit mb-1">Draft</Badge>
+                  <CardTitle className="text-base">Multi-vendor Invoice Processing</CardTitle>
+                  <CardDescription className="text-xs">
+                    Process invoices from multiple vendors against master agreements
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="text-sm space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Source:</span>
+                    <span>Email Connector</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Matching:</span>
+                    <span>Not configured</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Approval:</span>
+                    <span>Not configured</span>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex justify-end">
+                  <Button variant="default" size="sm">Configure</Button>
+                </CardFooter>
+              </Card>
+            </div>
+          </TabsContent>
           
           <TabsContent value="automated" className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -208,159 +556,6 @@ const Actions = () => {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
-          
-          <TabsContent value="workflows" className="space-y-4">
-            <Card>
-              <CardContent className="p-6">
-                <div className="mb-6">
-                  <h3 className="text-lg font-medium mb-2">Document Processing Pipeline</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Configure end-to-end document processing workflows from input to approval and storage
-                  </p>
-                  
-                  <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                    <Button variant="outline" className="flex items-center gap-2">
-                      <Cloud className="h-4 w-4" />
-                      <span>Configure Sources</span>
-                    </Button>
-                    
-                    <Button variant="outline" className="flex items-center gap-2">
-                      <FileSearch className="h-4 w-4" />
-                      <span>Comparison Rules</span>
-                    </Button>
-                    
-                    <Button variant="outline" className="flex items-center gap-2">
-                      <Mail className="h-4 w-4" />
-                      <span>Approval Flow</span>
-                    </Button>
-                    
-                    <Button variant="outline" className="flex items-center gap-2">
-                      <Database className="h-4 w-4" />
-                      <span>Storage Options</span>
-                    </Button>
-                  </div>
-                  
-                  <div className="bg-muted p-4 rounded-md">
-                    <h4 className="text-sm font-medium mb-3">Sample Workflow Pipeline</h4>
-                    
-                    <div className="relative">
-                      {/* Workflow steps with connector lines */}
-                      <div className="absolute top-0 left-6 w-[2px] h-full bg-muted-foreground/20"></div>
-                      
-                      <div className="space-y-6">
-                        <div className="flex relative">
-                          <div className="bg-blue-500 rounded-full h-3 w-3 mt-1 z-10"></div>
-                          <div className="ml-8">
-                            <div className="font-medium text-sm">Document Source</div>
-                            <div className="text-xs text-muted-foreground">
-                              Connect to Google Drive, Email or Database to import PO and Invoice documents
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="flex relative">
-                          <div className="bg-amber-500 rounded-full h-3 w-3 mt-1 z-10"></div>
-                          <div className="ml-8">
-                            <div className="font-medium text-sm">Document Comparison</div>
-                            <div className="text-xs text-muted-foreground">
-                              Automatically compare PO with Invoices to identify discrepancies
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="flex relative">
-                          <div className="bg-green-500 rounded-full h-3 w-3 mt-1 z-10"></div>
-                          <div className="ml-8">
-                            <div className="font-medium text-sm">Report Generation</div>
-                            <div className="text-xs text-muted-foreground">
-                              Create detailed reports and visualizations for the dashboard
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="flex relative">
-                          <div className="bg-purple-500 rounded-full h-3 w-3 mt-1 z-10"></div>
-                          <div className="ml-8">
-                            <div className="font-medium text-sm">Approval Notification</div>
-                            <div className="text-xs text-muted-foreground">
-                              Send email to appropriate authorities requesting approval
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="flex relative">
-                          <div className="bg-gray-500 rounded-full h-3 w-3 mt-1 z-10"></div>
-                          <div className="ml-8">
-                            <div className="font-medium text-sm">Database Storage</div>
-                            <div className="text-xs text-muted-foreground">
-                              Store processed documents and approvals in database for accounting
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader className="pb-2">
-                  <Badge className="w-fit mb-1">Active</Badge>
-                  <CardTitle className="text-base">PO-Invoice Approval Pipeline</CardTitle>
-                  <CardDescription className="text-xs">
-                    Automated workflow for processing and approving invoice payments
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="text-sm space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Source:</span>
-                    <span>Google Drive, Email</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Matching:</span>
-                    <span>90% threshold</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Approval:</span>
-                    <span>finance@example.com</span>
-                  </div>
-                </CardContent>
-                <CardFooter className="flex justify-between">
-                  <Button variant="outline" size="sm">Edit</Button>
-                  <Button size="sm">Run Now</Button>
-                </CardFooter>
-              </Card>
-              
-              <Card>
-                <CardHeader className="pb-2">
-                  <Badge variant="outline" className="w-fit mb-1">Draft</Badge>
-                  <CardTitle className="text-base">Multi-vendor Invoice Processing</CardTitle>
-                  <CardDescription className="text-xs">
-                    Process invoices from multiple vendors against master agreements
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="text-sm space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Source:</span>
-                    <span>Email Connector</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Matching:</span>
-                    <span>Not configured</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Approval:</span>
-                    <span>Not configured</span>
-                  </div>
-                </CardContent>
-                <CardFooter className="flex justify-end">
-                  <Button variant="default" size="sm">Configure</Button>
-                </CardFooter>
-              </Card>
-            </div>
           </TabsContent>
         </Tabs>
       </div>
