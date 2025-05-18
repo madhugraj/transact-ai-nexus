@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
 import { useForm } from "react-hook-form";
-import { Send, Plus } from "lucide-react";
+import { Send, Plus, FileIcon } from "lucide-react";
 import { useWorkflow } from "@/hooks/useWorkflow";
 import WorkflowDiagram from "./WorkflowDiagram";
 import { WorkflowConfig, WorkflowStep } from "@/types/workflow";
