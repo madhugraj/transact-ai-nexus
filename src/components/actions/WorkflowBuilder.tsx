@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,6 +44,8 @@ import { WorkflowStepNode, SidebarNode } from "./WorkflowNodeTypes";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface WorkflowBuilderProps {
   onWorkflowCreated?: (workflow: WorkflowConfig) => void;
@@ -52,12 +55,252 @@ const nodeTypes = {
   workflowStep: WorkflowStepNode,
 };
 
+interface NodeConfigDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  nodeType: WorkflowStepType | null;
+  nodeLabel: string | null;
+}
+
+// Node configuration dialog component
+const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({ 
+  open, 
+  onOpenChange, 
+  nodeType, 
+  nodeLabel 
+}) => {
+  if (!nodeType || !nodeLabel) return null;
+
+  const getTabContent = () => {
+    switch (nodeType) {
+      case 'document-source':
+        return (
+          <div className="space-y-4 p-2">
+            <h4 className="text-sm font-medium">Document Source Configuration</h4>
+            <div className="space-y-2">
+              <Label htmlFor="source-type">Source Type</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center space-x-2 border rounded-md p-2">
+                  <input type="checkbox" id="email" className="h-4 w-4" defaultChecked />
+                  <Label htmlFor="email" className="text-sm">Email</Label>
+                </div>
+                <div className="flex items-center space-x-2 border rounded-md p-2">
+                  <input type="checkbox" id="upload" className="h-4 w-4" defaultChecked />
+                  <Label htmlFor="upload" className="text-sm">File Upload</Label>
+                </div>
+                <div className="flex items-center space-x-2 border rounded-md p-2">
+                  <input type="checkbox" id="cloud" className="h-4 w-4" />
+                  <Label htmlFor="cloud" className="text-sm">Cloud Storage</Label>
+                </div>
+                <div className="flex items-center space-x-2 border rounded-md p-2">
+                  <input type="checkbox" id="sap" className="h-4 w-4" />
+                  <Label htmlFor="sap" className="text-sm">SAP Import</Label>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="doc-type">Document Types</Label>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <input type="checkbox" id="invoice" className="h-4 w-4" defaultChecked />
+                  <Label htmlFor="invoice" className="text-sm">Invoices</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input type="checkbox" id="po" className="h-4 w-4" defaultChecked />
+                  <Label htmlFor="po" className="text-sm">Purchase Orders</Label>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      
+      case 'comparison':
+        return (
+          <div className="space-y-4 p-2">
+            <h4 className="text-sm font-medium">Document Comparison Configuration</h4>
+            <div className="space-y-2">
+              <Label htmlFor="comparison-type">Comparison Type</Label>
+              <select id="comparison-type" className="w-full border rounded-md p-2 text-sm">
+                <option value="po-invoice">PO - Invoice Matching</option>
+                <option value="invoice-receipt">Invoice - Receipt Matching</option>
+                <option value="custom">Custom Fields Matching</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="match-threshold">Matching Threshold</Label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="range"
+                  id="match-threshold"
+                  min="0"
+                  max="100"
+                  defaultValue="80"
+                  className="flex-1"
+                />
+                <span className="text-sm">80%</span>
+              </div>
+            </div>
+          </div>
+        );
+      
+      case 'report-generation':
+        return (
+          <div className="space-y-4 p-2">
+            <h4 className="text-sm font-medium">Report Configuration</h4>
+            <div className="space-y-2">
+              <Label htmlFor="report-format">Report Format</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="flex items-center space-x-2 border rounded-md p-2">
+                  <input type="radio" name="format" id="pdf" className="h-4 w-4" defaultChecked />
+                  <Label htmlFor="pdf" className="text-sm">PDF</Label>
+                </div>
+                <div className="flex items-center space-x-2 border rounded-md p-2">
+                  <input type="radio" name="format" id="excel" className="h-4 w-4" />
+                  <Label htmlFor="excel" className="text-sm">Excel</Label>
+                </div>
+                <div className="flex items-center space-x-2 border rounded-md p-2">
+                  <input type="radio" name="format" id="csv" className="h-4 w-4" />
+                  <Label htmlFor="csv" className="text-sm">CSV</Label>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="schedule">Schedule</Label>
+              <select id="schedule" className="w-full border rounded-md p-2 text-sm">
+                <option value="immediate">Immediate</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
+          </div>
+        );
+
+      case 'notification':
+        return (
+          <div className="space-y-4 p-2">
+            <h4 className="text-sm font-medium">Notification Settings</h4>
+            <div className="space-y-2">
+              <Label htmlFor="notify-method">Notification Method</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center space-x-2 border rounded-md p-2">
+                  <input type="checkbox" id="email-notify" className="h-4 w-4" defaultChecked />
+                  <Label htmlFor="email-notify" className="text-sm">Email</Label>
+                </div>
+                <div className="flex items-center space-x-2 border rounded-md p-2">
+                  <input type="checkbox" id="app-notify" className="h-4 w-4" defaultChecked />
+                  <Label htmlFor="app-notify" className="text-sm">In-App</Label>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="recipients">Recipients</Label>
+              <Input id="recipients" placeholder="email@example.com, another@example.com" />
+              <div className="text-xs text-muted-foreground">Separate multiple emails with commas</div>
+            </div>
+          </div>
+        );
+        
+      case 'data-storage':
+        return (
+          <div className="space-y-4 p-2">
+            <h4 className="text-sm font-medium">Data Storage Configuration</h4>
+            <div className="space-y-2">
+              <Label htmlFor="storage-type">Storage Type</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center space-x-2 border rounded-md p-2">
+                  <input type="radio" name="storage" id="database" className="h-4 w-4" defaultChecked />
+                  <Label htmlFor="database" className="text-sm">Database</Label>
+                </div>
+                <div className="flex items-center space-x-2 border rounded-md p-2">
+                  <input type="radio" name="storage" id="file-system" className="h-4 w-4" />
+                  <Label htmlFor="file-system" className="text-sm">File System</Label>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="retention">Data Retention</Label>
+              <select id="retention" className="w-full border rounded-md p-2 text-sm">
+                <option value="30">30 Days</option>
+                <option value="90">90 Days</option>
+                <option value="180">180 Days</option>
+                <option value="365">1 Year</option>
+                <option value="forever">Forever</option>
+              </select>
+            </div>
+          </div>
+        );
+
+      default:
+        return (
+          <div className="p-4 text-center text-muted-foreground">
+            Configuration not available for this node type.
+          </div>
+        );
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>{nodeLabel} Configuration</DialogTitle>
+          <DialogDescription>
+            Configure the settings for this workflow step.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <Tabs defaultValue="config" className="w-full">
+          <TabsList className="grid grid-cols-2">
+            <TabsTrigger value="config">Configuration</TabsTrigger>
+            <TabsTrigger value="advanced">Advanced</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="config" className="space-y-4 mt-4">
+            {getTabContent()}
+          </TabsContent>
+          
+          <TabsContent value="advanced" className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="node-id">Node ID</Label>
+              <Input id="node-id" value={nodeType} readOnly />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="node-description">Description</Label>
+              <Input id="node-description" placeholder="Enter a description for this step" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="error-handling">Error Handling</Label>
+              <select id="error-handling" className="w-full border rounded-md p-2 text-sm">
+                <option value="continue">Continue Workflow</option>
+                <option value="stop">Stop Workflow</option>
+                <option value="retry">Retry (3 times)</option>
+              </select>
+            </div>
+          </TabsContent>
+        </Tabs>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={() => onOpenChange(false)}>Save Changes</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) => {
   const [showDialog, setShowDialog] = useState(false);
   const { createWorkflow } = useWorkflow();
   const isMobile = useIsMobile();
   const { toast } = useToast();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  
+  const [selectedNode, setSelectedNode] = useState<{
+    type: WorkflowStepType | null;
+    label: string | null;
+  }>({ type: null, label: null });
+  const [showNodeConfig, setShowNodeConfig] = useState(false);
 
   const form = useForm({
     defaultValues: {
@@ -141,12 +384,24 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
     [setNodes]
   );
 
+  // Handle node click to open configuration
+  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    const nodeType = node.data.type as WorkflowStepType;
+    const nodeLabel = node.data.label as string;
+    
+    setSelectedNode({ 
+      type: nodeType,
+      label: nodeLabel
+    });
+    setShowNodeConfig(true);
+  }, []);
+
   // Generate workflow steps from nodes and edges
   const generateWorkflowSteps = (): WorkflowStep[] => {
     return nodes.map((node, index) => ({
       id: node.id,
-      type: node.data.type as WorkflowStepType,  // Add explicit type cast here
-      name: node.data.label as string,  // Add explicit type cast here
+      type: node.data.type as WorkflowStepType,
+      name: node.data.label as string,
       position: index + 1,
       config: {
         x: node.position.x,
@@ -340,6 +595,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
                 onDrop={onDrop}
                 onDragOver={onDragOver}
                 nodeTypes={nodeTypes}
+                onNodeClick={onNodeClick}
                 fitView
               >
                 <Background />
@@ -362,6 +618,14 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Node configuration dialog */}
+      <NodeConfigDialog 
+        open={showNodeConfig} 
+        onOpenChange={setShowNodeConfig}
+        nodeType={selectedNode.type}
+        nodeLabel={selectedNode.label}
+      />
     </>
   );
 };
