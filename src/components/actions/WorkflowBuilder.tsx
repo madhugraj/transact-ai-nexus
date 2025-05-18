@@ -37,14 +37,12 @@ import {
   Edge,
   Node,
   Panel,
-  NodeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { WorkflowStepNode, SidebarNode } from "./WorkflowNodeTypes";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface WorkflowBuilderProps {
@@ -628,4 +626,3 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
 };
 
 export default WorkflowBuilder;
-

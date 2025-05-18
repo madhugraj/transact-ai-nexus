@@ -23,6 +23,13 @@ const Actions = () => {
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const { toast } = useToast();
 
+  const handleWorkflowCreated = (workflow: WorkflowConfig) => {
+    toast({
+      title: "Workflow Created",
+      description: `The "${workflow.name}" workflow has been created successfully.`
+    });
+  };
+
   const handleEditWorkflow = (workflow: WorkflowConfig) => {
     setSelectedWorkflow(workflow);
     setShowDetailDialog(true);
@@ -34,12 +41,7 @@ const Actions = () => {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Action Workflows</h1>
           {activeTab === "workflows" && (
-            <WorkflowBuilder onWorkflowCreated={(workflow) => {
-              toast({
-                title: "Workflow Created",
-                description: `The "${workflow.name}" workflow has been created successfully.`
-              });
-            }} />
+            <WorkflowBuilder onWorkflowCreated={handleWorkflowCreated} />
           )}
         </div>
 

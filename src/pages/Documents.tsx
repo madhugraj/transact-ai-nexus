@@ -4,7 +4,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Card } from "@/components/ui/card";
 import TableExtraction from "@/components/ingestion/GeminiVisionTest";
 import { Button } from "@/components/ui/button";
-import { Download, FileSearch, Bot } from "lucide-react";
+import { Download, Bot } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DocumentComparison from "@/components/document-comparison/DocumentComparison";
