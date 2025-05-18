@@ -96,11 +96,11 @@ const DocumentComparison = () => {
     setTimeout(() => {
       // Mock comparison results
       const mockResults: ComparisonResult[] = [
-        { field: "Vendor", poValue: "Acme Corp", invoiceValue: "Acme Corporation", match: false },
-        { field: "Amount", poValue: 5000, invoiceValue: 5000, match: true },
-        { field: "Quantity", poValue: 10, invoiceValue: 10, match: true },
-        { field: "Date", poValue: "2023-05-15", invoiceValue: "2023-06-01", match: false },
-        { field: "Document Number", poValue: "PO-123456", invoiceValue: "INV-789012", match: false }
+        { field: "Vendor", poValue: "Apex Financial Corp", invoiceValue: "Apex Financial", match: false },
+        { field: "Amount", poValue: 54000, invoiceValue: 54400, match: false },
+        { field: "Quantity", poValue: "1 license, 20 hours", invoiceValue: "1 license, 22 hours", match: false },
+        { field: "Date", poValue: "2023-05-15", invoiceValue: "2023-05-16", match: false },
+        { field: "Document Number", poValue: "PO-2025-001", invoiceValue: "INV-2025-789", match: false }
       ];
       
       // Calculate match percentage
