@@ -31,7 +31,7 @@ const Documents = () => {
           <div>
             <h1 className="text-3xl font-semibold">Document Processing</h1>
             <p className="text-muted-foreground mt-1">
-              Process, analyze, and compare financial documents using our Gemini AI
+              Process, analyze, and compare financial documents
             </p>
           </div>
           

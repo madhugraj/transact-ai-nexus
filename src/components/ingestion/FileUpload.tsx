@@ -126,6 +126,7 @@ const FileUpload = () => {
       
       {showWorkflow && processingComplete && (
         <PostProcessingWorkflow
+          processingType={currentAction}
           onClose={() => {
             handleWorkflowComplete();
             setShowWorkflow(false);

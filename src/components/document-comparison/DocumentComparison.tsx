@@ -3,22 +3,28 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, FileSearch, File, FileText, Download } from "lucide-react";
+import { FileText, File, FileSearch, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { 
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  BarChart, 
+  Bar,
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  ResponsiveContainer,
+  ChartTooltipContent,
   ChartContainer,
   ChartTooltip,
-  ChartTooltipContent,
   ChartLegend,
   ChartLegendContent
-} from "@/components/ui/chart";
-import { Bar, BarChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts";
+} from "recharts";
 
 // Types for document comparison
 interface DocumentDetails {
   vendor?: string;
   amount?: number;
-  quantity?: number;
+  quantity?: string;
   date?: string;
   documentNumber?: string;
 }
@@ -40,12 +46,13 @@ const DocumentComparison = () => {
   const [matchPercentage, setMatchPercentage] = useState<number>(0);
   const [activeTab, setActiveTab] = useState("upload");
 
-  // Mock data for charts
+  // Chart data based on the example
   const chartData = [
-    { name: "Vendor", match: 85, mismatch: 15 },
-    { name: "Amount", match: 70, mismatch: 30 },
-    { name: "Quantity", match: 95, mismatch: 5 },
-    { name: "Date", match: 65, mismatch: 35 },
+    { name: "Vendor", match: 0, mismatch: 100 },
+    { name: "Amount", match: 0, mismatch: 100 },
+    { name: "Quantity", match: 0, mismatch: 100 },
+    { name: "Date", match: 0, mismatch: 100 },
+    { name: "Document Number", match: 0, mismatch: 100 }
   ];
 
   // Handle PO file selection
@@ -79,7 +86,7 @@ const DocumentComparison = () => {
     }
   };
 
-  // Compare documents
+  // Compare documents - using the exact example provided by the user
   const compareDocuments = () => {
     if (!poFile || invoiceFiles.length === 0) {
       toast({
@@ -94,7 +101,7 @@ const DocumentComparison = () => {
     
     // Simulate processing delay
     setTimeout(() => {
-      // Mock comparison results
+      // Use the exact example data provided
       const mockResults: ComparisonResult[] = [
         { field: "Vendor", poValue: "Apex Financial Corp", invoiceValue: "Apex Financial", match: false },
         { field: "Amount", poValue: 54000, invoiceValue: 54400, match: false },
@@ -103,9 +110,8 @@ const DocumentComparison = () => {
         { field: "Document Number", poValue: "PO-2025-001", invoiceValue: "INV-2025-789", match: false }
       ];
       
-      // Calculate match percentage
-      const matchCount = mockResults.filter(result => result.match).length;
-      const percentage = Math.round((matchCount / mockResults.length) * 100);
+      // All fields mismatch as per example
+      const percentage = 0;
       
       setComparisonResults(mockResults);
       setMatchPercentage(percentage);
@@ -267,95 +273,61 @@ const DocumentComparison = () => {
                 </div>
               )}
               
-              {/* Comparison Summary */}
-              <Card className="overflow-hidden">
-                <CardHeader className="bg-slate-50 dark:bg-slate-950/20">
+              {/* Comparison Summary - Simplified and minimalistic as requested */}
+              <Card>
+                <CardHeader className="pb-2">
                   <CardTitle className="text-lg">
-                    Comparison Summary
+                    Document Comparison
                     <span className="ml-2 text-sm font-normal text-muted-foreground">
                       {poFile?.name} vs {invoiceFiles[activeInvoiceIndex]?.name}
                     </span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-4">
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <h3 className="text-lg font-medium mb-4">Field Comparison</h3>
-                      <div className="border rounded-md overflow-hidden">
-                        <table className="w-full">
-                          <thead className="bg-muted/50">
-                            <tr>
-                              <th className="p-3 text-left font-medium">Field</th>
-                              <th className="p-3 text-left font-medium">PO Value</th>
-                              <th className="p-3 text-left font-medium">Invoice Value</th>
-                              <th className="p-3 text-left font-medium">Match</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y">
-                            {comparisonResults.map((result, index) => (
-                              <tr key={index} className={result.match ? "" : "bg-red-50 dark:bg-red-900/10"}>
-                                <td className="p-3 font-medium">{result.field}</td>
-                                <td className="p-3">{result.poValue}</td>
-                                <td className="p-3">{result.invoiceValue}</td>
-                                <td className="p-3">
-                                  {result.match ? (
-                                    <span className="inline-block px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                                      Match
-                                    </span>
-                                  ) : (
-                                    <span className="inline-block px-2 py-1 text-xs rounded-full bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
-                                      Mismatch
-                                    </span>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                <CardContent>
+                  <div className="text-center mb-4">
+                    <div className="inline-block px-4 py-2 rounded-md bg-red-100 dark:bg-red-900/30">
+                      <span className="text-2xl font-bold text-red-700 dark:text-red-300">{matchPercentage}% Match</span>
                     </div>
-                    
-                    <div>
-                      <h3 className="text-lg font-medium mb-4">Match Statistics</h3>
-                      <div className="space-y-4">
-                        <div className="p-4 border rounded-md flex items-center justify-between bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-950/20 dark:to-blue-900/20">
-                          <span className="font-medium">Overall Match:</span>
-                          <span className="text-2xl font-bold">{matchPercentage}%</span>
-                        </div>
-                        
-                        <div className="pt-2 h-64">
-                          <ChartContainer
-                            config={{
-                              match: { color: "#22c55e" },
-                              mismatch: { color: "#ef4444" },
-                            }}
-                          >
-                            <BarChart data={chartData}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="name" />
-                              <YAxis />
-                              <ChartTooltip content={<ChartTooltipContent />} />
-                              <Bar dataKey="match" name="Match" fill="var(--color-match)" stackId="a" />
-                              <Bar dataKey="mismatch" name="Mismatch" fill="var(--color-mismatch)" stackId="a" />
-                              <ChartLegend content={<ChartLegendContent />} />
-                            </BarChart>
-                          </ChartContainer>
-                        </div>
-                      </div>
-                    </div>
+                  </div>
+                  
+                  <div className="border rounded-md overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Field</TableHead>
+                          <TableHead>PO Value</TableHead>
+                          <TableHead>Invoice Value</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {comparisonResults.map((result, index) => (
+                          <TableRow key={index} className={result.match ? "" : "bg-red-50 dark:bg-red-900/10"}>
+                            <TableCell className="font-medium">{result.field}</TableCell>
+                            <TableCell>{result.poValue}</TableCell>
+                            <TableCell>{result.invoiceValue}</TableCell>
+                            <TableCell>
+                              <span className={`inline-block px-2 py-1 text-xs rounded-full ${
+                                result.match 
+                                  ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                                  : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
+                              }`}>
+                                {result.match ? "Match" : "Mismatch"}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
                 </CardContent>
               </Card>
               
-              {/* Download and Report Options */}
-              <div className="flex justify-end gap-4">
-                <Button variant="outline">
-                  <Download className="mr-2 h-4 w-4" />
-                  Download Report
-                </Button>
+              {/* Simple Download Button */}
+              <div className="flex justify-end">
                 <Button>
-                  <FileText className="mr-2 h-4 w-4" />
-                  Generate Detailed Report
+                  <Download className="mr-2 h-4 w-4" />
+                  Export Comparison Report
                 </Button>
               </div>
             </>
