@@ -4,11 +4,14 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Card } from "@/components/ui/card";
 import TableExtraction from "@/components/ingestion/GeminiVisionTest";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import { Download, Compare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import DocumentComparison from "@/components/document-comparison/DocumentComparison";
 
 const Documents = () => {
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<string>("tableExtraction");
   
   const handleDownload = () => {
     // Placeholder for download functionality
@@ -28,7 +31,7 @@ const Documents = () => {
           <div>
             <h1 className="text-3xl font-semibold">Document Processing</h1>
             <p className="text-muted-foreground mt-1">
-              Process and analyze financial documents using our Gemini AI
+              Process, analyze, and compare financial documents using our Gemini AI
             </p>
           </div>
           
@@ -42,9 +45,24 @@ const Documents = () => {
           </Button>
         </div>
         
-        <Card className="overflow-hidden border-muted/40 shadow-sm hover:shadow-md transition-all duration-200 p-6">
-          <TableExtraction />
-        </Card>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid grid-cols-2 w-full max-w-md">
+            <TabsTrigger value="tableExtraction">Table Extraction</TabsTrigger>
+            <TabsTrigger value="documentComparison">Document Comparison</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="tableExtraction" className="mt-4">
+            <Card className="overflow-hidden border-muted/40 shadow-sm hover:shadow-md transition-all duration-200 p-6">
+              <TableExtraction />
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="documentComparison" className="mt-4">
+            <Card className="overflow-hidden border-muted/40 shadow-sm hover:shadow-md transition-all duration-200 p-6">
+              <DocumentComparison />
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );
