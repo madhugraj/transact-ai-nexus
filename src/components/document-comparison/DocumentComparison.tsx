@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Compare, File, FileText } from "lucide-react";
+import { Upload, FileSearch, File, FileText, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
   ChartContainer,
@@ -242,7 +242,7 @@ const DocumentComparison = () => {
               disabled={!poFile || invoiceFiles.length === 0 || isComparing}
               onClick={compareDocuments}
             >
-              <Compare className="h-5 w-5" />
+              <FileSearch className="h-5 w-5" />
               {isComparing ? "Processing..." : "Compare Documents"}
             </Button>
           </div>
