@@ -1,21 +1,9 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, File, FileSearch, Download, Upload } from "lucide-react";
+import { FileSearch } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  BarChart, 
-  Bar,
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  ResponsiveContainer,
-  Tooltip,
-  Legend
-} from "recharts";
 import { DocumentUploadPanel } from "./DocumentUploadPanel";
 import { ComparisonResultsPanel } from "./ComparisonResultsPanel";
 
@@ -101,7 +89,7 @@ const DocumentComparison = () => {
       ];
       
       // All fields mismatch as per example
-      const percentage = 0;
+      const percentage = 68;
       
       setComparisonResults(mockResults);
       setMatchPercentage(percentage);
