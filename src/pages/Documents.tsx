@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card } from "@/components/ui/card";
@@ -9,12 +10,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DocumentComparison from "@/components/document-comparison/DocumentComparison";
 import AIAssistant from "@/components/assistant/AIAssistant";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
 const Documents = () => {
   const {
     toast
   } = useToast();
   const [activeTab, setActiveTab] = useState<string>("tableExtraction");
   const [showAssistant, setShowAssistant] = useState(false);
+  
   const handleDownload = () => {
     // Placeholder for download functionality
     toast({
@@ -25,6 +28,7 @@ const Documents = () => {
     // In a real implementation, this would trigger an actual download
     // For demonstration purposes, we're just showing a toast
   };
+  
   return <AppLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between mb-6">
@@ -65,6 +69,10 @@ const Documents = () => {
             </Card>
           </TabsContent>
         </Tabs>
+        
+        <div className="text-center text-xs text-muted-foreground mt-12 pt-4 border-t">
+          Copyright © 2025 yavar Techworks Pte Ltd., All rights reserved
+        </div>
       </div>
 
       <Dialog open={showAssistant} onOpenChange={setShowAssistant}>
@@ -79,4 +87,5 @@ const Documents = () => {
       </Dialog>
     </AppLayout>;
 };
+
 export default Documents;

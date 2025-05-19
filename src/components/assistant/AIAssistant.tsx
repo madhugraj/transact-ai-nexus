@@ -1,9 +1,11 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import DocumentSelector from './DocumentSelector';
 import useAIAssistant from '@/hooks/useAIAssistant';
+
 const AIAssistant: React.FC = () => {
   const {
     message,
@@ -15,10 +17,12 @@ const AIAssistant: React.FC = () => {
     handleSendMessage,
     handleDocumentChange
   } = useAIAssistant();
-  return <Card className="w-full h-[600px] flex flex-col">
+
+  return (
+    <Card className="w-full h-[600px] flex flex-col">
       <CardHeader className="border-b px-6 py-4">
         <CardTitle className="text-lg flex items-center justify-between">
-          <div className="flex items-center bg-violet-400">Z-Intelligent Virtual Auditor</div>
+          <div className="flex items-center">Z-Intelligent Virtual Auditor</div>
           <DocumentSelector documents={processedDocuments} onDocumentChange={handleDocumentChange} />
         </CardTitle>
       </CardHeader>
@@ -28,8 +32,17 @@ const AIAssistant: React.FC = () => {
       </CardContent>
       
       <CardFooter className="p-4 border-t pt-4">
-        <MessageInput message={message} setMessage={setMessage} handleSendMessage={handleSendMessage} isProcessing={isProcessing} hasDocuments={processedDocuments.length > 0} isDocumentSelected={!!selectedDocument} />
+        <MessageInput 
+          message={message} 
+          setMessage={setMessage} 
+          handleSendMessage={handleSendMessage} 
+          isProcessing={isProcessing} 
+          hasDocuments={processedDocuments.length > 0} 
+          isDocumentSelected={!!selectedDocument} 
+        />
       </CardFooter>
-    </Card>;
+    </Card>
+  );
 };
+
 export default AIAssistant;
