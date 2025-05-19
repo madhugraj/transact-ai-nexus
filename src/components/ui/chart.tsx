@@ -47,13 +47,14 @@ export function ChartContainer({
   );
 }
 
-// Fix: Define proper types for the ChartTooltip component to match Recharts requirements
+// Fixed type definition to properly extend Recharts TooltipProps
 export function ChartTooltip({
   content,
+  children,
   ...props
 }: Omit<TooltipProps<any, any>, 'content'> & {
+  content?: React.ReactNode | React.FC<any>;
   children?: React.ReactNode;
-  content?: React.FC<any> | React.ReactNode;
 }) {
   return (
     <Tooltip
@@ -70,16 +71,16 @@ export function ChartTooltip({
         return (
           <ChartTooltipValueContext.Provider
             value={{
-              content: props.children,
+              content: children,
               label,
               payload,
               color: "currentColor",
             }}
           >
-            {/* Fix: Handle both function and ReactNode content types */}
+            {/* Handle different content types properly */}
             {typeof content === 'function' 
               ? content(tooltipProps) 
-              : props.children || content}
+              : children || content || null}
           </ChartTooltipValueContext.Provider>
         );
       }}

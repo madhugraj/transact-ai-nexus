@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Message } from '@/components/assistant/MessageList';
@@ -7,43 +6,46 @@ import { getProcessedDocuments, getDocumentDataById } from '@/utils/documentStor
 import { generateInsightsWithGemini } from '@/services/api/gemini/insightGenerator';
 import { supabase } from '@/integrations/supabase/client';
 
-// Business analyst prompt template
+// Enhanced business analyst prompt with improved format instructions
 const BUSINESS_ANALYST_PROMPT = `You are a business data analyst. Given the table data and user query, find the answer from the provided table only.
 
 Analyze the output and the original intent to provide a clear explanation and prescriptive business insights.
 
 Instructions:
 - Identify patterns, outliers, or anomalies using actual values from the data.
-- Explain what the result reveals in business terms in 1 line.
-- Recommend 1-2 specific business actions. Be precise, if asked by the user only.
+- Explain what the result reveals in business terms in 1-2 sentences.
+- Recommend 1-2 specific business actions if asked by the user.
 - Use professional, clear language.
-- Output plain text for the main response.
-- If data is tabular, provide formatted data separately in a structured format.
-- If the question requires visualization, suggest the appropriate chart type (bar, line, or pie).`;
+- ALWAYS structure your response consistently as shown below.`;
 
-// Enhanced prompt for visualization support
+// Enhanced visualization prompt with clearer JSON formatting requirements
 const VISUALIZATION_PROMPT = `
-If the query requires data visualization, format your response like this:
+ALWAYS format your response like this when visualizations would help:
 
-INSIGHT: [Your text analysis here]
+INSIGHT: 
+[Your text analysis here - keep this brief and focused]
 
 TABLE_DATA:
+\`\`\`json
 {
+  "title": "Table Title",
   "headers": ["Column1", "Column2", ...],
   "rows": [
     ["Value1", "Value2", ...],
     ...
   ]
 }
+\`\`\`
 
 CHART_OPTIONS:
+\`\`\`json
 {
-  "type": "bar|line|pie",
-  "xKey": "Column1",
-  "yKeys": ["Column2", "Column3"],
+  "type": "bar",  // Use "bar", "line", or "pie" as appropriate
+  "xKey": "Column1", // The column to use for X axis labels
+  "yKeys": ["Column2", "Column3"], // The columns to plot as values
   "title": "Chart Title"
 }
-`;
+\`\`\``;
 
 export const useAIAssistant = () => {
   const [message, setMessage] = useState('');
@@ -257,69 +259,130 @@ export const useAIAssistant = () => {
     return getDocumentDataById(documentId);
   };
 
-  // Helper function to parse structured data from AI response
+  // Helper function to parse structured data from AI response - completely rewritten for better parsing
   const parseStructuredData = (responseText: string) => {
     let content = responseText;
     let tableData = null;
     let chartOptions = null;
     let rawData = null;
     
-    // Try to parse JSON directly if the whole response is JSON
+    console.log("Parsing response:", responseText.substring(0, 100) + "...");
+    
+    // Try to parse direct JSON response (whole response is JSON)
     try {
       if (responseText.trim().startsWith('{') && responseText.trim().endsWith('}')) {
         const jsonData = JSON.parse(responseText);
+        console.log("Found direct JSON response:", jsonData);
         
-        // If we have tables in the JSON, use them
-        if (jsonData.tables) {
+        // Handle tables in JSON directly
+        if (jsonData.tables || (jsonData.headers && jsonData.rows)) {
           return {
-            content: jsonData.summary || "Here's your data analysis:",
+            content: jsonData.summary || jsonData.insight || "Here's your data analysis:",
             structuredData: {
+              tableData: jsonData.tables ? jsonData.tables[0] : jsonData,
               rawData: jsonData
             }
           };
         }
         
+        // Handle chart options in JSON directly
         if (jsonData.type && (jsonData.type === 'bar' || jsonData.type === 'line' || jsonData.type === 'pie')) {
           return {
-            content: "Here's your data visualization:",
+            content: jsonData.insight || jsonData.title || "Here's your data visualization:",
             structuredData: {
-              chartOptions: jsonData
+              chartOptions: jsonData,
+              rawData: jsonData
             }
           };
         }
       }
     } catch (e) {
-      console.log("Not a direct JSON response");
+      console.log("Not a direct JSON response, continuing with other extraction methods");
     }
     
-    // Extract TABLE_DATA if available
-    const tableDataMatch = responseText.match(/TABLE_DATA:\s*({[\s\S]*?})/);
-    if (tableDataMatch && tableDataMatch[1]) {
+    // Extract JSON from code blocks - look for ```json blocks first
+    const jsonCodeBlockMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
+    if (jsonCodeBlockMatch && jsonCodeBlockMatch[1]) {
       try {
-        tableData = JSON.parse(tableDataMatch[1]);
+        const jsonData = JSON.parse(jsonCodeBlockMatch[1].trim());
+        console.log("Extracted JSON from code block:", jsonData);
+        
+        if (jsonData.tables || (jsonData.headers && jsonData.rows)) {
+          content = content.replace(jsonCodeBlockMatch[0], '').trim();
+          return {
+            content: content || "Here's your data analysis:",
+            structuredData: {
+              tableData: jsonData.tables ? jsonData.tables[0] : jsonData,
+              rawData: jsonData
+            }
+          };
+        }
+      } catch (e) {
+        console.error("Failed to parse JSON from code block:", e);
+      }
+    }
+    
+    // Try code blocks without language specifier
+    const codeBlockMatch = responseText.match(/```\s*([\s\S]*?)\s*```/);
+    if (codeBlockMatch && codeBlockMatch[1]) {
+      try {
+        const jsonData = JSON.parse(codeBlockMatch[1].trim());
+        console.log("Extracted potential JSON from unmarked code block:", jsonData);
+        
+        if (jsonData.tables || (jsonData.headers && jsonData.rows)) {
+          content = content.replace(codeBlockMatch[0], '').trim();
+          return {
+            content: content || "Here's your data analysis:",
+            structuredData: {
+              tableData: jsonData.tables ? jsonData.tables[0] : jsonData,
+              rawData: jsonData
+            }
+          };
+        }
+      } catch (e) {
+        // Not JSON, continue with other extraction methods
+      }
+    }
+    
+    // Extract TABLE_DATA if available using improved regex
+    const tableDataMatch = responseText.match(/TABLE_DATA:[\s\n]*```json\s*([\s\S]*?)\s*```|TABLE_DATA:\s*({[\s\S]*?})/);
+    if (tableDataMatch && (tableDataMatch[1] || tableDataMatch[2])) {
+      try {
+        const jsonStr = (tableDataMatch[1] || tableDataMatch[2]).trim();
+        tableData = JSON.parse(jsonStr);
         content = content.replace(tableDataMatch[0], '');
         rawData = tableData;
+        console.log("Extracted TABLE_DATA:", tableData);
       } catch (e) {
         console.error("Failed to parse TABLE_DATA:", e);
       }
     }
     
-    // Extract CHART_OPTIONS if available
-    const chartMatch = responseText.match(/CHART_OPTIONS:\s*({[\s\S]*?})/);
-    if (chartMatch && chartMatch[1]) {
+    // Extract CHART_OPTIONS if available using improved regex
+    const chartMatch = responseText.match(/CHART_OPTIONS:[\s\n]*```json\s*([\s\S]*?)\s*```|CHART_OPTIONS:\s*({[\s\S]*?})/);
+    if (chartMatch && (chartMatch[1] || chartMatch[2])) {
       try {
-        chartOptions = JSON.parse(chartMatch[1]);
+        const jsonStr = (chartMatch[1] || chartMatch[2]).trim();
+        chartOptions = JSON.parse(jsonStr);
         content = content.replace(chartMatch[0], '');
+        console.log("Extracted CHART_OPTIONS:", chartOptions);
       } catch (e) {
         console.error("Failed to parse CHART_OPTIONS:", e);
       }
     }
     
     // Extract the main insight text
-    const insightMatch = responseText.match(/INSIGHT:\s*([\s\S]*?)(?=TABLE_DATA:|CHART_OPTIONS:|$)/);
+    const insightMatch = responseText.match(/INSIGHT:\s*([\s\S]*?)(?=TABLE_DATA:|CHART_OPTIONS:|```|$)/);
     if (insightMatch && insightMatch[1]) {
       content = insightMatch[1].trim();
     }
+    
+    console.log("Final parsed content:", {
+      content: content.substring(0, 100) + "...",
+      hasTableData: !!tableData,
+      hasChartOptions: !!chartOptions,
+      hasRawData: !!rawData
+    });
     
     return {
       content: content.trim(),
