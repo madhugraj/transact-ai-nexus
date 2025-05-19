@@ -175,8 +175,10 @@
   @apply text-base;
 }
 
+/* Fix for circular dependency - using direct CSS instead of @apply */
 .compact .text-base {
-  @apply text-sm;
+  font-size: 0.875rem; /* Equivalent to text-sm */
+  line-height: 1.25rem; /* Equivalent to text-sm */
 }
 
 .compact .h-16 {
