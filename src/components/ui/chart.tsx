@@ -1,7 +1,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { Tooltip, ResponsiveContainer } from 'recharts';
+import { Tooltip, ResponsiveContainer, TooltipProps } from 'recharts';
 
 const ChartTooltipValueContext = React.createContext<{ 
   content: React.ReactNode; 
@@ -47,17 +47,22 @@ export function ChartContainer({
   );
 }
 
+// Fix: Define proper types for the ChartTooltip component to match Recharts requirements
 export function ChartTooltip({
-  children,
   content,
   ...props
-}: React.ComponentPropsWithoutRef<typeof Tooltip>) {
+}: Omit<TooltipProps<any, any>, 'content'> & {
+  children?: React.ReactNode;
+  content?: React.FC<any> | React.ReactNode;
+}) {
   return (
     <Tooltip
       {...props}
       animationDuration={200}
       animationEasing="ease-in-out"
-      content={({ active, payload, label }) => {
+      content={(tooltipProps) => {
+        const { active, payload, label } = tooltipProps;
+        
         if (!active || !payload?.length) {
           return null;
         }
@@ -65,13 +70,16 @@ export function ChartTooltip({
         return (
           <ChartTooltipValueContext.Provider
             value={{
-              content: children,
+              content: props.children,
               label,
               payload,
               color: "currentColor",
             }}
           >
-            {content ? content({ active, payload, label }) : children}
+            {/* Fix: Handle both function and ReactNode content types */}
+            {typeof content === 'function' 
+              ? content(tooltipProps) 
+              : props.children || content}
           </ChartTooltipValueContext.Provider>
         );
       }}
