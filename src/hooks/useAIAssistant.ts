@@ -14,8 +14,8 @@ Analyze the output and the original intent to provide a clear explanation and pr
 
 Instructions:
 - Identify patterns, outliers, or anomalies using actual values from the data.
-- Explain what the result reveals in business terms.
-- Recommend 3-5 specific business actions. Be precise.
+- Explain what the result reveals in business terms in 1 line.
+- Recommend 1 -2  specific business actions. Be precise, if asked by the user only.
 - Use professional, clear language.
 - Output plain text only. No markdown or code formatting.`;
 
@@ -24,7 +24,7 @@ export const useAIAssistant = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: 'Hello! I am your AI business analyst assistant. I can help you analyze documents and tables that have been processed in the system. Ask me specific questions about your data, and I\'ll provide insights and business recommendations.',
+      content: 'Hello! I am your AI business analyst assistant.  Ask me specific questions about your data, and I\'ll provide insights and business recommendations.',
       sender: 'assistant',
       timestamp: new Date()
     }
@@ -43,33 +43,33 @@ export const useAIAssistant = () => {
         // First try to fetch from Supabase
         let docs: Document[] = [];
         
-        try {
-          // Fetch extracted tables
-          const { data: extractedTables, error: tableError } = await supabase
-            .from('extracted_tables')
-            .select('*')
-            .order('created_at', { ascending: false });
+        // try {
+        //   // Fetch extracted tables
+        //   const { data: extractedTables, error: tableError } = await supabase
+        //     .from('extracted_tables')
+        //     .select('*')
+        //     .order('created_at', { ascending: false });
             
-          if (tableError) {
-            console.error("Error fetching from extracted_tables:", tableError);
-          } else if (extractedTables?.length > 0) {
-            console.log(`Fetched ${extractedTables.length} tables from extracted_tables:`, extractedTables);
+        //   if (tableError) {
+        //     console.error("Error fetching from extracted_tables:", tableError);
+        //   } else if (extractedTables?.length > 0) {
+        //     console.log(`Fetched ${extractedTables.length} tables from extracted_tables:`, extractedTables);
             
-            // Map Supabase data to Document format
-            const tableDocs: Document[] = extractedTables.map(table => ({
-              id: table.id,
-              name: table.title || 'Extracted Table',
-              type: 'table' as const,
-              extractedAt: table.created_at,
-              source: 'supabase' as const,
-              data: {
-                headers: table.headers,
-                rows: table.rows
-              }
-            }));
+        //     // Map Supabase data to Document format
+        //     const tableDocs: Document[] = extractedTables.map(table => ({
+        //       id: table.id,
+        //       name: table.title || 'Extracted Table',
+        //       type: 'table' as const,
+        //       extractedAt: table.created_at,
+        //       source: 'supabase' as const,
+        //       data: {
+        //         headers: table.headers,
+        //         rows: table.rows
+        //       }
+        //     }));
             
-            docs = [...tableDocs];
-          }
+        //     docs = [...tableDocs];
+        //   }
           
           // Fetch from extracted_json table
           const { data: extractedJson, error: jsonError } = await supabase
