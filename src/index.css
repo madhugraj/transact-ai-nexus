@@ -158,12 +158,17 @@
   @apply p-2;
 }
 
-.compact .space-y-6 {
-  @apply space-y-4;
+/* Fix for circular dependency - using direct CSS instead of @apply */
+.compact .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+  --tw-space-y-reverse: 0;
+  margin-top: calc(1rem * calc(1 - var(--tw-space-y-reverse)));
+  margin-bottom: calc(1rem * var(--tw-space-y-reverse));
 }
 
-.compact .space-y-4 {
-  @apply space-y-2;
+.compact .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+  --tw-space-y-reverse: 0;
+  margin-top: calc(0.5rem * calc(1 - var(--tw-space-y-reverse)));
+  margin-bottom: calc(0.5rem * var(--tw-space-y-reverse));
 }
 
 .compact .text-lg {
