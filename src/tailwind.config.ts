@@ -116,13 +116,22 @@ export default {
 						transform: 'translateY(0)',
 						opacity: '1'
 					}
+				},
+				'flow': {
+					'0%': { backgroundPosition: '0% 50%' },
+					'50%': { backgroundPosition: '100% 50%' },
+					'100%': { backgroundPosition: '0% 50%' }
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
-				'pulse-light': 'pulse-light 1.5s infinite',
-				'slide-in': 'slide-in 0.2s ease-out'
+				'pulse-light': 'pulse-light 2s infinite',
+				'slide-in': 'slide-in 0.2s ease-out',
+				'flow': 'flow 8s ease infinite'
+			},
+			backgroundSize: {
+				'300%': '300%'
 			}
 		}
 	},

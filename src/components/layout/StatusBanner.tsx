@@ -43,7 +43,7 @@ const StatusBanner = () => {
         <div className="flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2">
+              <Button variant="outline" className="flex items-center gap-2 bg-transparent border-[#2a3149] hover:bg-blue-900/20 hover:text-blue-200">
                 <Building size={16} />
                 <span className="font-medium">{currentOrg.name}</span>
                 <span className="text-xs text-muted-foreground px-1.5 py-0.5 rounded-full bg-muted">
@@ -52,24 +52,24 @@ const StatusBanner = () => {
                 <ChevronDown size={14} />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-[220px]">
+            <DropdownMenuContent align="start" className="w-[220px] bg-[#151929] border-[#2a3149] text-gray-200">
               <DropdownMenuLabel>Organizations</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {organizations.map(org => <DropdownMenuItem key={org.id} onClick={() => handleSwitchOrg(org)} className="flex flex-col items-start">
+              <DropdownMenuSeparator className="bg-[#2a3149]" />
+              {organizations.map(org => <DropdownMenuItem key={org.id} onClick={() => handleSwitchOrg(org)} className="flex flex-col items-start hover:bg-blue-900/20 hover:text-blue-200">
                   <span className="font-medium">{org.name}</span>
                   <span className="text-xs text-muted-foreground">{org.plan} Plan</span>
                 </DropdownMenuItem>)}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setCreateDialogOpen(true)}>
+              <DropdownMenuSeparator className="bg-[#2a3149]" />
+              <DropdownMenuItem onClick={() => setCreateDialogOpen(true)} className="hover:bg-blue-900/20 hover:text-blue-200">
                 <span className="text-sm">Add New Organization</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
         
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="rounded-full" title="Notifications">
-            <BellRing className="h-5 w-5" />
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" className="rounded-full hover:bg-blue-900/20" title="Notifications">
+            <BellRing className="h-5 w-5 text-gray-300" />
           </Button>
           <img src="/lovable-uploads/27845ced-a36a-431c-8cd1-5016f13aab53.png" alt="yavar logo" className="h-8" />
         </div>
