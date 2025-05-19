@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useAuth } from './UserAuthContext';
 import { Button } from '@/components/ui/button';
@@ -77,23 +76,20 @@ const LoginForm = () => {
           
           <div className="space-y-6 text-gray-300">
             <p className="text-lg">
-              Z-Transact is more than a tool — it's your intelligent financial co-pilot. 
-              Designed to operate like a junior auditor, it automates complex accounting 
-              workflows with the precision of a compliance officer and the intuition of a 
-              seasoned analyst.
+              Z-Transact is your intelligent automation partner for finance and audit operations. 
+              It seamlessly handles invoice validation, payment tracking, client queries, and 
+              compliance monitoring — all powered by purpose-built AI agents.
             </p>
             
             <p className="text-lg">
-              From invoice matching to real-time payment tracking, Z-Transact seamlessly 
-              integrates with your financial data, client records, and workflow systems. 
-              It understands context, flags anomalies, answers queries, and drives 
-              decisions — all in real time.
+              Every interaction is designed to reduce manual overhead, accelerate reviews, and surface 
+              actionable insights. Whether you're managing workflows or verifying financials, Z-Transact 
+              works like a junior auditor that never sleeps — fast, accurate, and context-aware.
             </p>
             
             <p className="text-lg">
-              By harnessing the power of multiple specialized agents, Z-Transact transforms 
-              static finance operations into dynamic, self-optimizing systems. Reduce human 
-              error. Improve turnaround. Free your team for what matters most.
+              Start transforming your finance operations with intelligent automation, real-time analysis, 
+              and effortless scale — all from one unified platform.
             </p>
           </div>
           
