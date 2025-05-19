@@ -18,16 +18,25 @@ import { ActionHistoryContent } from "@/components/actions/ActionHistoryContent"
 
 const Actions = () => {
   const [activeTab, setActiveTab] = useState("workflows");
-  const { workflows } = useWorkflow();
+  const { workflows, createWorkflow } = useWorkflow();
   const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowConfig | null>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const { toast } = useToast();
 
   const handleWorkflowCreated = (workflow: WorkflowConfig) => {
+    // We're ensuring the workflow is properly created through the useWorkflow hook
+    const createdWorkflow = createWorkflow(workflow);
+    
     toast({
       title: "Workflow Created",
       description: `The "${workflow.name}" workflow has been created successfully.`
     });
+    
+    // Force a re-render to show the new workflow
+    setTimeout(() => {
+      setActiveTab("other");
+      setTimeout(() => setActiveTab("workflows"), 10);
+    }, 100);
   };
 
   const handleEditWorkflow = (workflow: WorkflowConfig) => {

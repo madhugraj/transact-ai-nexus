@@ -53,6 +53,7 @@ export class DynamicTableDetectionAgent implements Agent {
       // Try to save to Supabase if we have valid data
       if (tableData && tableData.headers && tableData.rows) {
         try {
+          // Save to extracted_tables table
           const { error } = await supabase
             .from('extracted_tables')
             .insert({
@@ -66,10 +67,34 @@ export class DynamicTableDetectionAgent implements Agent {
           if (error) {
             console.error("Error saving table to Supabase:", error);
           } else {
-            console.log("Successfully saved table to Supabase");
+            console.log("Successfully saved table to Supabase extracted_tables");
+          }
+          
+          // NEW: Save to extracted_json table
+          if (fileObjects.length > 0) {
+            const fileName = fileObjects[0].name || 'unknown';
+            const jsonData = {
+              headers: tableData.headers,
+              rows: tableData.rows,
+              metadata: tableData.metadata || {},
+              extractedAt: new Date().toISOString()
+            };
+            
+            const { error: jsonError } = await supabase
+              .from('extracted_json')
+              .insert({
+                file_name: fileName,
+                json_extract: jsonData
+              });
+              
+            if (jsonError) {
+              console.error("Error saving JSON to Supabase:", jsonError);
+            } else {
+              console.log("Successfully saved extracted JSON to Supabase extracted_json table");
+            }
           }
         } catch (err) {
-          console.error("Exception saving table to Supabase:", err);
+          console.error("Exception saving data to Supabase:", err);
         }
       }
       
@@ -122,6 +147,7 @@ export class DynamicTableDetectionAgent implements Agent {
                 
                 // Try to save to Supabase
                 try {
+                  // Save to extracted_tables table
                   const { error } = await supabase
                     .from('extracted_tables')
                     .insert({
@@ -137,8 +163,32 @@ export class DynamicTableDetectionAgent implements Agent {
                   } else {
                     console.log("Successfully saved table to Supabase");
                   }
+                  
+                  // NEW: Save to extracted_json table
+                  const jsonData = {
+                    headers: extractedTable.headers,
+                    rows: extractedTable.rows,
+                    metadata: {
+                      confidence: 0.9,
+                      sourceFile: file.name,
+                      extractedAt: new Date().toISOString()
+                    }
+                  };
+                  
+                  const { error: jsonError } = await supabase
+                    .from('extracted_json')
+                    .insert({
+                      file_name: file.name,
+                      json_extract: jsonData
+                    });
+                    
+                  if (jsonError) {
+                    console.error("Error saving JSON to Supabase:", jsonError);
+                  } else {
+                    console.log("Successfully saved JSON to extracted_json table");
+                  }
                 } catch (err) {
-                  console.error("Exception saving table to Supabase:", err);
+                  console.error("Exception saving to Supabase:", err);
                 }
                 
                 console.log("Extracted table data:", {
@@ -185,6 +235,7 @@ export class DynamicTableDetectionAgent implements Agent {
         
         // Try to save to Supabase
         try {
+          // Save to extracted_tables table
           const { error } = await supabase
             .from('extracted_tables')
             .insert({
@@ -200,8 +251,32 @@ export class DynamicTableDetectionAgent implements Agent {
           } else {
             console.log("Successfully saved text-extracted table to Supabase");
           }
+          
+          // NEW: Save to extracted_json table
+          const jsonData = {
+            headers: tableStructure.headers,
+            rows: tableStructure.rows,
+            metadata: {
+              confidence: 0.8,
+              sourceType: "text",
+              extractedAt: new Date().toISOString()
+            }
+          };
+          
+          const { error: jsonError } = await supabase
+            .from('extracted_json')
+            .insert({
+              file_name: "text-extracted-data",
+              json_extract: jsonData
+            });
+            
+          if (jsonError) {
+            console.error("Error saving JSON to Supabase:", jsonError);
+          } else {
+            console.log("Successfully saved JSON to extracted_json table");
+          }
         } catch (err) {
-          console.error("Exception saving text-extracted table to Supabase:", err);
+          console.error("Exception saving text-extracted data to Supabase:", err);
         }
         
         return {

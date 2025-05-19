@@ -1,71 +1,61 @@
 
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { UploadedFile } from '@/types/fileUpload';
+import { Button } from "@/components/ui/button";
+import { Upload, FileCheck, RefreshCw } from "lucide-react";
+import { UploadedFile } from "@/types/fileUpload";
 
 interface FileUploadActionsProps {
   files: UploadedFile[];
-  isLoading: boolean;
-  handleProcessFiles: () => void;
-  selectFilesForProcessing: (fileIds: string[]) => void;
-  selectByType: (type: 'document' | 'data') => any;
-  setShowProcessingDialog: (show: boolean) => void;
+  uploadAllFiles: () => void;
+  onProcessSelected: () => void;
+  processingId?: string | null;
+  isPolling?: boolean;
 }
 
-const FileUploadActions = ({
+export default function FileUploadActions({
   files,
-  isLoading,
-  handleProcessFiles,
-  selectFilesForProcessing,
-  selectByType,
-  setShowProcessingDialog
-}: FileUploadActionsProps) => {
-  const { toast } = useToast();
-  
-  // Open processing dialog for selected files
-  const openProcessingDialog = (fileIds: string[]) => {
-    selectFilesForProcessing(fileIds);
-    setShowProcessingDialog(true);
-  };
-
-  // Process document files
-  const handleProcessDocuments = () => {
-    const result = selectByType('document');
-    if (result) setShowProcessingDialog(true);
-  };
-
-  // Process data files
-  const handleProcessDataFiles = () => {
-    const result = selectByType('data');
-    if (result) setShowProcessingDialog(true);
-  };
+  uploadAllFiles,
+  onProcessSelected,
+  processingId,
+  isPolling,
+}: FileUploadActionsProps) {
+  const hasIdleFiles = files.some(f => f.status === 'idle');
+  const hasUploadedFiles = files.some(f => f.status === 'success');
 
   return (
-    <div className="flex flex-wrap gap-2 mt-4">
-      <Button 
-        onClick={handleProcessFiles}
-        disabled={isLoading || files.length === 0}
-      >
-        Process Selected Files
-      </Button>
+    <div className="flex flex-wrap gap-2">
+      {hasIdleFiles && (
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={uploadAllFiles} 
+          className="bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200"
+        >
+          <Upload className="mr-1 h-4 w-4" />
+          Upload All
+        </Button>
+      )}
       
-      <Button 
-        variant="outline"
-        onClick={handleProcessDocuments}
-        disabled={isLoading || files.length === 0}
-      >
-        Process Document Files
-      </Button>
-      
-      <Button 
-        variant="outline"
-        onClick={handleProcessDataFiles}
-        disabled={isLoading || files.length === 0}
-      >
-        Process Data Files
-      </Button>
+      {hasUploadedFiles && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onProcessSelected}
+          disabled={isPolling}
+          className="bg-green-50 hover:bg-green-100 text-green-600 border-green-200"
+        >
+          {isPolling ? (
+            <>
+              <RefreshCw className="mr-1 h-4 w-4 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            <>
+              <FileCheck className="mr-1 h-4 w-4" />
+              Process Files
+            </>
+          )}
+        </Button>
+      )}
     </div>
   );
-};
-
-export default FileUploadActions;
+}

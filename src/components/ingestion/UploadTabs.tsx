@@ -1,46 +1,42 @@
 
-import React from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DropZone from './DropZone';
-import CloudStorageConnector from './CloudStorageConnector';
+import { useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import FileUpload from "./FileUpload";
+import EmailConnector from "./EmailConnector";
+import CloudStorageConnector from "./CloudStorageConnector";
+import SapDataImport from "./SapDataImport";
 
 interface UploadTabsProps {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
-  onFilesSelected: (files: File[]) => void;
-  onCloudFilesSelected: (files: File[]) => void;
-  autoSync: boolean;
-  setAutoSync: (value: boolean) => void;
+  onUploadComplete?: () => void;
 }
 
-const UploadTabs: React.FC<UploadTabsProps> = ({
-  activeTab,
-  setActiveTab,
-  onFilesSelected,
-  onCloudFilesSelected,
-  autoSync,
-  setAutoSync
-}) => {
-  return (
-    <div className="w-full">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="flex items-center justify-between mb-4">
-          <TabsList className="grid grid-cols-2 w-64">
-            <TabsTrigger value="upload">Local Upload</TabsTrigger>
-            <TabsTrigger value="cloud">Cloud Storage</TabsTrigger>
-          </TabsList>
-        </div>
-        
-        <TabsContent value="upload" className="mt-0 pt-0">
-          <DropZone onFilesSelected={onFilesSelected} />
-        </TabsContent>
-        
-        <TabsContent value="cloud" className="mt-0 pt-0">
-          <CloudStorageConnector onFilesSelected={onCloudFilesSelected} />
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-};
+export default function UploadTabs({ onUploadComplete }: UploadTabsProps) {
+  const [activeTab, setActiveTab] = useState("upload");
 
-export default UploadTabs;
+  return (
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <TabsList className="grid grid-cols-4 w-full">
+        <TabsTrigger value="upload">File Upload</TabsTrigger>
+        <TabsTrigger value="email">Email Inbox</TabsTrigger>
+        <TabsTrigger value="cloud">Cloud Storage</TabsTrigger>
+        <TabsTrigger value="sap">SAP Import</TabsTrigger>
+      </TabsList>
+      
+      <TabsContent value="upload">
+        <FileUpload onUploadComplete={onUploadComplete} />
+      </TabsContent>
+      
+      <TabsContent value="email">
+        <EmailConnector />
+      </TabsContent>
+      
+      <TabsContent value="cloud">
+        <CloudStorageConnector />
+      </TabsContent>
+      
+      <TabsContent value="sap">
+        <SapDataImport />
+      </TabsContent>
+    </Tabs>
+  );
+}
