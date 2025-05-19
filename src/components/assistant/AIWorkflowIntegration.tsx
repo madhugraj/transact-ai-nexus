@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -8,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Database, Link, Tool, BarChart2 } from 'lucide-react';
+import { Database, Link, Settings, BarChart2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 const AIWorkflowIntegration: React.FC = () => {
@@ -27,7 +26,7 @@ const AIWorkflowIntegration: React.FC = () => {
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center justify-between">
           <div className="flex items-center">
-            <Tool className="h-5 w-5 mr-2 text-blue-500" />
+            <Settings className="h-5 w-5 mr-2 text-blue-500" />
             Assistant Tools
           </div>
           <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
