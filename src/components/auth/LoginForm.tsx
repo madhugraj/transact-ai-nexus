@@ -56,12 +56,17 @@ const LoginForm = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#9b87f5]/10 to-[#7E69AB]/10">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Transaction Agent Platform</CardTitle>
+          <div className="mx-auto mb-2">
+            <div className="h-12 w-12 rounded-full purple-gradient flex items-center justify-center">
+              <span className="text-white text-xl font-bold">Z</span>
+            </div>
+          </div>
+          <CardTitle className="text-2xl font-bold text-center">Z-Transact Platform</CardTitle>
           <CardDescription className="text-center">
-            Enter your credentials to access your account
+            AI-Powered Junior Auditor for Smarter, Faster Financial Reviews
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -98,7 +103,7 @@ const LoginForm = () => {
                 />
               </div>
             </div>
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+            <Button type="submit" className="w-full purple-gradient hover:opacity-90" disabled={isSubmitting}>
               {isSubmitting ? "Signing in..." : "Sign in"}
             </Button>
           </form>

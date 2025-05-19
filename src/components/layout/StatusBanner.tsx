@@ -53,6 +53,13 @@ const StatusBanner = () => {
   return (
     <>
       <div className="flex items-center">
+        <div className="flex items-center gap-2 mr-4">
+          <div className="h-8 w-8 rounded-full purple-gradient flex items-center justify-center">
+            <span className="text-white text-sm font-bold">Z</span>
+          </div>
+          <span className="font-semibold text-primary text-lg">Z-Transact</span>
+        </div>
+        
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="flex items-center gap-2">

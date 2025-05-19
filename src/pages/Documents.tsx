@@ -37,7 +37,7 @@ const Documents = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-semibold">Document Processing</h1>
+            <h1 className="text-3xl font-semibold text-primary">Document Processing</h1>
             <p className="text-muted-foreground mt-1">
               Process, analyze, and compare financial documents
             </p>
@@ -88,7 +88,7 @@ const Documents = () => {
       <Dialog open={showAssistant} onOpenChange={setShowAssistant}>
         <DialogContent className="sm:max-w-[600px] p-0">
           <DialogHeader className="px-4 py-2 border-b">
-            <DialogTitle>Document AI Assistant</DialogTitle>
+            <DialogTitle>Z-Transact AI Assistant</DialogTitle>
           </DialogHeader>
           <div className="p-0">
             <AIAssistant />

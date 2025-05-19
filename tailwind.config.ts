@@ -71,10 +71,10 @@ export default {
 					processing: '#2196F3'
 				},
 				transaction: {
-					invoice: '#3F51B5',
-					receipt: '#673AB7',
-					po: '#009688',
-					payment: '#FF5722'
+					invoice: '#9b87f5',
+					receipt: '#7E69AB',
+					po: '#6E59A5',
+					payment: '#8B5CF6'
 				}
 			},
 			borderRadius: {
