@@ -1,16 +1,13 @@
-
 import { useState, useEffect } from 'react';
 import { Building, ChevronDown, BellRing } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { CreateOrgDialog } from '@/components/organization/CreateOrgDialog';
 import { Organization, getOrganizations, getCurrentOrganization, saveCurrentOrganization, addOrganization } from '@/utils/organizations';
-
 const StatusBanner = () => {
   const [currentOrg, setCurrentOrg] = useState<Organization | null>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-
   useEffect(() => {
     // Load organizations and current organization from storage
     const orgs = getOrganizations();
@@ -18,12 +15,10 @@ const StatusBanner = () => {
     setOrganizations(orgs);
     setCurrentOrg(current);
   }, []);
-
   const handleSwitchOrg = (org: Organization) => {
     setCurrentOrg(org);
     saveCurrentOrganization(org);
   };
-
   const handleCreateOrg = (orgData: {
     name: string;
     plan: string;
@@ -35,9 +30,7 @@ const StatusBanner = () => {
     setOrganizations([...organizations, newOrg]);
     handleSwitchOrg(newOrg);
   };
-
   if (!currentOrg) return null;
-  
   return <>
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-2">
@@ -68,9 +61,7 @@ const StatusBanner = () => {
         </div>
         
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="rounded-full hover:bg-blue-900/20" title="Notifications">
-            <BellRing className="h-5 w-5 text-gray-300" />
-          </Button>
+          
           <img src="/lovable-uploads/27845ced-a36a-431c-8cd1-5016f13aab53.png" alt="Z-Transact logo" className="h-8" />
         </div>
       </div>
@@ -78,5 +69,4 @@ const StatusBanner = () => {
       <CreateOrgDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} onCreateOrg={handleCreateOrg} />
     </>;
 };
-
 export default StatusBanner;
