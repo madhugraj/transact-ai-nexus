@@ -24,12 +24,14 @@ interface MappingTableProps {
   sourceItems: InventoryItem[];
   mappingResults: Record<string, MappingResult>;
   onUpdateMapping: (itemId: string, targetCode: string, targetSystem: string) => void;
+  selectedTargetSystem: string;
 }
 
 export function MappingTable({ 
   sourceItems, 
   mappingResults, 
-  onUpdateMapping 
+  onUpdateMapping,
+  selectedTargetSystem
 }: MappingTableProps) {
   const [filter, setFilter] = useState<string>("");
   
@@ -78,8 +80,7 @@ export function MappingTable({
           <TableHeader>
             <TableRow className="bg-muted/50">
               <TableHead className="w-[30%]">Source Item</TableHead>
-              <TableHead className="w-[15%]">System</TableHead>
-              <TableHead className="w-[40%]">Target Code</TableHead>
+              <TableHead className="w-[55%]">Target Code</TableHead>
               <TableHead className="w-[15%] text-right">Status</TableHead>
             </TableRow>
           </TableHeader>
@@ -108,37 +109,14 @@ export function MappingTable({
                   </TableCell>
                   
                   <TableCell>
-                    <Select
-                      value={result?.targetSystem || ""}
-                      onValueChange={(value) => {
-                        onUpdateMapping(
-                          item.id, 
-                          result?.targetCode || "", 
-                          value
-                        );
-                      }}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="System" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="SAP">SAP</SelectItem>
-                        <SelectItem value="QuickBooks">QuickBooks</SelectItem>
-                        <SelectItem value="Xero">Xero</SelectItem>
-                        <SelectItem value="Zoho">Zoho</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  
-                  <TableCell>
-                    {result?.targetSystem ? (
+                    {selectedTargetSystem ? (
                       <Select
-                        value={result.targetCode || ""}
+                        value={result?.targetCode || ""}
                         onValueChange={(value) => {
                           onUpdateMapping(
                             item.id, 
                             value, 
-                            result.targetSystem
+                            selectedTargetSystem
                           );
                         }}
                       >
@@ -147,7 +125,7 @@ export function MappingTable({
                         </SelectTrigger>
                         <SelectContent>
                           {/* Auto-matched option first if available */}
-                          {result.targetCode && (
+                          {result?.targetCode && (
                             <SelectItem value={result.targetCode}>
                               <div className="flex items-center">
                                 <span className="truncate max-w-[180px]" title={result.targetCode}>{result.targetCode}</span>
@@ -164,8 +142,8 @@ export function MappingTable({
                           )}
                           
                           {/* Additional options */}
-                          {generateTargetOptions(item.name, result.targetSystem).map((option) => (
-                            option !== result.targetCode && (
+                          {generateTargetOptions(item.name, selectedTargetSystem).map((option) => (
+                            option !== result?.targetCode && (
                               <SelectItem key={option} value={option}>
                                 <span className="truncate max-w-[180px]" title={option}>{option}</span>
                               </SelectItem>
@@ -178,7 +156,7 @@ export function MappingTable({
                       </Select>
                     ) : (
                       <div className="text-sm text-muted-foreground italic">
-                        Select system first
+                        Select target system first
                       </div>
                     )}
                     
@@ -191,7 +169,7 @@ export function MappingTable({
                           onUpdateMapping(
                             item.id, 
                             e.target.value, 
-                            result.targetSystem
+                            selectedTargetSystem
                           );
                         }}
                       />
@@ -221,7 +199,7 @@ export function MappingTable({
             
             {filteredItems.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">
                   No items match the current filter
                 </TableCell>
               </TableRow>

@@ -10,7 +10,30 @@ import { FileUploader } from "./FileUploader";
 import { extractTablesFromImageWithGemini } from "@/services/api/gemini/tableExtractor";
 import { InventoryItem, MappingResult, MappingProfile } from "@/types/inventoryMapping";
 import { parseInventoryFile } from "@/utils/inventoryParser";
-import { Brain, Save, FileSpreadsheet, ArrowRight } from "lucide-react";
+import { Brain, Save, FileSpreadsheet, ArrowRight, Code } from "lucide-react";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle,
+  DialogFooter
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from "@/components/ui/alert-dialog";
 
 export function InventoryMappingPanel() {
   const [sourceItems, setSourceItems] = useState<InventoryItem[]>([]);
@@ -19,6 +42,9 @@ export function InventoryMappingPanel() {
   const [selectedProfile, setSelectedProfile] = useState<string | null>(null);
   const [fileUploaded, setFileUploaded] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showMappingJson, setShowMappingJson] = useState(false);
+  const [selectedTargetSystem, setSelectedTargetSystem] = useState<string>("");
+  const [showFinalizationAlert, setShowFinalizationAlert] = useState(false);
   const { toast } = useToast();
 
   // Load available profiles from localStorage
@@ -123,6 +149,15 @@ export function InventoryMappingPanel() {
   };
 
   const runAutoMatch = async () => {
+    if (!selectedTargetSystem) {
+      toast({
+        title: "Target system required",
+        description: "Please select a target system before running auto-match",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsProcessing(true);
     
     try {
@@ -135,17 +170,13 @@ export function InventoryMappingPanel() {
         // Random confidence score between 60-100
         const confidenceScore = Math.floor(Math.random() * 41) + 60;
         
-        // Simulate different target systems
-        const systems = ['SAP', 'QuickBooks', 'Xero', 'Zoho'];
-        const targetSystem = systems[Math.floor(Math.random() * systems.length)];
-        
-        // Generate a fake target code
-        const targetCode = generateFakeTargetCode(item.name, targetSystem);
+        // Generate a fake target code for the selected system
+        const targetCode = generateFakeTargetCode(item.name, selectedTargetSystem);
         
         updatedResults[item.id] = {
           ...updatedResults[item.id],
           targetCode,
-          targetSystem,
+          targetSystem: selectedTargetSystem,
           confidenceScore,
           isAmbiguous: confidenceScore < 80,
         };
@@ -155,7 +186,7 @@ export function InventoryMappingPanel() {
       
       toast({
         title: "Auto-matching complete",
-        description: `Generated suggestions for ${sourceItems.length} items`,
+        description: `Generated suggestions for ${sourceItems.length} items using ${selectedTargetSystem} system`,
       });
     } catch (error) {
       toast({
@@ -281,10 +312,33 @@ export function InventoryMappingPanel() {
     // For demonstration, save to localStorage
     localStorage.setItem('lastMappingResult', JSON.stringify(finalMapping));
     
-    toast({
-      title: "Mapping finalized",
-      description: "The inventory mapping has been finalized and saved",
-    });
+    // Show finalization alert
+    setShowFinalizationAlert(true);
+  };
+
+  // Generate JSON representation of current mapping
+  const getMappingJson = () => {
+    const mappingData = {
+      targetSystem: selectedTargetSystem,
+      mappings: Object.entries(mappingResults).map(([itemId, result]) => {
+        const sourceItem = sourceItems.find(item => item.id === itemId);
+        return {
+          sourceItem: {
+            id: itemId,
+            name: sourceItem?.name,
+            sku: sourceItem?.sku,
+            quantity: sourceItem?.quantity,
+            unitPrice: sourceItem?.unitPrice
+          },
+          targetCode: result.targetCode,
+          targetSystem: result.targetSystem,
+          isConfirmed: result.isConfirmed,
+          confidenceScore: result.confidenceScore
+        };
+      })
+    };
+    
+    return JSON.stringify(mappingData, null, 2);
   };
 
   return (
@@ -318,15 +372,32 @@ export function InventoryMappingPanel() {
               <SourceTableViewer items={sourceItems} />
               
               <div className="flex justify-between items-center bg-blue-50/30 p-3 rounded-md border border-blue-100">
-                <div className="flex items-center">
+                <div className="flex flex-1 items-center gap-3">
                   <ArrowRight className="h-5 w-5 text-blue-500 mr-2" />
                   <span className="text-sm font-medium text-blue-700">Map Items to Target System</span>
+                  
+                  <div className="max-w-xs">
+                    <Select 
+                      value={selectedTargetSystem}
+                      onValueChange={setSelectedTargetSystem}
+                    >
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Select system" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="SAP">SAP</SelectItem>
+                        <SelectItem value="QuickBooks">QuickBooks</SelectItem>
+                        <SelectItem value="Xero">Xero</SelectItem>
+                        <SelectItem value="Zoho">Zoho</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <Button
                   variant="secondary"
                   size="sm"
                   onClick={runAutoMatch}
-                  disabled={isProcessing}
+                  disabled={isProcessing || !selectedTargetSystem}
                 >
                   <Brain className="h-4 w-4 mr-2" />
                   Auto-Match Items
@@ -337,6 +408,7 @@ export function InventoryMappingPanel() {
                 sourceItems={sourceItems}
                 mappingResults={mappingResults}
                 onUpdateMapping={handleMappingUpdate}
+                selectedTargetSystem={selectedTargetSystem}
               />
 
               <div className="flex flex-wrap justify-between items-center gap-4 mt-6 pt-4 border-t">
@@ -355,6 +427,14 @@ export function InventoryMappingPanel() {
                   >
                     Confirm All Mappings
                   </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowMappingJson(true)}
+                    disabled={Object.values(mappingResults).every(r => !r.isConfirmed)}
+                  >
+                    <Code className="h-4 w-4 mr-2" />
+                    Show Mapping
+                  </Button>
                 </div>
                 <Button
                   onClick={handleFinalize}
@@ -363,6 +443,38 @@ export function InventoryMappingPanel() {
                   Finalize Mapping
                 </Button>
               </div>
+
+              {/* Mapping JSON Dialog */}
+              <Dialog open={showMappingJson} onOpenChange={setShowMappingJson}>
+                <DialogContent className="sm:max-w-[800px]">
+                  <DialogHeader>
+                    <DialogTitle>Current Mapping (JSON Format)</DialogTitle>
+                  </DialogHeader>
+                  <div className="bg-slate-50 p-4 rounded overflow-auto max-h-[500px]">
+                    <pre className="text-xs font-mono whitespace-pre-wrap">
+                      {getMappingJson()}
+                    </pre>
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={() => setShowMappingJson(false)}>Close</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              {/* Finalization Alert Dialog */}
+              <AlertDialog open={showFinalizationAlert} onOpenChange={setShowFinalizationAlert}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Mapping Finalized</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Your inventory mapping has been successfully finalized and pushed to the database.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogAction>OK</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </>
           )}
         </div>

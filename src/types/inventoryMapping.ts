@@ -41,4 +41,5 @@ export interface InventoryMappingState {
   mappingResults: Record<string, MappingResult>;
   selectedProfile?: MappingProfile;
   profiles: MappingProfile[];
+  selectedTargetSystem: string;
 }
