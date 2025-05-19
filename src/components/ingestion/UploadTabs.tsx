@@ -24,9 +24,19 @@ export default function UploadTabs({
 
   // Handle file selection callback from FileUpload component
   const handleFilesSelected = (files: File[]) => {
+    console.log("UploadTabs: handleFilesSelected called with", files.length, "files");
     if (onFilesSelected && files.length > 0) {
-      console.log("UploadTabs: forwarding selected files to parent", files.length);
+      console.log("UploadTabs: forwarding selected files to parent");
       onFilesSelected(files);
+    }
+  };
+
+  // Handle cloud file selection callback
+  const handleCloudFilesSelected = (files: File[]) => {
+    console.log("UploadTabs: handleCloudFilesSelected called with", files.length, "files");
+    if (onCloudFilesSelected && files.length > 0) {
+      console.log("UploadTabs: forwarding cloud selected files to parent");
+      onCloudFilesSelected(files);
     }
   };
 
@@ -52,7 +62,7 @@ export default function UploadTabs({
       
       <TabsContent value="cloud" className="mt-4">
         <CloudStorageConnector 
-          onFilesSelected={onCloudFilesSelected || (() => {})}
+          onFilesSelected={handleCloudFilesSelected || (() => {})}
         />
       </TabsContent>
       

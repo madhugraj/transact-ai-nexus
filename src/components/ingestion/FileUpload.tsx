@@ -5,7 +5,7 @@ import FileUploadActions from "./FileUploadActions";
 import { useFileProcessing } from "@/hooks/useFileProcessing";
 import { FileProcessingDialog } from "./dialog/FileProcessingDialog";
 import PostProcessingWorkflow from "./PostProcessingWorkflow";
-import UploadTabs from "./UploadTabs";
+import DropZone from "./DropZone";
 
 interface FileUploadProps {
   onUploadComplete?: () => void;
@@ -47,11 +47,13 @@ const FileUpload = ({ onUploadComplete, onFilesSelected }: FileUploadProps) => {
       addFiles(newFiles);
       
       if (onFilesSelected) {
+        console.log("FileUpload: notifying parent component about selected files");
         onFilesSelected(newFiles);
       }
   
       if (autoSync) {
         // Auto upload files if sync is enabled
+        console.log("FileUpload: auto uploading files");
         setTimeout(() => {
           uploadAllFiles();
         }, 500);
@@ -60,6 +62,8 @@ const FileUpload = ({ onUploadComplete, onFilesSelected }: FileUploadProps) => {
   };
   
   const handleCloudFilesSelected = (newFiles: File[]) => {
+    console.log("FileUpload: cloud files selected", newFiles.length);
+    
     if (newFiles && newFiles.length > 0) {
       addFiles(newFiles);
       
@@ -82,11 +86,7 @@ const FileUpload = ({ onUploadComplete, onFilesSelected }: FileUploadProps) => {
 
   return (
     <div className="space-y-6">
-      <UploadTabs
-        onFilesSelected={handleFilesSelected}
-        onCloudFilesSelected={handleCloudFilesSelected}
-        onUploadComplete={onUploadComplete}
-      />
+      <DropZone onFilesSelected={handleFilesSelected} />
       
       <FileList 
         files={files} 

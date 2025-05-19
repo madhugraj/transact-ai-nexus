@@ -43,33 +43,33 @@ export const useAIAssistant = () => {
         // First try to fetch from Supabase
         let docs: Document[] = [];
         
-        // try {
-        //   // Fetch extracted tables
-        //   const { data: extractedTables, error: tableError } = await supabase
-        //     .from('extracted_tables')
-        //     .select('*')
-        //     .order('created_at', { ascending: false });
+        try {
+          // Fetch extracted tables
+          const { data: extractedTables, error: tableError } = await supabase
+            .from('extracted_tables')
+            .select('*')
+            .order('created_at', { ascending: false });
             
-        //   if (tableError) {
-        //     console.error("Error fetching from extracted_tables:", tableError);
-        //   } else if (extractedTables?.length > 0) {
-        //     console.log(`Fetched ${extractedTables.length} tables from extracted_tables:`, extractedTables);
+          if (tableError) {
+            console.error("Error fetching from extracted_tables:", tableError);
+          } else if (extractedTables?.length > 0) {
+            console.log(`Fetched ${extractedTables.length} tables from extracted_tables:`, extractedTables);
             
-        //     // Map Supabase data to Document format
-        //     const tableDocs: Document[] = extractedTables.map(table => ({
-        //       id: table.id,
-        //       name: table.title || 'Extracted Table',
-        //       type: 'table' as const,
-        //       extractedAt: table.created_at,
-        //       source: 'supabase' as const,
-        //       data: {
-        //         headers: table.headers,
-        //         rows: table.rows
-        //       }
-        //     }));
+            // Map Supabase data to Document format
+            const tableDocs: Document[] = extractedTables.map(table => ({
+              id: table.id,
+              name: table.title || 'Extracted Table',
+              type: 'table' as const,
+              extractedAt: table.created_at,
+              source: 'supabase' as const,
+              data: {
+                headers: table.headers,
+                rows: table.rows
+              }
+            }));
             
-        //     docs = [...tableDocs];
-        //   }
+            docs = [...tableDocs];
+          }
           
           // Fetch from extracted_json table
           const { data: extractedJson, error: jsonError } = await supabase
