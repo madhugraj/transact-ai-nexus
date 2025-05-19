@@ -1,11 +1,13 @@
+
 import { Agent, ProcessingContext } from "./types";
 import * as api from '@/services/api';
 import * as pdfjs from 'pdfjs-dist';
 
 // Set up PDF.js worker
-const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.mjs');
-if (typeof window !== 'undefined' && 'pdfjsWorker' in window === false) {
-  pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+// Use a more compatible way to load the worker
+if (typeof window !== 'undefined') {
+  const pdfjsWorker = new URL('pdfjs-dist/build/pdf.worker.min.js', import.meta.url);
+  pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker.toString();
 }
 
 export class PDFTableExtractionAgent implements Agent {
