@@ -1,41 +1,6 @@
 
-import { API_BASE_URL } from "@/services/api/constants";
-
-interface TableExtractionResponse {
-  success: boolean;
-  data: {
-    tables: Array<{
-      headers: string[];
-      rows: any[][];
-    }>;
-  };
-  error?: string;
-}
-
-export interface ColumnDefinition {
-  header: string;
-  accessor: string;
-  format?: (value: any) => string;
-}
-
-export interface TableDetectionResponse {
-  tables: Array<{
-    headers: string[];
-    rows: any[][];
-    columns?: ColumnDefinition[];
-  }>;
-}
-
-/**
- * Extract tables from an image using Google's Gemini API
- */
-export async function extractTablesFromImageWithGemini(
-  base64Image: string, 
-  mimeType: string
-): Promise<TableExtractionResponse> {
-  try {
-    // Create a specific prompt for inventory data extraction
-    const prompt = `
+// Define a default extraction prompt that can be exported
+export const DEFAULT_TABLE_EXTRACTION_PROMPT = `
 You're an OCR assistant specializing in extracting tables from images. Read this scanned document image and extract ALL tables found in it, with a focus on inventory or invoice data.
 
 For each table:
@@ -60,11 +25,38 @@ FORMAT YOUR RESPONSE AS JSON:
 Only return valid JSON with no additional text, explanations or markdown.
 `;
 
+export interface ColumnDefinition {
+  header: string;
+  accessor: string;
+  format?: (value: any) => string;
+}
+
+export interface TableDetectionResponse {
+  tables: Array<{
+    headers: string[];
+    rows: any[][];
+    columns?: ColumnDefinition[];
+    title?: string; // Make title optional
+  }>;
+}
+
+/**
+ * Extract tables from an image using Google's Gemini API
+ */
+export async function extractTablesFromImageWithGemini(
+  base64Image: string, 
+  mimeType: string,
+  customPrompt?: string // Make the third parameter optional
+): Promise<{ success: boolean; data: TableDetectionResponse; error?: string }> {
+  try {
+    // Use custom prompt if provided, otherwise use the default
+    const prompt = customPrompt || DEFAULT_TABLE_EXTRACTION_PROMPT;
+
     console.info("Extracting tables from image using prompt: \n", prompt);
 
     // Mock response for testing purposes 
     // In a real implementation, this would call an actual API
-    const mockResponse: TableExtractionResponse = {
+    const mockResponse = {
       success: true,
       data: {
         tables: [
@@ -76,7 +68,8 @@ Only return valid JSON with no additional text, explanations or markdown.
               ["Wireless Mouse", "5", "$25", "$125"],
               ["External HDD", "2", "$89", "$178"],
               ["27\" Monitor", "3", "$245", "$735"]
-            ]
+            ],
+            title: "Inventory Items" // Add a title for demonstration
           }
         ]
       }
