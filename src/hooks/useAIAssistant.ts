@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Message } from '@/components/assistant/MessageList';
@@ -15,16 +14,42 @@ Analyze the output and the original intent to provide a clear explanation and pr
 Instructions:
 - Identify patterns, outliers, or anomalies using actual values from the data.
 - Explain what the result reveals in business terms in 1 line.
-- Recommend 1 -2  specific business actions. Be precise, if asked by the user only.
+- Recommend 1-2 specific business actions. Be precise, if asked by the user only.
 - Use professional, clear language.
-- Output plain text only. No markdown or code formatting.`;
+- Output plain text for the main response.
+- If data is tabular, provide formatted data separately in a structured format.
+- If the question requires visualization, suggest the appropriate chart type (bar, line, or pie).`;
+
+// Enhanced prompt for visualization support
+const VISUALIZATION_PROMPT = `
+If the query requires data visualization, format your response like this:
+
+INSIGHT: [Your text analysis here]
+
+TABLE_DATA:
+{
+  "headers": ["Column1", "Column2", ...],
+  "rows": [
+    ["Value1", "Value2", ...],
+    ...
+  ]
+}
+
+CHART_OPTIONS:
+{
+  "type": "bar|line|pie",
+  "xKey": "Date",
+  "yKeys": ["Sales", "Revenue"],
+  "title": "Sales Analysis"
+}
+`;
 
 export const useAIAssistant = () => {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: 'Hello! I am your AI business analyst assistant.  Ask me specific questions about your data, and I\'ll provide insights and business recommendations.',
+      content: 'Hello! I am your AI business analyst assistant. Ask me specific questions about your data, and I\'ll provide insights, business recommendations, and data visualizations when appropriate.',
       sender: 'assistant',
       timestamp: new Date()
     }
@@ -231,6 +256,51 @@ export const useAIAssistant = () => {
     return getDocumentDataById(documentId);
   };
 
+  // Helper function to parse structured data from AI response
+  const parseStructuredData = (responseText: string) => {
+    let content = responseText;
+    let tableData = null;
+    let chartOptions = null;
+    let rawData = null;
+    
+    // Extract TABLE_DATA if available
+    const tableDataMatch = responseText.match(/TABLE_DATA:\s*({[\s\S]*?})/);
+    if (tableDataMatch && tableDataMatch[1]) {
+      try {
+        tableData = JSON.parse(tableDataMatch[1]);
+        content = content.replace(tableDataMatch[0], '');
+      } catch (e) {
+        console.error("Failed to parse TABLE_DATA:", e);
+      }
+    }
+    
+    // Extract CHART_OPTIONS if available
+    const chartMatch = responseText.match(/CHART_OPTIONS:\s*({[\s\S]*?})/);
+    if (chartMatch && chartMatch[1]) {
+      try {
+        chartOptions = JSON.parse(chartMatch[1]);
+        content = content.replace(chartMatch[0], '');
+      } catch (e) {
+        console.error("Failed to parse CHART_OPTIONS:", e);
+      }
+    }
+    
+    // Extract the main insight text
+    const insightMatch = responseText.match(/INSIGHT:\s*([\s\S]*?)(?=TABLE_DATA:|CHART_OPTIONS:|$)/);
+    if (insightMatch && insightMatch[1]) {
+      content = insightMatch[1].trim();
+    }
+    
+    return {
+      content: content.trim(),
+      structuredData: tableData || chartOptions ? {
+        tableData,
+        chartOptions,
+        rawData: tableData || chartOptions
+      } : undefined
+    };
+  };
+
   const handleSendMessage = async () => {
     if (!message.trim()) return;
 
@@ -256,6 +326,7 @@ export const useAIAssistant = () => {
 
     try {
       let responseContent = '';
+      let structuredData = undefined;
       
       // If we have a selected document and data, use Gemini API
       if (selectedDocument && documentData) {
@@ -290,6 +361,8 @@ export const useAIAssistant = () => {
         // Prepare prompt with context and user query
         const analysisPrompt = `${BUSINESS_ANALYST_PROMPT}
         
+${VISUALIZATION_PROMPT}
+        
 Table data:
 ${tableContext}
 
@@ -303,7 +376,12 @@ ${message}`;
         console.log("Gemini API response:", response);
         
         if (response.success && response.data) {
-          responseContent = response.data.insights || response.data.summary || "I've analyzed the data but don't have specific insights to share.";
+          // Parse response to extract structured data
+          const parsedResponse = parseStructuredData(response.data.insights || response.data.summary || "");
+          responseContent = parsedResponse.content || "I've analyzed the data but don't have specific insights to share.";
+          structuredData = parsedResponse.structuredData;
+          
+          console.log("Parsed structured data:", structuredData);
         } else {
           responseContent = `I couldn't analyze this data due to an error: ${response.error || 'Unknown error'}`;
         }
@@ -321,7 +399,8 @@ ${message}`;
         id: (Date.now() + 1).toString(),
         content: responseContent,
         sender: 'assistant',
-        timestamp: new Date()
+        timestamp: new Date(),
+        structuredData
       };
 
       setMessages(prev => [...prev, aiMessage]);
@@ -358,7 +437,7 @@ ${message}`;
     if (doc) {
       const aiMessage: Message = {
         id: Date.now().toString(),
-        content: `I've loaded "${doc.name}". What would you like to know about this ${doc.type}? I can provide business insights and recommendations based on this data.`,
+        content: `I've loaded "${doc.name}". What would you like to know about this ${doc.type}? I can provide business insights, recommendations, and visualizations based on this data.`,
         sender: 'assistant',
         timestamp: new Date()
       };

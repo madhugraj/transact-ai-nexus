@@ -1,14 +1,29 @@
 
-import React, { useRef, useEffect } from 'react';
-import { cn } from '@/lib/utils';
+import React, { useEffect, useRef } from 'react';
 import { Avatar } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Bot, User } from 'lucide-react';
+import StructuredDataDisplay from './StructuredDataDisplay';
 
 export interface Message {
   id: string;
   content: string;
   sender: 'user' | 'assistant';
   timestamp: Date;
+  structuredData?: {
+    tableData?: {
+      headers: string[];
+      rows: any[][];
+    };
+    chartOptions?: {
+      type: 'bar' | 'line' | 'pie';
+      xKey?: string;
+      yKeys?: string[];
+      data?: any[];
+    };
+    rawData?: any;
+  };
 }
 
 interface MessageListProps {
@@ -17,62 +32,82 @@ interface MessageListProps {
 }
 
 const MessageList: React.FC<MessageListProps> = ({ messages, isProcessing }) => {
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Scroll to bottom when new messages are added
+  // Auto-scroll to the most recent message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Function to render message content with support for basic Markdown
+  const renderMessageContent = (content: string) => {
+    return content.split('\n').map((line, i) => (
+      <span key={i}>
+        {line}
+        {i < content.split('\n').length - 1 && <br />}
+      </span>
+    ));
+  };
+
   return (
-    <ScrollArea className="h-[450px] p-4">
-      <div className="space-y-4">
-        {messages.map((msg) => (
+    <ScrollArea className="h-[calc(100%-1px)]" ref={scrollAreaRef}>
+      <div className="p-4 space-y-4">
+        {messages.map((message) => (
           <div
-            key={msg.id}
-            className={cn(
-              "flex items-start gap-3 text-sm",
-              msg.sender === 'user' ? "justify-end" : "justify-start"
-            )}
+            key={message.id}
+            className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
           >
-            {msg.sender === 'assistant' && (
-              <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
-                <span className="text-xs">AI</span>
-              </Avatar>
-            )}
             <div
-              className={cn(
-                "rounded-lg px-4 py-2 max-w-[80%]",
-                msg.sender === 'user'
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted"
-              )}
+              className={`max-w-[85%] p-3 rounded-lg ${
+                message.sender === 'user'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted'
+              }`}
             >
-              <p className="whitespace-pre-wrap">{msg.content}</p>
+              <div className="flex items-start gap-3">
+                {message.sender === 'assistant' && (
+                  <Avatar className="w-8 h-8 border">
+                    <Bot className="h-4 w-4" />
+                  </Avatar>
+                )}
+                <div>
+                  <div className="text-sm">{renderMessageContent(message.content)}</div>
+                  
+                  {/* Render structured data if available */}
+                  {message.structuredData && (
+                    <StructuredDataDisplay data={message.structuredData} />
+                  )}
+                </div>
+                {message.sender === 'user' && (
+                  <Avatar className="w-8 h-8 border">
+                    <User className="h-4 w-4" />
+                  </Avatar>
+                )}
+              </div>
+              <div className="text-xs text-right mt-1 opacity-70">
+                {new Date(message.timestamp).toLocaleTimeString()}
+              </div>
             </div>
-            {msg.sender === 'user' && (
-              <Avatar className="h-8 w-8 bg-muted">
-                <span className="text-xs">You</span>
-              </Avatar>
-            )}
           </div>
         ))}
-        <div ref={messagesEndRef} />
-
         {isProcessing && (
-          <div className="flex items-center justify-start gap-3 text-sm">
-            <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
-              <span className="text-xs">AI</span>
-            </Avatar>
-            <div className="bg-muted rounded-lg px-4 py-2 max-w-[80%]">
-              <div className="flex space-x-1 items-center h-6">
-                <div className="w-2 h-2 rounded-full bg-slate-400 animate-bounce [animation-delay:-0.3s]"></div>
-                <div className="w-2 h-2 rounded-full bg-slate-400 animate-bounce [animation-delay:-0.15s]"></div>
-                <div className="w-2 h-2 rounded-full bg-slate-400 animate-bounce"></div>
+          <div className="flex justify-start">
+            <div className="max-w-[85%] p-3 rounded-lg bg-muted">
+              <div className="flex items-start gap-3">
+                <Avatar className="w-8 h-8 border">
+                  <Bot className="h-4 w-4" />
+                </Avatar>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-[250px]" />
+                  <Skeleton className="h-4 w-[200px]" />
+                  <Skeleton className="h-4 w-[170px]" />
+                </div>
               </div>
             </div>
           </div>
         )}
+        <div ref={messagesEndRef} />
       </div>
     </ScrollArea>
   );
