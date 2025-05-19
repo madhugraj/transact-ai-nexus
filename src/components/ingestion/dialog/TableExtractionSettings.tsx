@@ -67,6 +67,38 @@ Instructions:
 \`\`\``
   },
   {
+    id: 'bank',
+    name: 'Bank Transactions',
+    value: `Extract structured transactions from the bank statement.
+
+Instructions:
+- There may be several tables with in the document.
+- Combine them into single table
+ 
+**STRICT RULES:**
+- Do **NOT** modify transaction descriptions.
+- Return **pure JSON output** ONLY. No explanations, no additional text.
+ 
+**Statement Text:**
+{text}
+ 
+**Output Format (ONLY JSON)**
+\`\`\`json
+{
+  "tables": [
+    {
+      "title": "Bank Transactions",
+      "headers": ["Date", "Description", "Deposits_Credits", "Withdrawals_Debits"],
+      "rows": [
+        ["MM/DD/YYYY", "transaction details", "number", "number"],
+        ["MM/DD/YYYY", "another transaction", "number", "number"]
+      ]
+    }
+  ]
+}
+\`\`\``
+  },
+  {
     id: 'custom',
     name: 'Custom Prompt',
     value: ''
