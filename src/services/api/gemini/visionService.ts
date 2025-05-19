@@ -1,41 +1,28 @@
 
-/**
- * Gemini Vision API service for image and document processing
- */
-import { ApiResponse } from '../types';
+import { fileToBase64 } from './fileUtils';
 
 /**
- * Process an image with Gemini Vision API
+ * Process an image using Google's Gemini Vision API
  */
-export const processImageWithGemini = async (
-  prompt: string, 
+export async function processImageWithGemini(
+  prompt: string,
   base64Image: string,
-  mimeType: string
-): Promise<ApiResponse<string>> => {
-  console.log(`Processing image with Gemini API, prompt length: ${prompt.length}, image length: ${base64Image.length}`);
-  
+  mimeType: string = 'image/jpeg'
+): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
-    // Use the Gemini API key from Supabase secrets (environment variables)
-    const geminiApiKey = process.env.GEMINI_API_KEY || 
-                         localStorage.getItem('Gemini_key') || 
-                         'AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk'; // Fallback to hardcoded key only as last resort
+    console.info("Processing image with Gemini API, prompt length:", prompt.length, ", image length:", base64Image.length);
     
-    if (!geminiApiKey) {
-      console.error("Gemini API key not found");
-      return {
-        success: false,
-        error: "Gemini API key not configured"
-      };
-    }
+    // Use Gemini API key from environment or from localStorage if running in browser
+    const apiKey = typeof window !== 'undefined' 
+      ? localStorage.getItem('GEMINI_API_KEY') || 'AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk'
+      : 'AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk';
     
-    // Using Gemini 1.5 Flash model instead of the deprecated Gemini Pro Vision
+    // Call Google's Gemini API
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [
             {
@@ -44,50 +31,41 @@ export const processImageWithGemini = async (
                 {
                   inline_data: {
                     mime_type: mimeType,
-                    data: base64Image
+                    data: base64Image.replace(/^data:image\/\w+;base64,/, '')
                   }
                 }
               ]
             }
           ],
           generationConfig: {
-            temperature: 0.1,
+            temperature: 0.4,
             maxOutputTokens: 4096
           }
         })
       }
     );
-
+    
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Gemini API error:", errorText);
-      return {
-        success: false,
-        error: `Gemini API error: ${response.status} ${errorText}`
-      };
+      throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
     }
-
+    
     const data = await response.json();
-    const extractedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
     
-    console.log("Gemini Vision API response:", extractedText ? extractedText.substring(0, 100) + "..." : "No text extracted");
-    
-    if (!extractedText) {
-      return {
-        success: false,
-        error: "No text extracted from the image"
-      };
-    }
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     
     return {
       success: true,
-      data: extractedText
+      data: text
     };
+    
   } catch (error) {
     console.error("Error processing image with Gemini:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      error: error instanceof Error ? error.message : String(error)
     };
   }
-};
+}
+
+export { fileToBase64 };

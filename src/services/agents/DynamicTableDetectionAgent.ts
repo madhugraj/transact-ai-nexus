@@ -128,8 +128,8 @@ export class DynamicTableDetectionAgent implements Agent {
             // Use the specialized table extraction function with custom prompt if available
             const tableResponse = await api.extractTablesFromImageWithGemini(
               base64Image, 
-              file.type, 
-              customPrompt // This is now an optional parameter
+              file.type,
+              customPrompt // Pass the customPrompt (it's now optional)
             );
             
             if (tableResponse.success && tableResponse.data) {

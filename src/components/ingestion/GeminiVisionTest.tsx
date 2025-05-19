@@ -138,7 +138,7 @@ Instructions:
       const tableResponse = await api.extractTablesFromImageWithGemini(
         base64Image,
         selectedFile.type,
-        prompt
+        prompt // Pass the prompt as the optional third argument
       );
 
       clearInterval(progressInterval);
