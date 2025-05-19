@@ -74,18 +74,18 @@ const LoginForm = () => {
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-900/10 to-purple-900/10 animate-flow"></div>
         
         <div className="relative z-10 max-w-2xl">
-          {/* Logo section */}
+          {/* Logo section - smaller size */}
           <div className="flex items-center mb-16">
             <img 
               src="/lovable-uploads/27845ced-a36a-431c-8cd1-5016f13aab53.png" 
               alt="Z-Transact logo" 
-              className="h-24 w-auto"
+              className="h-16 w-auto" 
             />
           </div>
           
-          {/* Minimalistic hero content */}
+          {/* Updated title - removed "AI Assistant" */}
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-3 text-gradient">
-            Z-Transact AI Assistant
+            Z-Transact
           </h1>
           
           <h2 className="text-xl md:text-2xl mb-8 text-blue-200 font-light">
@@ -108,7 +108,7 @@ const LoginForm = () => {
           <CardHeader className="space-y-2 pb-4">
             <div className="flex justify-center items-center mb-4">
               <div className="md:hidden mb-4">
-                <img src="/lovable-uploads/27845ced-a36a-431c-8cd1-5016f13aab53.png" alt="Z-Transact logo" className="h-12" />
+                <img src="/lovable-uploads/27845ced-a36a-431c-8cd1-5016f13aab53.png" alt="Z-Transact logo" className="h-10" />
               </div>
               <div className="h-20 w-20 rounded-full bg-gradient-to-br from-[#6366F1] to-[#A855F7] flex items-center justify-center shadow-glow">
                 <span className="text-white text-3xl font-bold">Z</span>
