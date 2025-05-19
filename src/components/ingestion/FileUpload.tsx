@@ -1,6 +1,5 @@
 
 import { useState } from "react";
-import UploadTabs from "./UploadTabs";
 import { FileList } from "./FileList";
 import FileUploadActions from "./FileUploadActions";
 import { useFileProcessing } from "@/hooks/useFileProcessing";
@@ -9,11 +8,15 @@ import PostProcessingWorkflow from "./PostProcessingWorkflow";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import UploadTabs from "./UploadTabs";
 
-const FileUpload = () => {
+interface FileUploadProps {
+  onUploadComplete?: () => void;
+}
+
+const FileUpload = ({ onUploadComplete }: FileUploadProps) => {
   const [showProcessingDialog, setShowProcessingDialog] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(false);
-  const [activeTab, setActiveTab] = useState<string>("upload");
   const [autoSync, setAutoSync] = useState(false);
 
   const {
@@ -33,7 +36,9 @@ const FileUpload = () => {
     processingOptions,
     setProcessingOptions,
     currentAction,
-    setCurrentAction
+    setCurrentAction,
+    processingId,
+    isPolling
   } = useFileProcessing();
 
   // Handle when files are added
@@ -80,10 +85,9 @@ const FileUpload = () => {
       </div>
       
       <UploadTabs
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
         onFilesSelected={handleFilesSelected}
         onCloudFilesSelected={handleCloudFilesSelected}
+        onUploadComplete={onUploadComplete}
         autoSync={autoSync}
         setAutoSync={setAutoSync}
       />
@@ -97,11 +101,14 @@ const FileUpload = () => {
       
       <FileUploadActions
         files={files}
-        isLoading={false}
+        uploadAllFiles={uploadAllFiles}
         handleProcessFiles={() => setShowProcessingDialog(true)}
         selectFilesForProcessing={selectFilesForProcessing}
         selectByType={selectByType}
         setShowProcessingDialog={setShowProcessingDialog}
+        isLoading={false}
+        processingId={processingId}
+        isPolling={isPolling}
       />
       
       {showProcessingDialog && (

@@ -1,14 +1,21 @@
 
 import { Button } from "@/components/ui/button";
-import { Upload, FileCheck, RefreshCw } from "lucide-react";
+import { Upload, FileCheck, RefreshCw, FileType, Database } from "lucide-react";
 import { UploadedFile } from "@/types/fileUpload";
+import { Dispatch, SetStateAction } from "react";
+import { PostProcessAction } from "@/types/processing";
 
-interface FileUploadActionsProps {
+export interface FileUploadActionsProps {
   files: UploadedFile[];
-  uploadAllFiles: () => void;
-  onProcessSelected: () => void;
+  uploadAllFiles?: () => void;
+  onProcessSelected?: () => void;
   processingId?: string | null;
   isPolling?: boolean;
+  isLoading?: boolean;
+  handleProcessFiles?: () => void;
+  selectFilesForProcessing?: (fileIds: string[]) => any;
+  selectByType?: (type: "data" | "document") => any;
+  setShowProcessingDialog?: Dispatch<SetStateAction<boolean>>;
 }
 
 export default function FileUploadActions({
@@ -17,13 +24,37 @@ export default function FileUploadActions({
   onProcessSelected,
   processingId,
   isPolling,
+  isLoading,
+  handleProcessFiles,
+  selectFilesForProcessing,
+  selectByType,
+  setShowProcessingDialog
 }: FileUploadActionsProps) {
   const hasIdleFiles = files.some(f => f.status === 'idle');
   const hasUploadedFiles = files.some(f => f.status === 'success');
 
+  // Handle the process button click
+  const onProcess = () => {
+    if (handleProcessFiles) {
+      handleProcessFiles();
+    } else if (onProcessSelected) {
+      onProcessSelected();
+    }
+  };
+
+  // Handle the select by type functionality
+  const handleSelectByType = (type: "data" | "document") => {
+    if (selectByType) {
+      selectByType(type);
+      if (setShowProcessingDialog) {
+        setShowProcessingDialog(true);
+      }
+    }
+  };
+
   return (
     <div className="flex flex-wrap gap-2">
-      {hasIdleFiles && (
+      {hasIdleFiles && uploadAllFiles && (
         <Button 
           variant="outline" 
           size="sm" 
@@ -36,25 +67,51 @@ export default function FileUploadActions({
       )}
       
       {hasUploadedFiles && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onProcessSelected}
-          disabled={isPolling}
-          className="bg-green-50 hover:bg-green-100 text-green-600 border-green-200"
-        >
-          {isPolling ? (
+        <>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onProcess}
+            disabled={isPolling || isLoading}
+            className="bg-green-50 hover:bg-green-100 text-green-600 border-green-200"
+          >
+            {isPolling ? (
+              <>
+                <RefreshCw className="mr-1 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <FileCheck className="mr-1 h-4 w-4" />
+                Process Files
+              </>
+            )}
+          </Button>
+
+          {selectByType && (
             <>
-              <RefreshCw className="mr-1 h-4 w-4 animate-spin" />
-              Processing...
-            </>
-          ) : (
-            <>
-              <FileCheck className="mr-1 h-4 w-4" />
-              Process Files
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSelectByType("document")}
+                className="bg-purple-50 hover:bg-purple-100 text-purple-600 border-purple-200"
+              >
+                <FileType className="mr-1 h-4 w-4" />
+                Process Documents
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSelectByType("data")}
+                className="bg-amber-50 hover:bg-amber-100 text-amber-600 border-amber-200"
+              >
+                <Database className="mr-1 h-4 w-4" />
+                Process Data Files
+              </Button>
             </>
           )}
-        </Button>
+        </>
       )}
     </div>
   );

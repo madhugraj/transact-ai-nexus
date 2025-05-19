@@ -6,11 +6,22 @@ import EmailConnector from "./EmailConnector";
 import CloudStorageConnector from "./CloudStorageConnector";
 import SapDataImport from "./SapDataImport";
 
-interface UploadTabsProps {
+// Updated interface to include all required props
+export interface UploadTabsProps {
   onUploadComplete?: () => void;
+  onFilesSelected?: (files: File[]) => void;
+  onCloudFilesSelected?: (files: File[]) => void;
+  autoSync?: boolean;
+  setAutoSync?: (value: boolean) => void;
 }
 
-export default function UploadTabs({ onUploadComplete }: UploadTabsProps) {
+export default function UploadTabs({ 
+  onUploadComplete,
+  onFilesSelected,
+  onCloudFilesSelected,
+  autoSync,
+  setAutoSync
+}: UploadTabsProps) {
   const [activeTab, setActiveTab] = useState("upload");
 
   return (
@@ -31,7 +42,9 @@ export default function UploadTabs({ onUploadComplete }: UploadTabsProps) {
       </TabsContent>
       
       <TabsContent value="cloud">
-        <CloudStorageConnector />
+        <CloudStorageConnector 
+          onFilesSelected={onCloudFilesSelected || (() => {})}
+        />
       </TabsContent>
       
       <TabsContent value="sap">
