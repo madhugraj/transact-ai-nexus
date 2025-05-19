@@ -47,41 +47,79 @@ export async function extractTablesFromImageWithGemini(
   base64Image: string, 
   mimeType: string,
   customPrompt?: string // Make the third parameter optional
-): Promise<{ success: boolean; data: TableDetectionResponse; error?: string }> {
+): Promise<{ success: boolean; data?: TableDetectionResponse; error?: string }> {
   try {
     // Use custom prompt if provided, otherwise use the default
     const prompt = customPrompt || DEFAULT_TABLE_EXTRACTION_PROMPT;
 
     console.info("Extracting tables from image using prompt: \n", prompt);
-
-    // Mock response for testing purposes 
-    // In a real implementation, this would call an actual API
-    const mockResponse = {
-      success: true,
-      data: {
-        tables: [
-          {
-            headers: ["Item", "Quantity", "Unit Price", "Total"],
-            rows: [
-              ["Dell Laptop", "2", "$1200", "$2400"],
-              ["HP Printer", "1", "$350", "$350"],
-              ["Wireless Mouse", "5", "$25", "$125"],
-              ["External HDD", "2", "$89", "$178"],
-              ["27\" Monitor", "3", "$245", "$735"]
-            ],
-            title: "Inventory Items" // Add a title for demonstration
-          }
-        ]
-      }
-    };
-
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
     
-    return mockResponse;
+    // Use Gemini API key from environment or from localStorage if running in browser
+    const apiKey = typeof window !== 'undefined' 
+      ? localStorage.getItem('GEMINI_API_KEY') || 'AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk'
+      : 'AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk';
 
+    // Call the Gemini API
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: prompt },
+                {
+                  inline_data: {
+                    mime_type: mimeType,
+                    data: base64Image.replace(/^data:image\/\w+;base64,/, '')
+                  }
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 4096
+          }
+        })
+      }
+    );
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+    }
+    
+    const data = await response.json();
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    // Extract JSON from response text
+    const jsonMatch = responseText.match(/\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}/);
+    if (!jsonMatch) {
+      throw new Error("No valid JSON found in the response");
+    }
+    
+    console.log("Raw Gemini response:", responseText);
+    
+    // Parse the JSON content
+    const parsedData = JSON.parse(jsonMatch[0]);
+    
+    // Validate the response format
+    if (!parsedData.tables || !Array.isArray(parsedData.tables)) {
+      throw new Error("Invalid response format: 'tables' array not found");
+    }
+    
+    return {
+      success: true,
+      data: parsedData as TableDetectionResponse
+    };
   } catch (error) {
     console.error("Error processing image with Gemini:", error);
-    throw new Error("Failed to extract table from image");
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error)
+    };
   }
 }
