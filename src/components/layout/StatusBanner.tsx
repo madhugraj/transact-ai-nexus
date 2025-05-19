@@ -55,9 +55,12 @@ const StatusBanner = () => {
       <div className="flex items-center">
         <div className="flex items-center gap-2 mr-4">
           <div className="h-8 w-8 rounded-full purple-gradient flex items-center justify-center">
-            <span className="text-white text-sm font-bold">Z</span>
+            <span className="text-white text-sm font-bold">Y</span>
           </div>
-          <span className="font-semibold text-primary text-lg">Z-Transact</span>
+          <div className="flex flex-col">
+            <span className="font-semibold text-primary text-lg">yavar</span>
+            <span className="text-xs text-muted-foreground -mt-1">Z-Transact</span>
+          </div>
         </div>
         
         <DropdownMenu>
