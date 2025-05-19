@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,7 +18,35 @@ const TableExtraction: React.FC = () => {
   const promptTemplates = {
     tableExtraction: defaultPrompt,
     simpleOcr: "Extract all text from this image and maintain the formatting.",
-    formExtraction: "Extract form fields and their values from this document in a structured format."
+    formExtraction: "Extract form fields and their values from this document in a structured format.",
+    bankTransactions: `Extract structured transactions from the bank statement.
+
+Instructions:
+- There may be several tables with in the document.
+- Combine them into single table
+ 
+**STRICT RULES:**
+- Do **NOT** modify transaction descriptions.
+- Return **pure JSON output** ONLY. No explanations, no additional text.
+ 
+**Statement Text:**
+{text}
+ 
+**Output Format (ONLY JSON)**
+\`\`\`json
+{
+  "tables": [
+    {
+      "title": "Bank Transactions",
+      "headers": ["Date", "Description", "Deposits_Credits", "Withdrawals_Debits"],
+      "rows": [
+        ["MM/DD/YYYY", "transaction details", "number", "number"],
+        ["MM/DD/YYYY", "another transaction", "number", "number"]
+      ]
+    }
+  ]
+}
+\`\`\``
   };
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -58,6 +85,9 @@ const TableExtraction: React.FC = () => {
         break;
       case 'formExtraction':
         setPrompt(promptTemplates.formExtraction);
+        break;
+      case 'bankTransactions':
+        setPrompt(promptTemplates.bankTransactions);
         break;
       case 'custom':
         // Keep current prompt for custom
@@ -274,6 +304,7 @@ const TableExtraction: React.FC = () => {
                     <SelectItem value="tableExtraction">Table Extraction</SelectItem>
                     <SelectItem value="simpleOcr">Simple OCR</SelectItem>
                     <SelectItem value="formExtraction">Form Extraction</SelectItem>
+                    <SelectItem value="bankTransactions">Bank Transactions</SelectItem>
                     <SelectItem value="custom">Custom Prompt</SelectItem>
                   </SelectContent>
                 </Select>
