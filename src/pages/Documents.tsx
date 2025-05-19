@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card } from "@/components/ui/card";
@@ -9,31 +8,24 @@ import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DocumentComparison from "@/components/document-comparison/DocumentComparison";
 import AIAssistant from "@/components/assistant/AIAssistant";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 const Documents = () => {
-  const { toast } = useToast();
+  const {
+    toast
+  } = useToast();
   const [activeTab, setActiveTab] = useState<string>("tableExtraction");
   const [showAssistant, setShowAssistant] = useState(false);
-  
   const handleDownload = () => {
     // Placeholder for download functionality
     toast({
       title: "Download initiated",
-      description: "Your document is being prepared for download",
+      description: "Your document is being prepared for download"
     });
-    
+
     // In a real implementation, this would trigger an actual download
     // For demonstration purposes, we're just showing a toast
   };
-  
-  return (
-    <AppLayout>
+  return <AppLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -44,22 +36,12 @@ const Documents = () => {
           </div>
           
           <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              className="flex items-center gap-2"
-              onClick={handleDownload}
-            >
+            <Button variant="outline" className="flex items-center gap-2" onClick={handleDownload}>
               <Download className="h-4 w-4" />
               Download Results
             </Button>
             
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowAssistant(true)}
-              className="h-9 w-9 rounded-full bg-primary/10 hover:bg-primary/20 text-primary"
-              title="Document AI Assistant"
-            >
+            <Button variant="ghost" size="icon" onClick={() => setShowAssistant(true)} className="h-9 w-9 rounded-full bg-primary/10 hover:bg-primary/20 text-primary" title="Document AI Assistant">
               <Bot className="h-5 w-5" />
             </Button>
           </div>
@@ -88,15 +70,13 @@ const Documents = () => {
       <Dialog open={showAssistant} onOpenChange={setShowAssistant}>
         <DialogContent className="sm:max-w-[600px] p-0">
           <DialogHeader className="px-4 py-2 border-b">
-            <DialogTitle>Z-Transact AI Assistant</DialogTitle>
+            <DialogTitle className="text-violet-700">Ziva</DialogTitle>
           </DialogHeader>
           <div className="p-0">
             <AIAssistant />
           </div>
         </DialogContent>
       </Dialog>
-    </AppLayout>
-  );
+    </AppLayout>;
 };
-
 export default Documents;
