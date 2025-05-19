@@ -1,5 +1,5 @@
 
-import FileUpload from "@/components/ingestion/FileUpload";
+import UploadTabs from "@/components/ingestion/UploadTabs";
 import AppLayout from "@/components/layout/AppLayout";
 
 const Upload = () => {
@@ -15,8 +15,8 @@ const Upload = () => {
           </div>
         </div>
         
-        {/* Component handles uploading and processing */}
-        <FileUpload />
+        {/* Using UploadTabs to show all available connectors */}
+        <UploadTabs />
       </div>
     </AppLayout>
   );
