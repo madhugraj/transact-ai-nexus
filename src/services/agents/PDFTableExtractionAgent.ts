@@ -1,6 +1,12 @@
-
 import { Agent, ProcessingContext } from "./types";
 import * as api from '@/services/api';
+import * as pdfjs from 'pdfjs-dist';
+
+// Set up PDF.js worker
+const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.mjs');
+if (typeof window !== 'undefined' && 'pdfjsWorker' in window === false) {
+  pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+}
 
 export class PDFTableExtractionAgent implements Agent {
   id: string = "PDFTableExtraction";
@@ -41,67 +47,12 @@ export class PDFTableExtractionAgent implements Agent {
       try {
         console.log(`Processing PDF: ${pdfFile.name}`);
         
-        // Use the extracted text content if available
-        const extractedText = data.extractedTextContent || "";
-        
-        if (extractedText) {
-          console.log("Using extracted text to identify tables in PDF");
-          
-          // Use Gemini to identify and extract tables from the text
-          const tablePrompt = "Identify any tables in this text and format them with proper column headers and rows. Maintain the original structure.";
-          
-          // Convert PDF to base64 for Gemini processing if needed
-          const base64Data = await api.fileToBase64(pdfFile);
-          const response = await api.processImageWithGemini(tablePrompt, base64Data, pdfFile.type);
-          
-          if (response.success && response.data) {
-            console.log("Successfully extracted table content from PDF using Gemini");
-            
-            // Parse the table data from the text response
-            const tableData = await this.parseTableFromText(response.data);
-            
-            if (tableData) {
-              extractedTables.push({
-                tableId: `pdf-table-${extractedTables.length + 1}`,
-                source: pdfFile.name,
-                title: `Table from ${pdfFile.name}`,
-                headers: tableData.headers,
-                rows: tableData.rows,
-                confidence: 0.9
-              });
-            }
-          } else {
-            console.error("Failed to extract table from PDF:", response.error);
-          }
-        } else {
-          console.log("No extracted text available, sending PDF directly to Gemini");
-          
-          // Direct PDF processing with Gemini Vision
-          const tablePrompt = "Extract all tables from this document. Format each table with proper column headers and rows.";
-          
-          const base64Data = await api.fileToBase64(pdfFile);
-          const response = await api.processImageWithGemini(tablePrompt, base64Data, pdfFile.type);
-          
-          if (response.success && response.data) {
-            console.log("Successfully extracted table content from PDF using direct Gemini Vision");
-            
-            // Parse the table data from the text response
-            const tableData = await this.parseTableFromText(response.data);
-            
-            if (tableData) {
-              extractedTables.push({
-                tableId: `pdf-table-${extractedTables.length + 1}`,
-                source: pdfFile.name,
-                title: `Table from ${pdfFile.name}`,
-                headers: tableData.headers,
-                rows: tableData.rows,
-                confidence: 0.85
-              });
-            }
-          } else {
-            console.error("Failed to extract table from PDF using direct method:", response.error);
-          }
+        // Process the PDF page by page
+        const pdfTables = await this.extractTablesFromPDFByPage(pdfFile);
+        if (pdfTables && pdfTables.length > 0) {
+          extractedTables.push(...pdfTables);
         }
+        
       } catch (error) {
         console.error(`Error processing PDF file ${pdfFile.name}:`, error);
       }
@@ -115,6 +66,209 @@ export class PDFTableExtractionAgent implements Agent {
       pdfTablesExtracted: extractedTables.length > 0,
       extractedTables: [...(data.extractedTables || []), ...extractedTables],
       processedBy: 'PDFTableExtractionAgent'
+    };
+  }
+  
+  /**
+   * Process a PDF file page by page
+   */
+  private async extractTablesFromPDFByPage(pdfFile: File): Promise<any[]> {
+    const extractedTables: any[] = [];
+    const arrayBuffer = await pdfFile.arrayBuffer();
+    
+    try {
+      // Load the PDF document
+      const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+      const totalPages = pdf.numPages;
+      
+      console.log(`PDF has ${totalPages} pages. Processing each page individually.`);
+      
+      // Process each page
+      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+        console.log(`Processing page ${pageNum} of ${totalPages}`);
+        
+        try {
+          const page = await pdf.getPage(pageNum);
+          
+          // Render the page to a canvas
+          const viewport = page.getViewport({ scale: 1.5 }); // Higher scale for better quality
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          
+          if (!context) {
+            throw new Error('Could not create canvas context');
+          }
+          
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          
+          await page.render({
+            canvasContext: context,
+            viewport: viewport
+          }).promise;
+          
+          // Convert canvas to base64 image
+          const base64Image = canvas.toDataURL('image/png').split(',')[1];
+          
+          // Extract tables from this page
+          const pageTableData = await this.extractTablesFromPageImage(
+            base64Image, 
+            pdfFile.name, 
+            pageNum, 
+            totalPages
+          );
+          
+          if (pageTableData && pageTableData.length > 0) {
+            extractedTables.push(...pageTableData);
+          }
+        } catch (pageError) {
+          console.error(`Error processing page ${pageNum}:`, pageError);
+          // Continue with next page even if this one fails
+        }
+      }
+      
+      // Consolidate tables from all pages if needed
+      return this.consolidateTables(extractedTables, pdfFile.name);
+      
+    } catch (error) {
+      console.error('Error processing PDF:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * Extract tables from a single PDF page image
+   */
+  private async extractTablesFromPageImage(
+    base64Image: string, 
+    fileName: string, 
+    pageNum: number, 
+    totalPages: number
+  ): Promise<any[]> {
+    // Customize the prompt to indicate we're processing a single page
+    const tablePrompt = `
+Extract all tables from this document image (page ${pageNum} of ${totalPages}).
+Format each table with proper column headers and rows.
+Return tables in JSON format only.
+`;
+
+    try {
+      const response = await api.processImageWithGemini(tablePrompt, base64Image, 'image/png');
+      
+      if (response.success && response.data) {
+        console.log(`Successfully extracted content from page ${pageNum}`);
+        
+        // Parse the table data from the text response
+        const tableData = await this.parseTableFromText(response.data);
+        
+        if (tableData) {
+          return [{
+            tableId: `pdf-table-p${pageNum}-${Date.now()}`,
+            source: fileName,
+            title: `Table from ${fileName} (Page ${pageNum})`,
+            headers: tableData.headers,
+            rows: tableData.rows,
+            confidence: 0.9,
+            pageNumber: pageNum
+          }];
+        }
+      }
+      
+      return [];
+    } catch (error) {
+      console.error(`Error extracting tables from page ${pageNum}:`, error);
+      return [];
+    }
+  }
+  
+  /**
+   * Consolidate tables extracted from multiple pages
+   */
+  private consolidateTables(tables: any[], fileName: string): any[] {
+    if (!tables || tables.length <= 1) {
+      return tables;
+    }
+    
+    console.log(`Consolidating ${tables.length} tables extracted from PDF`);
+    
+    // Group tables by similar headers
+    const tableGroups: Record<string, any[]> = {};
+    
+    tables.forEach(table => {
+      if (!table.headers || !table.rows) return;
+      
+      // Create a signature for the table based on headers
+      const headerSignature = this.createHeaderSignature(table.headers);
+      
+      if (!tableGroups[headerSignature]) {
+        tableGroups[headerSignature] = [];
+      }
+      
+      tableGroups[headerSignature].push(table);
+    });
+    
+    // Merge tables with similar headers
+    const consolidatedTables: any[] = [];
+    
+    Object.keys(tableGroups).forEach(signature => {
+      const tablesInGroup = tableGroups[signature];
+      
+      if (tablesInGroup.length === 1) {
+        // Only one table with this header signature, no need to merge
+        consolidatedTables.push(tablesInGroup[0]);
+      } else {
+        // Multiple tables with same headers, merge them
+        const mergedTable = this.mergeTables(tablesInGroup, fileName);
+        consolidatedTables.push(mergedTable);
+      }
+    });
+    
+    console.log(`Consolidated ${tables.length} tables into ${consolidatedTables.length} tables`);
+    return consolidatedTables;
+  }
+  
+  /**
+   * Create a signature for table headers to identify similar tables
+   */
+  private createHeaderSignature(headers: string[]): string {
+    return headers
+      .map(header => header.trim().toLowerCase())
+      .sort()
+      .join('|');
+  }
+  
+  /**
+   * Merge multiple tables with similar headers
+   */
+  private mergeTables(tables: any[], fileName: string): any {
+    // Use the headers from the first table
+    const headers = tables[0].headers;
+    
+    // Combine all rows from all tables
+    const allRows: string[][] = [];
+    const pageNumbers: number[] = [];
+    
+    tables.forEach(table => {
+      allRows.push(...table.rows);
+      if (table.pageNumber) {
+        pageNumbers.push(table.pageNumber);
+      }
+    });
+    
+    // Sort page numbers for the title
+    pageNumbers.sort((a, b) => a - b);
+    const pageRangeStr = pageNumbers.length > 0 
+      ? `(Pages ${pageNumbers[0]}-${pageNumbers[pageNumbers.length - 1]})`
+      : '';
+    
+    return {
+      tableId: `pdf-merged-table-${Date.now()}`,
+      source: fileName,
+      title: `Table from ${fileName} ${pageRangeStr}`,
+      headers: headers,
+      rows: allRows,
+      confidence: 0.85,
+      mergedFromPages: pageNumbers
     };
   }
   
