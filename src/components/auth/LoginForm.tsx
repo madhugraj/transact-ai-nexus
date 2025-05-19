@@ -64,79 +64,38 @@ const LoginForm = () => {
 
   return (
     <div className="flex min-h-screen bg-[#101322] overflow-hidden">
-      {/* Left Panel (60%) - Hero Section with animations */}
+      {/* Left Panel (60%) - Hero Section with logo and minimalist content */}
       <div 
         className={`hidden md:flex md:w-[60%] flex-col justify-center items-start p-8 lg:p-16 xl:p-24 text-white relative transition-all duration-1000 ease-out ${isAnimated ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-10'}`}
       >
         <div className="absolute inset-0 bg-gradient-to-br from-[#1A1D2E] to-[#101322] opacity-95"></div>
         
-        {/* Animated gradient overlay with particle effect */}
-        <div className="absolute inset-0 bg-[url('/lovable-uploads/27845ced-a36a-431c-8cd1-5016f13aab53.png')] bg-cover opacity-[0.04]"></div>
+        {/* Simplified backdrop */}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-900/10 to-purple-900/10 animate-flow"></div>
         
-        {/* Particle effect (simulated with dots) */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="particle-container">
-            {[...Array(20)].map((_, i) => (
-              <div 
-                key={i}
-                className="absolute rounded-full bg-white/10"
-                style={{
-                  width: `${Math.random() * 6 + 2}px`,
-                  height: `${Math.random() * 6 + 2}px`,
-                  top: `${Math.random() * 100}%`,
-                  left: `${Math.random() * 100}%`,
-                  opacity: `${Math.random() * 0.5}`,
-                  animation: `float ${Math.random() * 20 + 10}s linear infinite`
-                }}
-              />
-            ))}
-          </div>
-        </div>
-        
         <div className="relative z-10 max-w-2xl">
-          <div className="flex items-center mb-10">
-            <div className="h-16 w-16 rounded-full bg-gradient-to-br from-[#6366F1] to-[#A855F7] flex items-center justify-center shadow-glow mb-4">
-              <span className="text-white text-3xl font-bold">Z</span>
-            </div>
+          {/* Logo section */}
+          <div className="flex items-center mb-16">
+            <img 
+              src="/lovable-uploads/27845ced-a36a-431c-8cd1-5016f13aab53.png" 
+              alt="Z-Transact logo" 
+              className="h-24 w-auto"
+            />
           </div>
           
+          {/* Minimalistic hero content */}
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-3 text-gradient">
             Z-Transact AI Assistant
           </h1>
           
           <h2 className="text-xl md:text-2xl mb-8 text-blue-200 font-light">
-            Built to Think Like an Auditor. Designed to Move Like an Analyst.
+            Built to Think Like an Auditor
           </h2>
           
           <div className="space-y-6 text-gray-300">
             <p className="text-lg">
-              Z-Transact is your intelligent automation partner for finance and audit operations. 
-              It seamlessly handles invoice validation, payment tracking, client queries, and 
-              compliance monitoring — all powered by purpose-built AI agents.
+              Intelligent automation for finance and audit operations.
             </p>
-            
-            <p className="text-lg">
-              Every interaction is designed to reduce manual overhead, accelerate reviews, and surface 
-              actionable insights. Whether you're managing workflows or verifying financials, Z-Transact 
-              works like a junior auditor that never sleeps — fast, accurate, and context-aware.
-            </p>
-            
-            <p className="text-lg">
-              Start transforming your finance operations with intelligent automation, real-time analysis, 
-              and effortless scale — all from one unified platform.
-            </p>
-          </div>
-          
-          {/* Z avatar/mascot with pulsing effect */}
-          <div className="mt-12 flex items-center">
-            <div className="h-14 w-14 rounded-full bg-gradient-to-br from-[#6366F1] to-[#A855F7] flex items-center justify-center shadow-glow animate-pulse-light">
-              <span className="text-white text-2xl font-bold">Z</span>
-            </div>
-            <div className="ml-4">
-              <p className="text-blue-200 text-sm font-medium">Let Z-Transact handle the repetitive,</p>
-              <p className="text-white font-semibold">so you can focus on the strategic.</p>
-            </div>
           </div>
         </div>
       </div>
@@ -149,7 +108,7 @@ const LoginForm = () => {
           <CardHeader className="space-y-2 pb-4">
             <div className="flex justify-center items-center mb-4">
               <div className="md:hidden mb-4">
-                <img src="/lovable-uploads/27845ced-a36a-431c-8cd1-5016f13aab53.png" alt="Z-Transact logo" className="h-10" />
+                <img src="/lovable-uploads/27845ced-a36a-431c-8cd1-5016f13aab53.png" alt="Z-Transact logo" className="h-12" />
               </div>
               <div className="h-20 w-20 rounded-full bg-gradient-to-br from-[#6366F1] to-[#A855F7] flex items-center justify-center shadow-glow">
                 <span className="text-white text-3xl font-bold">Z</span>
@@ -159,7 +118,7 @@ const LoginForm = () => {
               Welcome Back
             </CardTitle>
             <CardDescription className="text-center text-gray-400 text-lg">
-              Access your AI-powered financial assistant
+              Access your AI-powered assistant
             </CardDescription>
           </CardHeader>
           
