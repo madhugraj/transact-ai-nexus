@@ -3,7 +3,7 @@ import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import CloudStorageConnector from "@/components/ingestion/CloudStorageConnector";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileUpload } from "lucide-react";
+import { Upload as UploadIcon } from "lucide-react";
 
 const Upload = () => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -28,7 +28,7 @@ const Upload = () => {
         <Card>
           <CardHeader className="bg-muted/30">
             <CardTitle className="flex items-center gap-2 text-lg">
-              <FileUpload className="h-5 w-5 text-primary" />
+              <UploadIcon className="h-5 w-5 text-primary" />
               Cloud Storage Integration
             </CardTitle>
           </CardHeader>
