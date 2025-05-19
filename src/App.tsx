@@ -11,31 +11,33 @@ import Index from './pages/Index';
 import NotFound from './pages/NotFound';
 import EmailConnector from './pages/EmailConnector';
 import SapData from './pages/SapData';
-
+import { ThemeProvider } from './components/theme/ThemeProvider';
 import { Toaster } from './components/ui/toaster';
 
 function App() {
   console.info("App rendering. Navigate to /documents to access Gemini Vision Test");
   
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/upload" element={<Upload />} />
-        <Route path="/documents" element={<Documents />} />
-        <Route path="/database" element={<Database />} />
-        <Route path="/actions" element={<Actions />} />
-        <Route path="/assistant" element={<Assistant />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/email-connector" element={<EmailConnector />} />
-        <Route path="/sap-data" element={<SapData />} />
-        <Route path="/index" element={<Index />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+    <ThemeProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/upload" element={<Upload />} />
+          <Route path="/documents" element={<Documents />} />
+          <Route path="/database" element={<Database />} />
+          <Route path="/actions" element={<Actions />} />
+          <Route path="/assistant" element={<Assistant />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/email-connector" element={<EmailConnector />} />
+          <Route path="/sap-data" element={<SapData />} />
+          <Route path="/index" element={<Index />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
 
-      <Toaster />
-    </Router>
+        <Toaster />
+      </Router>
+    </ThemeProvider>
   );
 }
 

@@ -54,9 +54,11 @@ const StatusBanner = () => {
     <>
       <div className="flex items-center">
         <div className="flex items-center gap-2 mr-4">
-          <div className="h-8 w-8 rounded-full purple-gradient flex items-center justify-center">
-            <span className="text-white text-sm font-bold">Y</span>
-          </div>
+          <img 
+            src="/lovable-uploads/27845ced-a36a-431c-8cd1-5016f13aab53.png" 
+            alt="yavar logo" 
+            className="h-8" 
+          />
           <div className="flex flex-col">
             <span className="font-semibold text-primary text-lg">yavar</span>
             <span className="text-xs text-muted-foreground -mt-1">Z-Transact</span>

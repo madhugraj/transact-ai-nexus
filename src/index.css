@@ -139,3 +139,53 @@
     @apply backdrop-blur-xl bg-white/5 border border-white/10 shadow-[0_4px_12px_-2px_rgba(0,0,0,0.3)];
   }
 }
+
+/* Compact mode styles */
+.compact {
+  /* Reduce padding and margins throughout the app */
+  --compact-scale: 0.85;
+}
+
+.compact .card {
+  @apply p-3;
+}
+
+.compact .p-6 {
+  @apply p-3;
+}
+
+.compact .p-4 {
+  @apply p-2;
+}
+
+.compact .space-y-6 {
+  @apply space-y-4;
+}
+
+.compact .space-y-4 {
+  @apply space-y-2;
+}
+
+.compact .text-lg {
+  @apply text-base;
+}
+
+.compact .text-base {
+  @apply text-sm;
+}
+
+.compact .h-16 {
+  @apply h-12;
+}
+
+.compact .my-4 {
+  @apply my-2;
+}
+
+.compact .h-10 {
+  @apply h-8;
+}
+
+.compact .py-2 {
+  @apply py-1;
+}

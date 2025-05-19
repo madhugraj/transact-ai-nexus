@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { useTheme } from "@/components/theme/ThemeProvider";
 import {
   User,
   Bell,
@@ -33,11 +34,10 @@ interface SettingsPanelProps {
 
 const SettingsPanel = ({ isAdmin = false, isReadOnly = false }: SettingsPanelProps) => {
   const { user } = useAuth();
+  const { theme, setTheme, compactMode, setCompactMode } = useTheme();
   const [notifyOnNewDocuments, setNotifyOnNewDocuments] = useState(true);
   const [notifyOnErrors, setNotifyOnErrors] = useState(true);
   const [notifyOnComments, setNotifyOnComments] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
-  const [compactMode, setCompactMode] = useState(false);
   const [dataRetentionDays, setDataRetentionDays] = useState("90");
   const [dataEncryption, setDataEncryption] = useState(true);
   const [twoFactorAuth, setTwoFactorAuth] = useState(false);
@@ -58,6 +58,10 @@ const SettingsPanel = ({ isAdmin = false, isReadOnly = false }: SettingsPanelPro
 
   const handleSaveAdvancedSettings = () => {
     toast.success("Advanced settings saved successfully");
+  };
+
+  const handleSaveAppearance = () => {
+    toast.success("Appearance settings saved successfully");
   };
 
   return (
@@ -235,8 +239,8 @@ const SettingsPanel = ({ isAdmin = false, isReadOnly = false }: SettingsPanelPro
                 </div>
                 <Switch
                   id="dark-mode"
-                  checked={darkMode}
-                  onCheckedChange={setDarkMode}
+                  checked={theme === "dark"}
+                  onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
                   disabled={isReadOnly}
                 />
               </div>
@@ -255,7 +259,7 @@ const SettingsPanel = ({ isAdmin = false, isReadOnly = false }: SettingsPanelPro
                 />
               </div>
               <div className="pt-4">
-                <Button disabled={isReadOnly}>
+                <Button onClick={handleSaveAppearance} disabled={isReadOnly}>
                   <Check size={16} className="mr-2" />
                   Save Appearance
                 </Button>
