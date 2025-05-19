@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { InventoryItem } from "@/types/inventoryMapping";
 import { 
@@ -56,12 +57,12 @@ export function SourceTableViewer({ items, maxRows = 5 }: SourceTableViewerProps
         </Badge>
       </div>
       
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               {displayKeys.map(key => (
-                <TableHead key={key} className="text-xs">
+                <TableHead key={key} className="text-xs whitespace-nowrap">
                   {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}
                 </TableHead>
               ))}
@@ -72,7 +73,9 @@ export function SourceTableViewer({ items, maxRows = 5 }: SourceTableViewerProps
               <TableRow key={item.id || index}>
                 {displayKeys.map(key => (
                   <TableCell key={`${item.id}-${key}`} className="text-xs">
-                    {item[key] !== undefined ? String(item[key]) : '-'}
+                    <div className="truncate max-w-[150px]" title={String(item[key] !== undefined ? item[key] : '-')}>
+                      {item[key] !== undefined ? String(item[key]) : '-'}
+                    </div>
                   </TableCell>
                 ))}
               </TableRow>

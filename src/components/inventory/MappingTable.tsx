@@ -33,7 +33,7 @@ export function MappingTable({
 }: MappingTableProps) {
   const [filter, setFilter] = useState<string>("");
   
-  // Generate fake target options for the demo
+  // Generate target options for the demo
   const generateTargetOptions = (itemName: string, system: string) => {
     const options = [];
     const prefix = system === 'SAP' 
@@ -73,7 +73,7 @@ export function MappingTable({
         />
       </div>
       
-      <div className="rounded-md border overflow-hidden">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
@@ -101,7 +101,7 @@ export function MappingTable({
                   }
                 >
                   <TableCell>
-                    <div className="font-medium">{item.name}</div>
+                    <div className="font-medium truncate max-w-[250px]" title={item.name}>{item.name}</div>
                     {item.sku && (
                       <div className="text-xs text-muted-foreground">SKU: {item.sku}</div>
                     )}
@@ -119,7 +119,7 @@ export function MappingTable({
                       }}
                     >
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select system" />
+                        <SelectValue placeholder="System" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="SAP">SAP</SelectItem>
@@ -143,14 +143,14 @@ export function MappingTable({
                         }}
                       >
                         <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select target code" />
+                          <SelectValue placeholder="Select code" />
                         </SelectTrigger>
                         <SelectContent>
-                          {/* Show auto-matched option first if available */}
+                          {/* Auto-matched option first if available */}
                           {result.targetCode && (
                             <SelectItem value={result.targetCode}>
                               <div className="flex items-center">
-                                <span>{result.targetCode}</span>
+                                <span className="truncate max-w-[180px]" title={result.targetCode}>{result.targetCode}</span>
                                 {result.confidenceScore && (
                                   <Badge 
                                     variant="outline" 
@@ -167,7 +167,7 @@ export function MappingTable({
                           {generateTargetOptions(item.name, result.targetSystem).map((option) => (
                             option !== result.targetCode && (
                               <SelectItem key={option} value={option}>
-                                {option}
+                                <span className="truncate max-w-[180px]" title={option}>{option}</span>
                               </SelectItem>
                             )
                           ))}

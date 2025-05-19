@@ -38,15 +38,15 @@ export function MappingProfileSelector({
           <ChevronDown className="h-4 w-4 ml-2" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="end" className="w-[220px] bg-white">
         {profiles.map((profile) => (
           <DropdownMenuItem
             key={profile.id}
             onClick={() => onSelectProfile(profile.id)}
-            className="cursor-pointer"
+            className="cursor-pointer hover:bg-gray-100"
           >
-            <div className="flex flex-col">
-              <span className="font-medium">{profile.name}</span>
+            <div className="flex flex-col w-full">
+              <span className="font-medium truncate" title={profile.name}>{profile.name}</span>
               <div className="flex justify-between items-center w-full text-xs text-muted-foreground mt-1">
                 <span>{profile.targetSystem}</span>
                 <span>
