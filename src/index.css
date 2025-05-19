@@ -15,17 +15,17 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    /* Transaction agent theme - professional blue tones */
-    --primary: 210 100% 35%;
-    --primary-foreground: 210 40% 98%;
+    /* Z-Transact theme - professional purple tones */
+    --primary: 260 73% 75%;
+    --primary-foreground: 260 40% 98%;
 
-    --secondary: 200 35% 95%;
+    --secondary: 260 35% 95%;
     --secondary-foreground: 222.2 47.4% 11.2%;
 
-    --muted: 210 40% 96.1%;
+    --muted: 260 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 196 100% 42%;
+    --accent: 260 100% 42%;
     --accent-foreground: 222.2 47.4% 11.2%;
 
     --destructive: 0 84.2% 60.2%;
@@ -37,14 +37,14 @@
 
     --radius: 0.5rem;
 
-    --sidebar-background: 215 30% 22%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 196 100% 42%;
+    --sidebar-background: 260 30% 22%;
+    --sidebar-foreground: 260 40% 98%;
+    --sidebar-primary: 260 100% 42%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 215 30% 30%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 215 30% 18%;
-    --sidebar-ring: 196 100% 42%;
+    --sidebar-accent: 260 30% 30%;
+    --sidebar-accent-foreground: 260 40% 98%;
+    --sidebar-border: 260 30% 18%;
+    --sidebar-ring: 260 100% 42%;
   }
 
   .dark {
@@ -57,7 +57,7 @@
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
+    --primary: 260 40% 98%;
     --primary-foreground: 222.2 47.4% 11.2%;
 
     --secondary: 217.2 32.6% 17.5%;
@@ -76,14 +76,14 @@
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
     
-    --sidebar-background: 215 30% 15%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 196 100% 42%;
+    --sidebar-background: 260 30% 15%;
+    --sidebar-foreground: 260 40% 98%;
+    --sidebar-primary: 260 100% 42%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 215 30% 25%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 215 30% 20%;
-    --sidebar-ring: 196 100% 42%;
+    --sidebar-accent: 260 30% 25%;
+    --sidebar-accent-foreground: 260 40% 98%;
+    --sidebar-border: 260 30% 20%;
+    --sidebar-ring: 260 100% 42%;
   }
 }
 
@@ -94,6 +94,7 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
   }
 }
 
@@ -129,4 +130,15 @@
   .section-header {
     @apply text-lg font-semibold mb-4;
   }
+  
+  .glass-effect {
+    @apply bg-white/10 backdrop-blur-md border border-white/20 shadow-lg;
+  }
+  
+  .text-gradient {
+    @apply bg-gradient-to-r from-purple-500 to-indigo-500 bg-clip-text text-transparent;
+  }
 }
+
+/* Add Inter font for better typography */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');

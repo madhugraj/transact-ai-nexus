@@ -1,8 +1,14 @@
+
 #root {
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
   text-align: center;
+}
+
+/* Add gradient effects for branding elements */
+.brand-gradient {
+  background: linear-gradient(135deg, #9b87f5 0%, #7E69AB 100%);
 }
 
 .logo {
@@ -11,11 +17,13 @@
   will-change: filter;
   transition: filter 300ms;
 }
+
 .logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
+  filter: drop-shadow(0 0 2em #9b87f5aa);
 }
+
 .logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+  filter: drop-shadow(0 0 2em #9b87f5aa);
 }
 
 @keyframes logo-spin {
@@ -35,8 +43,18 @@
 
 .card {
   padding: 2em;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(155, 135, 245, 0.2);
 }
 
 .read-the-docs {
-  color: #888;
+  color: #7E69AB;
+}
+
+/* Glass effect for cards and elements */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
 }
