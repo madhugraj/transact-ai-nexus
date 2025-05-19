@@ -82,10 +82,10 @@ export const useAIAssistant = () => {
           } else if (extractedJson?.length > 0) {
             console.log(`Fetched ${extractedJson.length} documents from extracted_json:`, extractedJson);
             
-            // Map extracted JSON to Document format
+            // Map extracted JSON to Document format - ensure we use file_name properly
             const jsonDocs: Document[] = extractedJson.map(doc => ({
               id: `json_${doc.id}`,
-              name: doc.file_name || `Document ${doc.id}`,
+              name: doc.file_name ? removeFileExtension(doc.file_name) : `Document ${doc.id}`,
               type: 'document' as const,
               extractedAt: doc.created_at,
               source: 'supabase' as const,
@@ -136,6 +136,13 @@ export const useAIAssistant = () => {
           variant: "destructive",
         });
       }
+    };
+    
+    // Helper function to remove file extension - moved inside to ensure it's available
+    const removeFileExtension = (fileName: string): string => {
+      if (!fileName) return '';
+      const lastDotIndex = fileName.lastIndexOf('.');
+      return lastDotIndex !== -1 ? fileName.substring(0, lastDotIndex) : fileName;
     };
     
     // Fetch immediately on mount

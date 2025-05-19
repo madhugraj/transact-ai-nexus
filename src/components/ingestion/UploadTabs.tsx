@@ -24,7 +24,8 @@ export default function UploadTabs({
 
   // Handle file selection callback from FileUpload component
   const handleFilesSelected = (files: File[]) => {
-    if (onFilesSelected) {
+    if (onFilesSelected && files.length > 0) {
+      console.log("UploadTabs: forwarding selected files to parent", files.length);
       onFilesSelected(files);
     }
   };

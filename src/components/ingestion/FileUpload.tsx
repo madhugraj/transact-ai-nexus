@@ -41,31 +41,37 @@ const FileUpload = ({ onUploadComplete, onFilesSelected }: FileUploadProps) => {
 
   // Handle when files are added
   const handleFilesSelected = (newFiles: File[]) => {
-    addFiles(newFiles);
+    console.log("FileUpload: files selected", newFiles.length);
     
-    if (onFilesSelected) {
-      onFilesSelected(newFiles);
-    }
-
-    if (autoSync) {
-      // Auto upload files if sync is enabled
-      setTimeout(() => {
-        uploadAllFiles();
-      }, 500);
+    if (newFiles && newFiles.length > 0) {
+      addFiles(newFiles);
+      
+      if (onFilesSelected) {
+        onFilesSelected(newFiles);
+      }
+  
+      if (autoSync) {
+        // Auto upload files if sync is enabled
+        setTimeout(() => {
+          uploadAllFiles();
+        }, 500);
+      }
     }
   };
   
   const handleCloudFilesSelected = (newFiles: File[]) => {
-    addFiles(newFiles);
-    
-    if (onFilesSelected) {
-      onFilesSelected(newFiles);
+    if (newFiles && newFiles.length > 0) {
+      addFiles(newFiles);
+      
+      if (onFilesSelected) {
+        onFilesSelected(newFiles);
+      }
+      
+      // Always auto upload files from cloud sources
+      setTimeout(() => {
+        uploadAllFiles();
+      }, 500);
     }
-    
-    // Always auto upload files from cloud sources
-    setTimeout(() => {
-      uploadAllFiles();
-    }, 500);
   };
 
   // Handle processing a single file
