@@ -9,9 +9,10 @@ import UploadTabs from "./UploadTabs";
 
 interface FileUploadProps {
   onUploadComplete?: () => void;
+  onFilesSelected?: (files: File[]) => void;
 }
 
-const FileUpload = ({ onUploadComplete }: FileUploadProps) => {
+const FileUpload = ({ onUploadComplete, onFilesSelected }: FileUploadProps) => {
   const [showProcessingDialog, setShowProcessingDialog] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(false);
   const [autoSync, setAutoSync] = useState(false);
@@ -41,6 +42,10 @@ const FileUpload = ({ onUploadComplete }: FileUploadProps) => {
   // Handle when files are added
   const handleFilesSelected = (newFiles: File[]) => {
     addFiles(newFiles);
+    
+    if (onFilesSelected) {
+      onFilesSelected(newFiles);
+    }
 
     if (autoSync) {
       // Auto upload files if sync is enabled
@@ -52,6 +57,10 @@ const FileUpload = ({ onUploadComplete }: FileUploadProps) => {
   
   const handleCloudFilesSelected = (newFiles: File[]) => {
     addFiles(newFiles);
+    
+    if (onFilesSelected) {
+      onFilesSelected(newFiles);
+    }
     
     // Always auto upload files from cloud sources
     setTimeout(() => {

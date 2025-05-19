@@ -22,6 +22,13 @@ export default function UploadTabs({
 }: UploadTabsProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
 
+  // Handle file selection callback from FileUpload component
+  const handleFilesSelected = (files: File[]) => {
+    if (onFilesSelected) {
+      onFilesSelected(files);
+    }
+  };
+
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
       <TabsList className="grid grid-cols-4 w-full">
@@ -32,7 +39,10 @@ export default function UploadTabs({
       </TabsList>
       
       <TabsContent value="upload" className="mt-4">
-        <FileUpload onUploadComplete={onUploadComplete} />
+        <FileUpload 
+          onUploadComplete={onUploadComplete} 
+          onFilesSelected={handleFilesSelected}
+        />
       </TabsContent>
       
       <TabsContent value="email" className="mt-4">

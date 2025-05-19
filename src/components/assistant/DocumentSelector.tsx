@@ -22,6 +22,13 @@ interface DocumentSelectorProps {
   onDocumentChange: (value: string) => void;
 }
 
+// Helper function to remove file extension
+const removeFileExtension = (fileName: string): string => {
+  if (!fileName) return '';
+  const lastDotIndex = fileName.lastIndexOf('.');
+  return lastDotIndex !== -1 ? fileName.substring(0, lastDotIndex) : fileName;
+};
+
 const DocumentSelector: React.FC<DocumentSelectorProps> = ({ documents, onDocumentChange }) => {
   return (
     <div className="flex items-center gap-2">
@@ -60,7 +67,7 @@ const DocumentSelector: React.FC<DocumentSelectorProps> = ({ documents, onDocume
                   ) : (
                     <FileText className="h-4 w-4 mr-2 text-blue-500" />
                   )}
-                  <span className="truncate max-w-[160px]">{doc.name}</span>
+                  <span className="truncate max-w-[160px]">{removeFileExtension(doc.name)}</span>
                   {doc.source === 'supabase' && (
                     <Badge variant="outline" className="ml-2 text-[10px] py-0">DB</Badge>
                   )}

@@ -44,18 +44,19 @@ export const useAIAssistant = () => {
         let docs: Document[] = [];
         
         try {
-          const { data: extractedTables, error } = await supabase
+          // Fetch extracted tables
+          const { data: extractedTables, error: tableError } = await supabase
             .from('extracted_tables')
             .select('*')
             .order('created_at', { ascending: false });
             
-          if (error) {
-            console.error("Error fetching from Supabase:", error);
+          if (tableError) {
+            console.error("Error fetching from extracted_tables:", tableError);
           } else if (extractedTables?.length > 0) {
-            console.log(`Fetched ${extractedTables.length} tables from Supabase:`, extractedTables);
+            console.log(`Fetched ${extractedTables.length} tables from extracted_tables:`, extractedTables);
             
-            // Map Supabase data to Document format with proper typing
-            const supabaseDocs: Document[] = extractedTables.map(table => ({
+            // Map Supabase data to Document format
+            const tableDocs: Document[] = extractedTables.map(table => ({
               id: table.id,
               name: table.title || 'Extracted Table',
               type: 'table' as const,
@@ -67,7 +68,34 @@ export const useAIAssistant = () => {
               }
             }));
             
-            docs = [...supabaseDocs];
+            docs = [...tableDocs];
+          }
+          
+          // Fetch from extracted_json table
+          const { data: extractedJson, error: jsonError } = await supabase
+            .from('extracted_json')
+            .select('*')
+            .order('created_at', { ascending: false });
+            
+          if (jsonError) {
+            console.error("Error fetching from extracted_json:", jsonError);
+          } else if (extractedJson?.length > 0) {
+            console.log(`Fetched ${extractedJson.length} documents from extracted_json:`, extractedJson);
+            
+            // Map extracted JSON to Document format
+            const jsonDocs: Document[] = extractedJson.map(doc => ({
+              id: `json_${doc.id}`,
+              name: doc.file_name || `Document ${doc.id}`,
+              type: 'document' as const,
+              extractedAt: doc.created_at,
+              source: 'supabase' as const,
+              data: {
+                headers: ["Content"],
+                rows: [[JSON.stringify(doc.json_extract)]]
+              }
+            }));
+            
+            docs = [...docs, ...jsonDocs];
           }
         } catch (supabaseError) {
           console.error("Failed to fetch from Supabase:", supabaseError);
@@ -132,7 +160,36 @@ export const useAIAssistant = () => {
 
   // Function to get document data, prioritizing Supabase data
   const getDocumentData = async (documentId: string) => {
-    // Check if it's a Supabase document
+    // Check if it's a JSON document from extracted_json table
+    if (documentId.startsWith('json_')) {
+      const realId = documentId.replace('json_', '');
+      console.log("Fetching JSON document data:", realId);
+      
+      try {
+        const { data, error } = await supabase
+          .from('extracted_json')
+          .select('*')
+          .eq('id', realId)
+          .single();
+          
+        if (error) {
+          console.error("Error fetching document from extracted_json:", error);
+          return null;
+        }
+        
+        if (data) {
+          return {
+            name: data.file_name || `Document ${data.id}`,
+            content: data.json_extract,
+            type: 'json'
+          };
+        }
+      } catch (error) {
+        console.error("Error processing JSON document:", error);
+      }
+    }
+    
+    // Check if it's from extracted_tables
     const supabaseDoc = processedDocuments.find(d => d.id === documentId && d.source === 'supabase');
     
     if (supabaseDoc) {
