@@ -126,6 +126,8 @@ export function useFileProcessing() {
     selectByType,
     getUnprocessedFiles,
     handleWorkflowComplete,
-    processingId
+    processingId,
+    isPolling, // Added isPolling to the return object
+    setIsPolling // Added setIsPolling to the return object
   };
 }

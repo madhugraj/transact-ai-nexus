@@ -11,16 +11,12 @@ export interface UploadTabsProps {
   onUploadComplete?: () => void;
   onFilesSelected?: (files: File[]) => void;
   onCloudFilesSelected?: (files: File[]) => void;
-  autoSync?: boolean;
-  setAutoSync?: (value: boolean) => void;
 }
 
 export default function UploadTabs({ 
   onUploadComplete,
   onFilesSelected,
-  onCloudFilesSelected,
-  autoSync,
-  setAutoSync
+  onCloudFilesSelected
 }: UploadTabsProps) {
   const [activeTab, setActiveTab] = useState("upload");
 

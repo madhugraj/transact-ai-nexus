@@ -5,9 +5,6 @@ import FileUploadActions from "./FileUploadActions";
 import { useFileProcessing } from "@/hooks/useFileProcessing";
 import { FileProcessingDialog } from "./dialog/FileProcessingDialog";
 import PostProcessingWorkflow from "./PostProcessingWorkflow";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import UploadTabs from "./UploadTabs";
 
 interface FileUploadProps {
@@ -70,26 +67,10 @@ const FileUpload = ({ onUploadComplete }: FileUploadProps) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold tracking-tight">Upload Files</h2>
-        <div className="flex items-center gap-2">
-          <Label htmlFor="auto-sync" className="text-sm font-medium">
-            Auto Sync
-          </Label>
-          <Switch
-            id="auto-sync"
-            checked={autoSync}
-            onCheckedChange={setAutoSync}
-          />
-        </div>
-      </div>
-      
       <UploadTabs
         onFilesSelected={handleFilesSelected}
         onCloudFilesSelected={handleCloudFilesSelected}
         onUploadComplete={onUploadComplete}
-        autoSync={autoSync}
-        setAutoSync={setAutoSync}
       />
       
       <FileList 

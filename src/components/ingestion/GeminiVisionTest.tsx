@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { FileJson, FileText, Table as TableIcon, Upload, Loader } from 'lucide-react';
+import { FileJson, FileText, Table as TableIcon, Upload, Loader, Database } from 'lucide-react';
 import * as api from '@/services/api';
+import { supabase } from '@/integrations/supabase/client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import DocumentPreview from './DocumentPreview';
 
@@ -28,6 +29,7 @@ const TableExtraction: React.FC = () => {
     tables: { title?: string; headers: string[]; rows: string[][]; }[];
   } | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('table');
@@ -134,6 +136,59 @@ const TableExtraction: React.FC = () => {
       });
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const saveToDatabase = async () => {
+    if (!tableData || !selectedFile) {
+      toast({
+        title: "No data to save",
+        description: "Please extract table data first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    
+    try {
+      // Combine the data for insertion
+      const jsonData = {
+        tables: tableData.tables,
+        rawText: result,
+        fileName: selectedFile.name,
+        fileType: selectedFile.type,
+        extractedAt: new Date().toISOString(),
+      };
+
+      // Insert into Supabase
+      const { data, error } = await supabase
+        .from('extracted_json')
+        .insert({
+          file_name: selectedFile.name,
+          json_extract: jsonData
+        })
+        .select();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      toast({
+        title: "Data saved successfully",
+        description: "Table data has been pushed to database",
+      });
+
+      console.log("Saved data to Supabase:", data);
+    } catch (error) {
+      console.error("Error saving to database:", error);
+      toast({
+        title: "Save failed",
+        description: error instanceof Error ? error.message : "Error saving data to database",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -247,8 +302,27 @@ const TableExtraction: React.FC = () => {
       {/* Results Section */}
       {(tableData || result) && (
         <Card className="shadow-md">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Extraction Results</CardTitle>
+            {tableData && (
+              <Button 
+                onClick={saveToDatabase} 
+                disabled={isSaving || !tableData}
+                className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader className="h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Database className="h-4 w-4" />
+                    Push to DB
+                  </>
+                )}
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
