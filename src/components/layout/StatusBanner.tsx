@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Building, ChevronDown } from 'lucide-react';
+import { Building, ChevronDown, BellRing } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { CreateOrgDialog } from '@/components/organization/CreateOrgDialog';
@@ -67,7 +67,10 @@ const StatusBanner = () => {
           </DropdownMenu>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" className="rounded-full" title="Notifications">
+            <BellRing className="h-5 w-5" />
+          </Button>
           <img src="/lovable-uploads/27845ced-a36a-431c-8cd1-5016f13aab53.png" alt="yavar logo" className="h-8" />
         </div>
       </div>

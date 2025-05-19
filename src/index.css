@@ -5,7 +5,7 @@
 
 @layer base {
   :root {
-    /* Original theme colors */
+    /* Base theme colors aligned with yavar.ai */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
 
@@ -15,17 +15,17 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    /* Z-Transact theme - professional purple tones */
-    --primary: 262 83% 58%;
+    /* Yavar theme - professional blue tones */
+    --primary: 213 94% 40%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 260 30% 95%;
+    --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
 
-    --muted: 261 30% 96.1%;
+    --muted: 213 10% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 262 83% 58%;
+    --accent: 213 94% 40%;
     --accent-foreground: 222.2 47.4% 11.2%;
 
     --destructive: 0 84.2% 60.2%;
@@ -33,18 +33,18 @@
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 262 83% 58%;
+    --ring: 213 94% 40%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 262 60% 20%;
+    --sidebar-background: 213 50% 20%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 262 83% 58%;
+    --sidebar-primary: 213 94% 40%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 262 60% 30%;
+    --sidebar-accent: 213 50% 30%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 262 60% 15%;
-    --sidebar-ring: 262 83% 58%;
+    --sidebar-border: 213 50% 15%;
+    --sidebar-ring: 213 94% 40%;
   }
 
   .dark {
@@ -57,7 +57,7 @@
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 262 83% 58%;
+    --primary: 213 94% 40%;
     --primary-foreground: 210 40% 98%;
 
     --secondary: 217.2 32.6% 17.5%;
@@ -66,7 +66,7 @@
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 262 83% 58%;
+    --accent: 213 94% 40%;
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 62.8% 30.6%;
@@ -74,16 +74,16 @@
 
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 262 83% 58%;
+    --ring: 213 94% 40%;
     
-    --sidebar-background: 262 60% 15%;
+    --sidebar-background: 213 50% 15%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 262 83% 58%;
+    --sidebar-primary: 213 94% 40%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 262 60% 25%;
+    --sidebar-accent: 213 50% 25%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 262 60% 20%;
-    --sidebar-ring: 262 83% 58%;
+    --sidebar-border: 213 50% 20%;
+    --sidebar-ring: 213 94% 40%;
   }
 }
 
@@ -131,8 +131,12 @@
     @apply text-lg font-semibold mb-4;
   }
 
-  .purple-gradient {
-    @apply bg-gradient-to-br from-[#9b87f5] to-[#7E69AB];
+  .blue-gradient {
+    @apply bg-gradient-to-br from-[#0066cc] to-[#004494];
+  }
+  
+  .yavar-gradient {
+    @apply bg-gradient-to-br from-[#0078D4] to-[#004494];
   }
   
   .glass-morphism {

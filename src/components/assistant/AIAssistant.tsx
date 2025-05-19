@@ -20,7 +20,7 @@ const AIAssistant: React.FC = () => {
 
   return (
     <Card className="w-full h-[600px] flex flex-col">
-      <CardHeader className="border-b px-6 py-4">
+      <CardHeader className="border-b px-6 py-4 bg-blue-50">
         <CardTitle className="text-lg flex items-center justify-between">
           <div className="flex items-center">Z-Intelligent Virtual Auditor</div>
           <DocumentSelector documents={processedDocuments} onDocumentChange={handleDocumentChange} />
@@ -31,7 +31,7 @@ const AIAssistant: React.FC = () => {
         <MessageList messages={messages} isProcessing={isProcessing} />
       </CardContent>
       
-      <CardFooter className="p-4 border-t pt-4">
+      <CardFooter className="p-4 border-t pt-4 bg-white">
         <MessageInput 
           message={message} 
           setMessage={setMessage} 

@@ -66,10 +66,10 @@ const LoginForm = () => {
   ];
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-[#f4f4f8] to-[#e6e6f0] dark:from-[#1a1a2e] dark:to-[#16213e]">
+    <div className="flex min-h-screen bg-gradient-to-br from-[#f8f9fa] to-[#e9ecef] dark:from-[#1a1a2e] dark:to-[#16213e]">
       {/* Left Panel (60%) */}
-      <div className="hidden md:flex md:w-[60%] bg-gradient-to-br from-[#9b87f5]/10 to-[#7E69AB]/20 p-8 lg:p-12 flex-col justify-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=800')] bg-cover opacity-[0.03]"></div>
+      <div className="hidden md:flex md:w-[60%] bg-gradient-to-br from-[#f0f6ff]/20 to-[#e6f0ff]/30 p-8 lg:p-12 flex-col justify-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1554774853-b415df9eeb92?auto=format&fit=crop&w=800')] bg-cover opacity-[0.03]"></div>
         
         <div className="relative z-10 max-w-2xl mx-auto">
           <div className="flex items-center mb-8 gap-4">
@@ -78,7 +78,7 @@ const LoginForm = () => {
               alt="yavar logo" 
               className="h-12" 
             />
-            <div className="h-12 w-12 rounded-full purple-gradient flex items-center justify-center">
+            <div className="h-12 w-12 rounded-full blue-gradient flex items-center justify-center">
               <span className="text-white text-xl font-bold">Z</span>
             </div>
           </div>
@@ -113,20 +113,20 @@ const LoginForm = () => {
         </div>
         
         {/* Avatar/Mascot */}
-        <div className="absolute bottom-8 right-8 flex items-center gap-3 bg-card/60 backdrop-blur-sm p-3 rounded-full">
-          <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center">
+        <div className="absolute bottom-8 right-8 flex items-center gap-3 bg-white/70 backdrop-blur-sm p-3 rounded-full shadow-md">
+          <div className="h-10 w-10 rounded-full yavar-gradient flex items-center justify-center">
             <span className="text-white font-bold">Zi</span>
           </div>
           <div className="pr-2">
-            <div className="text-sm font-medium">Ziva</div>
-            <div className="text-xs text-muted-foreground">AI Assistant</div>
+            <div className="text-sm font-medium text-gray-800">Ziva</div>
+            <div className="text-xs text-gray-600">AI Assistant</div>
           </div>
         </div>
       </div>
       
       {/* Right Panel (40%) - Login Form */}
       <div className="w-full md:w-[40%] flex items-center justify-center px-6 py-12">
-        <Card className="w-full max-w-md shadow-xl bg-card/50 backdrop-blur-sm border-muted/30">
+        <Card className="w-full max-w-md shadow-lg bg-white border border-gray-200">
           <CardHeader className="space-y-1">
             <div className="flex justify-center items-center gap-2 mb-2">
               <img 
@@ -134,7 +134,7 @@ const LoginForm = () => {
                 alt="yavar logo" 
                 className="h-8 md:hidden" 
               />
-              <div className="h-12 w-12 rounded-full purple-gradient flex items-center justify-center">
+              <div className="h-12 w-12 rounded-full yavar-gradient flex items-center justify-center">
                 <span className="text-white text-xl font-bold">Z</span>
               </div>
             </div>
@@ -177,15 +177,15 @@ const LoginForm = () => {
                   />
                 </div>
               </div>
-              <Button type="submit" className="w-full purple-gradient hover:opacity-90" disabled={isSubmitting}>
+              <Button type="submit" className="w-full yavar-gradient hover:opacity-90 text-white" disabled={isSubmitting}>
                 {isSubmitting ? "Signing in..." : "Sign in"}
               </Button>
             </form>
             
             <div className="mt-6 pt-6 border-t border-border">
-              <div className="rounded-md bg-secondary/50 p-4 flex">
-                <AlertCircle className="h-5 w-5 mr-2 text-muted-foreground" />
-                <div className="text-sm">
+              <div className="rounded-md bg-blue-50 p-4 flex">
+                <AlertCircle className="h-5 w-5 mr-2 text-blue-500" />
+                <div className="text-sm text-blue-800">
                   <strong>Demo accounts:</strong><br />
                   finance@example.com | 123456<br />
                   manager@example.com | 123456<br />

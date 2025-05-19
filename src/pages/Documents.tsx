@@ -78,7 +78,7 @@ const Documents = () => {
       <Dialog open={showAssistant} onOpenChange={setShowAssistant}>
         <DialogContent className="sm:max-w-[600px] p-0">
           <DialogHeader className="px-4 py-2 border-b">
-            <DialogTitle className="text-violet-700">Ziva</DialogTitle>
+            <DialogTitle className="text-blue-700">Ziva</DialogTitle>
           </DialogHeader>
           <div className="p-0">
             <AIAssistant />
