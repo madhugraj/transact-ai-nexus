@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DocumentComparison from "@/components/document-comparison/DocumentComparison";
 import AIAssistant from "@/components/assistant/AIAssistant";
+import { InventoryMappingPanel } from "@/components/inventory/InventoryMappingPanel";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const Documents = () => {
@@ -52,9 +53,10 @@ const Documents = () => {
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-2 w-full max-w-md">
+          <TabsList className="grid grid-cols-3 w-full max-w-md">
             <TabsTrigger value="tableExtraction">Table Extraction</TabsTrigger>
             <TabsTrigger value="documentComparison">Document Comparison</TabsTrigger>
+            <TabsTrigger value="inventoryMapping">Inventory Mapping</TabsTrigger>
           </TabsList>
           
           <TabsContent value="tableExtraction" className="mt-4">
@@ -66,6 +68,12 @@ const Documents = () => {
           <TabsContent value="documentComparison" className="mt-4">
             <Card className="overflow-hidden border-muted/40 shadow-sm hover:shadow-md transition-all duration-200 p-6">
               <DocumentComparison />
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="inventoryMapping" className="mt-4">
+            <Card className="overflow-hidden border-muted/40 shadow-sm hover:shadow-md transition-all duration-200 p-6">
+              <InventoryMappingPanel />
             </Card>
           </TabsContent>
         </Tabs>

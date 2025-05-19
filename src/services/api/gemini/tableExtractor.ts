@@ -19,6 +19,7 @@ Instructions:
 - Extract all rows with their data, maintaining the original format when possible.
 - For numerical values, extract them as numbers without currency symbols when appropriate.
 - Avoid any logos or text not part of a structured table.
+- For inventory data, try to identify columns like item name, quantity, price, SKU, etc.
 
 ALWAYS output in this exact JSON format:
 
