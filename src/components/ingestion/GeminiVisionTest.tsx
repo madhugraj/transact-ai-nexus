@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { FileJson, FileText, Table as TableIcon, Upload, Loader, Database } from 'lucide-react';
+import { FileJson, FileText, Table as TableIcon, Upload, Loader, Database, CheckCircle } from 'lucide-react';
 import * as api from '@/services/api';
 import { supabase } from '@/integrations/supabase/client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -30,6 +30,7 @@ const TableExtraction: React.FC = () => {
   } | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('table');
@@ -40,6 +41,10 @@ const TableExtraction: React.FC = () => {
       const file = e.target.files[0];
       setSelectedFile(file);
       setFilePreviewUrl(URL.createObjectURL(file));
+      // Reset previous results when a new file is selected
+      setTableData(null);
+      setResult('');
+      setSaveSuccess(false);
     }
   };
 
@@ -74,6 +79,7 @@ const TableExtraction: React.FC = () => {
     setProgress(10);
     setResult('');
     setTableData(null);
+    setSaveSuccess(false);
 
     try {
       // Progress simulation
@@ -150,6 +156,7 @@ const TableExtraction: React.FC = () => {
     }
 
     setIsSaving(true);
+    setSaveSuccess(false);
     
     try {
       // Combine the data for insertion
@@ -174,6 +181,8 @@ const TableExtraction: React.FC = () => {
         throw new Error(error.message);
       }
 
+      // Set success state and show success toast
+      setSaveSuccess(true);
       toast({
         title: "Data saved successfully",
         description: "Table data has been pushed to database",
@@ -187,6 +196,7 @@ const TableExtraction: React.FC = () => {
         description: error instanceof Error ? error.message : "Error saving data to database",
         variant: "destructive",
       });
+      setSaveSuccess(false);
     } finally {
       setIsSaving(false);
     }
@@ -304,25 +314,32 @@ const TableExtraction: React.FC = () => {
         <Card className="shadow-md">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Extraction Results</CardTitle>
-            {tableData && (
-              <Button 
-                onClick={saveToDatabase} 
-                disabled={isSaving || !tableData}
-                className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader className="h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Database className="h-4 w-4" />
-                    Push to DB
-                  </>
-                )}
-              </Button>
-            )}
+            <Button 
+              onClick={saveToDatabase} 
+              disabled={isSaving || !tableData || saveSuccess}
+              className={`flex items-center gap-2 ${
+                saveSuccess 
+                  ? "bg-green-600 hover:bg-green-700" 
+                  : "bg-blue-600 hover:bg-blue-700"
+              } text-white`}
+            >
+              {isSaving ? (
+                <>
+                  <Loader className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : saveSuccess ? (
+                <>
+                  <CheckCircle className="h-4 w-4" />
+                  Saved
+                </>
+              ) : (
+                <>
+                  <Database className="h-4 w-4" />
+                  Push to DB
+                </>
+              )}
+            </Button>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">

@@ -11,14 +11,16 @@ export interface UploadTabsProps {
   onUploadComplete?: () => void;
   onFilesSelected?: (files: File[]) => void;
   onCloudFilesSelected?: (files: File[]) => void;
+  initialTab?: string;
 }
 
 export default function UploadTabs({ 
   onUploadComplete,
   onFilesSelected,
-  onCloudFilesSelected
+  onCloudFilesSelected,
+  initialTab = "upload"
 }: UploadTabsProps) {
-  const [activeTab, setActiveTab] = useState("upload");
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -29,21 +31,21 @@ export default function UploadTabs({
         <TabsTrigger value="sap">SAP Import</TabsTrigger>
       </TabsList>
       
-      <TabsContent value="upload">
+      <TabsContent value="upload" className="mt-4">
         <FileUpload onUploadComplete={onUploadComplete} />
       </TabsContent>
       
-      <TabsContent value="email">
+      <TabsContent value="email" className="mt-4">
         <EmailConnector />
       </TabsContent>
       
-      <TabsContent value="cloud">
+      <TabsContent value="cloud" className="mt-4">
         <CloudStorageConnector 
           onFilesSelected={onCloudFilesSelected || (() => {})}
         />
       </TabsContent>
       
-      <TabsContent value="sap">
+      <TabsContent value="sap" className="mt-4">
         <SapDataImport />
       </TabsContent>
     </Tabs>

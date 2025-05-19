@@ -107,6 +107,7 @@ export function useFileProcessing() {
     };
   }, [processingId, isPolling, toast, currentAction, processingOptions]);
 
+  // Make sure to include isPolling and setIsPolling in the return object
   return {
     files,
     selectedFileIds,
@@ -127,7 +128,7 @@ export function useFileProcessing() {
     getUnprocessedFiles,
     handleWorkflowComplete,
     processingId,
-    isPolling, // Added isPolling to the return object
-    setIsPolling // Added setIsPolling to the return object
+    isPolling,
+    setIsPolling
   };
 }

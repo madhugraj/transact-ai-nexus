@@ -70,13 +70,18 @@ export class DynamicTableDetectionAgent implements Agent {
             console.log("Successfully saved table to Supabase extracted_tables");
           }
           
-          // NEW: Save to extracted_json table
+          // Save to extracted_json table
           if (fileObjects.length > 0) {
             const fileName = fileObjects[0].name || 'unknown';
             const jsonData = {
-              headers: tableData.headers,
-              rows: tableData.rows,
-              metadata: tableData.metadata || {},
+              tables: [{
+                headers: tableData.headers,
+                rows: tableData.rows,
+                title: tableData.metadata?.title || "Extracted Table"
+              }],
+              rawText: data.extractedTextContent || "",
+              fileName: fileName,
+              fileType: fileObjects[0].type || "application/octet-stream",
               extractedAt: new Date().toISOString()
             };
             
