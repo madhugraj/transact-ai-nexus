@@ -5,6 +5,7 @@ import { useAuth } from '@/components/auth/UserAuthContext';
 import AppSidebar from './AppSidebar';
 import StatusBanner from './StatusBanner';
 import NotificationCenter from './NotificationCenter';
+import AppFooter from './AppFooter';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -38,6 +39,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
         <main className="flex-1 overflow-auto p-6">
           {children}
         </main>
+        <AppFooter />
       </div>
     </div>
   );
