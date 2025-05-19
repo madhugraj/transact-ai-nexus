@@ -16,7 +16,12 @@ export async function extractTablesFromImage(
   customPrompt?: string
 ): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
+    // Import fileToBase64 from the local module to use it here
+    const { fileToBase64 } = await import('./gemini/fileUtils');
     const base64Image = await fileToBase64(file);
+    
+    // Import extractTablesFromImageWithGemini from the local module
+    const { extractTablesFromImageWithGemini } = await import('./gemini/tableExtractor');
     return extractTablesFromImageWithGemini(base64Image, file.type, customPrompt);
   } catch (error) {
     console.error("Error extracting tables from image:", error);
