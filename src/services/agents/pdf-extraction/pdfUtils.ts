@@ -3,8 +3,8 @@ import * as pdfjs from 'pdfjs-dist';
 
 // Set up PDF.js worker
 if (typeof window !== 'undefined') {
-  const pdfjsWorker = new URL('pdfjs-dist/build/pdf.worker.min.js', import.meta.url);
-  pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker.toString();
+  // Use a more compatible way to set the worker
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
 }
 
 /**

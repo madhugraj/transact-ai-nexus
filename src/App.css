@@ -6,9 +6,19 @@
   text-align: center;
 }
 
+/* Z-Transact brand colors */
+:root {
+  --z-transact-primary: #9b87f5;
+  --z-transact-secondary: #7E69AB;
+  --z-transact-tertiary: #6E59A5;
+  --z-transact-light: #D6BCFA;
+  --z-transact-background: #F9F7FF;
+  --z-transact-text: #2D2B3A;
+}
+
 /* Add gradient effects for branding elements */
 .brand-gradient {
-  background: linear-gradient(135deg, #9b87f5 0%, #7E69AB 100%);
+  background: linear-gradient(135deg, var(--z-transact-primary) 0%, var(--z-transact-secondary) 100%);
 }
 
 .logo {
@@ -19,11 +29,11 @@
 }
 
 .logo:hover {
-  filter: drop-shadow(0 0 2em #9b87f5aa);
+  filter: drop-shadow(0 0 2em var(--z-transact-primary));
 }
 
 .logo.react:hover {
-  filter: drop-shadow(0 0 2em #9b87f5aa);
+  filter: drop-shadow(0 0 2em var(--z-transact-primary));
 }
 
 @keyframes logo-spin {
@@ -48,7 +58,7 @@
 }
 
 .read-the-docs {
-  color: #7E69AB;
+  color: var(--z-transact-secondary);
 }
 
 /* Glass effect for cards and elements */
@@ -57,4 +67,34 @@
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 0.75rem;
+}
+
+/* Z-Transact specific styles */
+.z-transact-title {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  color: var(--z-transact-primary);
+  letter-spacing: -0.025em;
+}
+
+.z-transact-subtitle {
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  color: var(--z-transact-secondary);
+}
+
+/* Z-Transact branded components */
+.z-transact-card {
+  border-radius: 1rem;
+  border: 1px solid rgba(155, 135, 245, 0.2);
+  background: white;
+  box-shadow: 0 4px 6px -1px rgba(155, 135, 245, 0.1), 
+              0 2px 4px -1px rgba(155, 135, 245, 0.06);
+  transition: all 0.3s ease;
+}
+
+.z-transact-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(155, 135, 245, 0.1), 
+              0 4px 6px -2px rgba(155, 135, 245, 0.05);
+  border-color: rgba(155, 135, 245, 0.4);
 }
