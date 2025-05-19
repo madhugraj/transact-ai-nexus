@@ -77,7 +77,7 @@ const AppSidebar = () => {
       <div className="flex h-16 items-center justify-between px-4 py-2">
         {!collapsed && (
           <div className="text-sidebar-foreground font-semibold text-lg">
-            Z-Transact
+            Transaction Agent
           </div>
         )}
         <Button 

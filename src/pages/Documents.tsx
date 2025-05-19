@@ -37,14 +37,9 @@ const Documents = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-semibold z-transact-title">
-              Z-Transact
-              <span className="text-sm ml-2 font-normal text-muted-foreground z-transact-subtitle">
-                AI-Powered Junior Auditor for Smarter, Faster Financial Reviews
-              </span>
-            </h1>
+            <h1 className="text-3xl font-semibold">Document Processing</h1>
             <p className="text-muted-foreground mt-1">
-              Process, analyze, and compare financial documents with AI assistance
+              Process, analyze, and compare financial documents
             </p>
           </div>
           
@@ -77,13 +72,13 @@ const Documents = () => {
           </TabsList>
           
           <TabsContent value="tableExtraction" className="mt-4">
-            <Card className="overflow-hidden border-muted/40 shadow-sm hover:shadow-md transition-all duration-200 p-6 z-transact-card">
+            <Card className="overflow-hidden border-muted/40 shadow-sm hover:shadow-md transition-all duration-200 p-6">
               <TableExtraction />
             </Card>
           </TabsContent>
           
           <TabsContent value="documentComparison" className="mt-4">
-            <Card className="overflow-hidden border-muted/40 shadow-sm hover:shadow-md transition-all duration-200 p-6 z-transact-card">
+            <Card className="overflow-hidden border-muted/40 shadow-sm hover:shadow-md transition-all duration-200 p-6">
               <DocumentComparison />
             </Card>
           </TabsContent>
@@ -93,7 +88,7 @@ const Documents = () => {
       <Dialog open={showAssistant} onOpenChange={setShowAssistant}>
         <DialogContent className="sm:max-w-[600px] p-0">
           <DialogHeader className="px-4 py-2 border-b">
-            <DialogTitle>Z-Transact AI Assistant</DialogTitle>
+            <DialogTitle>Document AI Assistant</DialogTitle>
           </DialogHeader>
           <div className="p-0">
             <AIAssistant />

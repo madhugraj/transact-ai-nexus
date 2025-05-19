@@ -19,9 +19,6 @@ export default {
 			}
 		},
 		extend: {
-			fontFamily: {
-				sans: ['Inter', 'sans-serif'],
-			},
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
@@ -66,18 +63,18 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
-				// Z-Transact specific colors
+				// Transaction Agent specific colors
 				status: {
-					pending: '#9b87f5', // Updated to purple
-					approved: '#7E69AB', // Updated to secondary purple
+					pending: '#FFC107',
+					approved: '#4CAF50',
 					rejected: '#F44336',
-					processing: '#6E59A5' // Updated to tertiary purple
+					processing: '#2196F3'
 				},
 				transaction: {
-					invoice: '#9b87f5', // Updated to primary purple
-					receipt: '#7E69AB', // Updated to secondary purple 
-					po: '#6E59A5', // Updated to tertiary purple
-					payment: '#D6BCFA' // Updated to light purple
+					invoice: '#3F51B5',
+					receipt: '#673AB7',
+					po: '#009688',
+					payment: '#FF5722'
 				}
 			},
 			borderRadius: {
