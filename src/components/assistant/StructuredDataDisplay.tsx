@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -9,6 +9,7 @@ import { TableIcon, BarChart2, LineChart as LineChartIcon, PieChart as PieChartI
 interface TableData {
   headers: string[];
   rows: any[][];
+  title?: string;
 }
 
 interface ChartOptions {
@@ -16,6 +17,7 @@ interface ChartOptions {
   xKey?: string;
   yKeys?: string[];
   data?: any[];
+  title?: string;
 }
 
 interface StructuredDataDisplayProps {
@@ -29,8 +31,32 @@ interface StructuredDataDisplayProps {
 const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088fe', '#00C49F', '#FFBB28', '#FF8042'];
 
 const StructuredDataDisplay: React.FC<StructuredDataDisplayProps> = ({ data }) => {
+  const [activeView, setActiveView] = useState<string>('table');
   const { tableData, chartOptions, rawData } = data;
-  const [activeView, setActiveView] = useState<string>(tableData ? 'table' : chartOptions ? 'chart' : 'raw');
+
+  // Process data from nested structure if needed (handles TableData format in rawData)
+  const processedTableData = React.useMemo(() => {
+    // If we have direct tableData, use it
+    if (tableData) return tableData;
+    
+    // If rawData contains tables array
+    if (rawData && rawData.tables && Array.isArray(rawData.tables) && rawData.tables.length > 0) {
+      return rawData.tables[0]; // Take the first table by default
+    }
+    
+    return null;
+  }, [tableData, rawData]);
+  
+  // Set initial active view based on available data
+  useEffect(() => {
+    if (processedTableData) {
+      setActiveView('table');
+    } else if (chartOptions) {
+      setActiveView('chart');
+    } else {
+      setActiveView('raw');
+    }
+  }, [processedTableData, chartOptions]);
   
   // Generate chart data from table data if chart options present but no specific chart data
   const chartData = React.useMemo(() => {
@@ -38,17 +64,17 @@ const StructuredDataDisplay: React.FC<StructuredDataDisplayProps> = ({ data }) =
       return chartOptions.data;
     }
     
-    if (tableData && chartOptions) {
+    if (processedTableData) {
       // Try to convert table data to chart data
-      return tableData.rows.map((row, index) => {
+      return processedTableData.rows.map((row, index) => {
         const dataPoint: any = { name: row[0] };  // Assume first column is name/label
         
         // Add each column as a data point
-        tableData.headers.forEach((header, headerIndex) => {
+        processedTableData.headers.forEach((header, headerIndex) => {
           if (headerIndex > 0) { // Skip first column which we used as name
             // Try to parse as number if possible
             const value = typeof row[headerIndex] === 'string' 
-              ? parseFloat(row[headerIndex].replace(/[^0-9.-]+/g, ''))
+              ? parseFloat(row[headerIndex]?.replace(/[^0-9.-]+/g, ''))
               : row[headerIndex];
               
             dataPoint[header] = isNaN(value) ? 0 : value;
@@ -60,7 +86,7 @@ const StructuredDataDisplay: React.FC<StructuredDataDisplayProps> = ({ data }) =
     }
     
     return [];
-  }, [tableData, chartOptions]);
+  }, [processedTableData, chartOptions]);
 
   // Determine what fields to show in charts
   const fields = React.useMemo(() => {
@@ -68,9 +94,9 @@ const StructuredDataDisplay: React.FC<StructuredDataDisplayProps> = ({ data }) =
       return chartOptions.yKeys;
     }
     
-    if (tableData) {
+    if (processedTableData) {
       // Skip first header which we use as name
-      return tableData.headers.slice(1);
+      return processedTableData.headers.slice(1);
     }
     
     if (chartData.length > 0) {
@@ -79,30 +105,35 @@ const StructuredDataDisplay: React.FC<StructuredDataDisplayProps> = ({ data }) =
     }
     
     return [];
-  }, [chartData, chartOptions, tableData]);
+  }, [chartData, chartOptions, processedTableData]);
 
-  if (!tableData && !chartOptions && !rawData) {
+  if (!processedTableData && !chartOptions && !rawData) {
     return null;
   }
+
+  const showTableTab = processedTableData && processedTableData.headers && processedTableData.rows;
+  const showChartTab = chartOptions || (chartData && chartData.length > 0);
 
   return (
     <div className="mt-2 border rounded-md overflow-hidden bg-card">
       <Tabs value={activeView} onValueChange={setActiveView} className="w-full">
         <div className="flex items-center justify-between border-b p-2">
-          <h4 className="text-sm font-medium">Analysis Results</h4>
+          <h4 className="text-sm font-medium">
+            {processedTableData?.title || chartOptions?.title || "Analysis Results"}
+          </h4>
           <TabsList className="grid w-auto grid-cols-3 h-8">
-            {tableData && (
+            {showTableTab && (
               <TabsTrigger value="table" className="flex items-center space-x-1 px-3">
                 <TableIcon className="h-3.5 w-3.5" />
                 <span>Table</span>
               </TabsTrigger>
             )}
             
-            {chartOptions && chartData.length > 0 && (
+            {showChartTab && (
               <TabsTrigger value="chart" className="flex items-center space-x-1 px-3">
-                {chartOptions.type === 'bar' && <BarChart2 className="h-3.5 w-3.5" />}
-                {chartOptions.type === 'line' && <LineChartIcon className="h-3.5 w-3.5" />}
-                {chartOptions.type === 'pie' && <PieChartIcon className="h-3.5 w-3.5" />}
+                {(chartOptions?.type === 'bar' || !chartOptions?.type) && <BarChart2 className="h-3.5 w-3.5" />}
+                {chartOptions?.type === 'line' && <LineChartIcon className="h-3.5 w-3.5" />}
+                {chartOptions?.type === 'pie' && <PieChartIcon className="h-3.5 w-3.5" />}
                 <span>Chart</span>
               </TabsTrigger>
             )}
@@ -113,19 +144,19 @@ const StructuredDataDisplay: React.FC<StructuredDataDisplayProps> = ({ data }) =
           </TabsList>
         </div>
         
-        {tableData && (
+        {showTableTab && (
           <TabsContent value="table" className="p-0 m-0">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    {tableData.headers.map((header, index) => (
+                    {processedTableData.headers.map((header, index) => (
                       <TableHead key={index}>{header}</TableHead>
                     ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {tableData.rows.map((row, rowIndex) => (
+                  {processedTableData.rows.map((row, rowIndex) => (
                     <TableRow key={rowIndex}>
                       {row.map((cell, cellIndex) => (
                         <TableCell key={cellIndex}>{cell}</TableCell>
@@ -138,10 +169,10 @@ const StructuredDataDisplay: React.FC<StructuredDataDisplayProps> = ({ data }) =
           </TabsContent>
         )}
         
-        {chartOptions && chartData.length > 0 && (
+        {showChartTab && (
           <TabsContent value="chart" className="p-4 m-0">
             <div className="h-64 w-full">
-              {chartOptions.type === 'bar' && (
+              {(!chartOptions?.type || chartOptions?.type === 'bar') && (
                 <ChartContainer
                   config={{
                     ...fields.reduce((acc, field, i) => ({ 
@@ -150,76 +181,82 @@ const StructuredDataDisplay: React.FC<StructuredDataDisplayProps> = ({ data }) =
                     }), {}),
                   }}
                 >
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Legend />
-                    {fields.map((field, index) => (
-                      <Bar 
-                        key={field} 
-                        dataKey={field} 
-                        fill={COLORS[index % COLORS.length]} 
-                      />
-                    ))}
-                  </BarChart>
-                </ChartContainer>
-              )}
-              
-              {chartOptions.type === 'line' && (
-                <ChartContainer
-                  config={{
-                    ...fields.reduce((acc, field, i) => ({ 
-                      ...acc, 
-                      [field]: { color: COLORS[i % COLORS.length] } 
-                    }), {}),
-                  }}
-                >
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Legend />
-                    {fields.map((field, index) => (
-                      <Line 
-                        key={field}
-                        type="monotone" 
-                        dataKey={field} 
-                        stroke={COLORS[index % COLORS.length]} 
-                      />
-                    ))}
-                  </LineChart>
-                </ChartContainer>
-              )}
-              
-              {chartOptions.type === 'pie' && (
-                <ChartContainer
-                  config={{
-                    ...fields.reduce((acc, field, i) => ({ 
-                      ...acc, 
-                      [field]: { color: COLORS[i % COLORS.length] } 
-                    }), {}),
-                  }}
-                >
-                  <PieChart>
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Legend />
-                    <Pie
-                      data={chartData}
-                      dataKey={fields[0]}
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      label
-                    >
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Legend />
+                      {fields.map((field, index) => (
+                        <Bar 
+                          key={field} 
+                          dataKey={field} 
+                          fill={COLORS[index % COLORS.length]} 
+                        />
                       ))}
-                    </Pie>
-                  </PieChart>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              )}
+              
+              {chartOptions?.type === 'line' && (
+                <ChartContainer
+                  config={{
+                    ...fields.reduce((acc, field, i) => ({ 
+                      ...acc, 
+                      [field]: { color: COLORS[i % COLORS.length] } 
+                    }), {}),
+                  }}
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Legend />
+                      {fields.map((field, index) => (
+                        <Line 
+                          key={field}
+                          type="monotone" 
+                          dataKey={field} 
+                          stroke={COLORS[index % COLORS.length]} 
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              )}
+              
+              {chartOptions?.type === 'pie' && (
+                <ChartContainer
+                  config={{
+                    ...fields.reduce((acc, field, i) => ({ 
+                      ...acc, 
+                      [field]: { color: COLORS[i % COLORS.length] } 
+                    }), {}),
+                  }}
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Legend />
+                      <Pie
+                        data={chartData}
+                        dataKey={fields[0]}
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        label
+                      >
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
                 </ChartContainer>
               )}
             </div>
@@ -227,7 +264,7 @@ const StructuredDataDisplay: React.FC<StructuredDataDisplayProps> = ({ data }) =
         )}
         
         <TabsContent value="raw" className="p-4 m-0">
-          <pre className="text-xs overflow-auto whitespace-pre-wrap bg-muted p-2 rounded-md max-h-64">
+          <pre className="text-xs overflow-auto whitespace-pre-wrap bg-muted p-2 rounded-md max-h-64 text-foreground">
             {JSON.stringify(rawData || tableData || chartData, null, 2)}
           </pre>
         </TabsContent>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Message } from '@/components/assistant/MessageList';
@@ -38,9 +39,9 @@ TABLE_DATA:
 CHART_OPTIONS:
 {
   "type": "bar|line|pie",
-  "xKey": "Date",
-  "yKeys": ["Sales", "Revenue"],
-  "title": "Sales Analysis"
+  "xKey": "Column1",
+  "yKeys": ["Column2", "Column3"],
+  "title": "Chart Title"
 }
 `;
 
@@ -263,12 +264,41 @@ export const useAIAssistant = () => {
     let chartOptions = null;
     let rawData = null;
     
+    // Try to parse JSON directly if the whole response is JSON
+    try {
+      if (responseText.trim().startsWith('{') && responseText.trim().endsWith('}')) {
+        const jsonData = JSON.parse(responseText);
+        
+        // If we have tables in the JSON, use them
+        if (jsonData.tables) {
+          return {
+            content: jsonData.summary || "Here's your data analysis:",
+            structuredData: {
+              rawData: jsonData
+            }
+          };
+        }
+        
+        if (jsonData.type && (jsonData.type === 'bar' || jsonData.type === 'line' || jsonData.type === 'pie')) {
+          return {
+            content: "Here's your data visualization:",
+            structuredData: {
+              chartOptions: jsonData
+            }
+          };
+        }
+      }
+    } catch (e) {
+      console.log("Not a direct JSON response");
+    }
+    
     // Extract TABLE_DATA if available
     const tableDataMatch = responseText.match(/TABLE_DATA:\s*({[\s\S]*?})/);
     if (tableDataMatch && tableDataMatch[1]) {
       try {
         tableData = JSON.parse(tableDataMatch[1]);
         content = content.replace(tableDataMatch[0], '');
+        rawData = tableData;
       } catch (e) {
         console.error("Failed to parse TABLE_DATA:", e);
       }
@@ -296,7 +326,7 @@ export const useAIAssistant = () => {
       structuredData: tableData || chartOptions ? {
         tableData,
         chartOptions,
-        rawData: tableData || chartOptions
+        rawData
       } : undefined
     };
   };

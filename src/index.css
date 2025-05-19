@@ -5,7 +5,7 @@
 
 @layer base {
   :root {
-    /* Base theme colors aligned with yavar.ai */
+    /* Base theme colors aligned with Z-Transact */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
 
@@ -15,7 +15,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    /* Yavar theme - professional blue tones */
+    /* Theme - professional blue tones */
     --primary: 213 94% 40%;
     --primary-foreground: 210 40% 98%;
 
@@ -95,6 +95,11 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', sans-serif;
+  }
+  
+  /* Ensure pre elements and code blocks have good contrast */
+  pre, code {
+    @apply bg-muted text-foreground;
   }
 }
 

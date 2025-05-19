@@ -62,7 +62,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isProcessing }) => 
               className={`max-w-[85%] p-3 rounded-lg ${
                 message.sender === 'user'
                   ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted'
+                  : 'bg-muted text-foreground'
               }`}
             >
               <div className="flex items-start gap-3">
@@ -80,7 +80,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isProcessing }) => 
                   )}
                 </div>
                 {message.sender === 'user' && (
-                  <Avatar className="w-8 h-8 border">
+                  <Avatar className="w-8 h-8">
                     <User className="h-4 w-4" />
                   </Avatar>
                 )}

@@ -71,7 +71,7 @@ const StatusBanner = () => {
           <Button variant="ghost" size="icon" className="rounded-full hover:bg-blue-900/20" title="Notifications">
             <BellRing className="h-5 w-5 text-gray-300" />
           </Button>
-          <img src="/lovable-uploads/27845ced-a36a-431c-8cd1-5016f13aab53.png" alt="yavar logo" className="h-8" />
+          <img src="/lovable-uploads/27845ced-a36a-431c-8cd1-5016f13aab53.png" alt="Z-Transact logo" className="h-8" />
         </div>
       </div>
 
