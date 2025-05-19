@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card } from "@/components/ui/card";
@@ -11,14 +10,12 @@ import DocumentComparison from "@/components/document-comparison/DocumentCompari
 import AIAssistant from "@/components/assistant/AIAssistant";
 import { InventoryMappingPanel } from "@/components/inventory/InventoryMappingPanel";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-
 const Documents = () => {
   const {
     toast
   } = useToast();
   const [activeTab, setActiveTab] = useState<string>("tableExtraction");
   const [showAssistant, setShowAssistant] = useState(false);
-  
   const handleDownload = () => {
     // Placeholder for download functionality
     toast({
@@ -29,7 +26,6 @@ const Documents = () => {
     // In a real implementation, this would trigger an actual download
     // For demonstration purposes, we're just showing a toast
   };
-  
   return <AppLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between mb-6">
@@ -54,9 +50,9 @@ const Documents = () => {
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid grid-cols-3 w-full max-w-md">
-            <TabsTrigger value="tableExtraction">Table Extraction</TabsTrigger>
-            <TabsTrigger value="documentComparison">Document Comparison</TabsTrigger>
-            <TabsTrigger value="inventoryMapping">Inventory Mapping</TabsTrigger>
+            <TabsTrigger value="tableExtraction" className="text-xs">Table Extraction</TabsTrigger>
+            <TabsTrigger value="documentComparison" className="text-xs">Document Comparison</TabsTrigger>
+            <TabsTrigger value="inventoryMapping" className="text-xs">Inventory Mapping</TabsTrigger>
           </TabsList>
           
           <TabsContent value="tableExtraction" className="mt-4">
@@ -95,5 +91,4 @@ const Documents = () => {
       </Dialog>
     </AppLayout>;
 };
-
 export default Documents;
