@@ -3,11 +3,12 @@ import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, CheckSquare, X, Edit, User } from "lucide-react";
+import { CheckCircle, CheckSquare, X, Edit, User, FileText, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface Transaction {
   id: string;
@@ -15,25 +16,29 @@ interface Transaction {
   amount: string;
   date: string;
   suggestedCategory: string;
-  alternativeCategories: string[];
+  confidence: number;
+  status: "pending" | "processed" | "review";
+  alternativeCategories?: string[];
 }
 
 const TaskAutomation = () => {
-  const [query, setQuery] = useState("");
+  const [selectedCRM, setSelectedCRM] = useState("keap");
+  const [selectedAccounting, setSelectedAccounting] = useState("myob");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const [currentTransaction, setCurrentTransaction] = useState(0);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [completedTransactions, setCompletedTransactions] = useState<string[]>([]);
   const { toast } = useToast();
 
   // Mock transactions
-  const transactions: Transaction[] = [
+  const mockTransactions: Transaction[] = [
     {
       id: "tx-001",
       description: "Quarterly Software License - Creative Cloud",
       amount: "₹45,000",
       date: "2025-04-15",
       suggestedCategory: "Software Subscriptions",
+      confidence: 95,
+      status: "pending",
       alternativeCategories: ["IT Expenses", "Creative Department", "Operating Expenses"]
     },
     {
@@ -42,6 +47,8 @@ const TaskAutomation = () => {
       amount: "₹12,800",
       date: "2025-04-16",
       suggestedCategory: "Office Supplies",
+      confidence: 88,
+      status: "pending",
       alternativeCategories: ["Administrative Expenses", "Printing Costs", "Consumables"]
     },
     {
@@ -50,73 +57,90 @@ const TaskAutomation = () => {
       amount: "₹8,500",
       date: "2025-04-17",
       suggestedCategory: "Meals & Entertainment",
+      confidence: 72,
+      status: "pending",
       alternativeCategories: ["Marketing Expenses", "Team Building", "Staff Welfare"]
+    },
+    {
+      id: "tx-004",
+      description: "Annual Conference Registration Fee",
+      amount: "₹35,000",
+      date: "2025-04-18",
+      suggestedCategory: "Conferences & Events",
+      confidence: 91,
+      status: "pending",
+      alternativeCategories: ["Professional Development", "Marketing Expenses", "Travel Expenses"]
+    },
+    {
+      id: "tx-005",
+      description: "Server Hosting - Q2 2025",
+      amount: "₹78,200",
+      date: "2025-04-19",
+      suggestedCategory: "Web Hosting & Infrastructure",
+      confidence: 94,
+      status: "pending",
+      alternativeCategories: ["IT Expenses", "Technology Services", "Cloud Services"]
     }
   ];
 
-  const handleQuerySubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query) return;
-    
+  // Mock task logs
+  const taskLogs = [
+    { timestamp: "2025-04-20 09:45:23", action: "System pulled 24 transactions from Keap", user: "System" },
+    { timestamp: "2025-04-20 09:45:25", action: "Applied XGBoost categorization to transactions", user: "System" },
+    { timestamp: "2025-04-20 09:46:12", action: "Categorized 'Office Renovation' as 'Capital Improvement'", user: "Nisha M." },
+    { timestamp: "2025-04-20 10:12:54", action: "Approved batch of 15 transactions", user: "Raj K." }
+  ];
+
+  const handleProcessData = () => {
     setIsProcessing(true);
+    
     setTimeout(() => {
       setIsProcessing(false);
-      setShowResults(true);
+      setTransactions(mockTransactions);
     }, 1500);
   };
 
   const handleAccept = (id: string) => {
+    setTransactions(current => 
+      current.map(tx => 
+        tx.id === id ? { ...tx, status: "processed" as const } : tx
+      )
+    );
+    
     setCompletedTransactions([...completedTransactions, id]);
+    
     toast({
       title: "Category Accepted",
-      description: `Transaction ${transactions[currentTransaction].description} categorized as ${transactions[currentTransaction].suggestedCategory}`,
+      description: `Transaction has been categorized successfully.`,
     });
-    
-    if (currentTransaction < transactions.length - 1) {
-      setCurrentTransaction(currentTransaction + 1);
-    } else {
-      handleComplete();
-    }
   };
   
   const handleChangeCategory = (id: string, category: string) => {
+    setTransactions(current => 
+      current.map(tx => 
+        tx.id === id ? { ...tx, suggestedCategory: category, status: "processed" as const } : tx
+      )
+    );
+    
     setCompletedTransactions([...completedTransactions, id]);
+    
     toast({
       title: "Category Changed",
-      description: `Transaction categorized as ${category} instead of ${transactions[currentTransaction].suggestedCategory}`,
+      description: `Transaction category has been updated.`,
     });
-    
-    if (currentTransaction < transactions.length - 1) {
-      setCurrentTransaction(currentTransaction + 1);
-    } else {
-      handleComplete();
-    }
   };
   
-  const handleAssignForReview = () => {
+  const handleAssignForReview = (id: string) => {
+    setTransactions(current => 
+      current.map(tx => 
+        tx.id === id ? { ...tx, status: "review" as const } : tx
+      )
+    );
+    
     toast({
       title: "Assigned for Review",
-      description: `Transaction ${transactions[currentTransaction].description} has been assigned to the accounting team for review.`,
+      description: `Transaction has been assigned to the accounting team for review.`,
     });
-    
-    if (currentTransaction < transactions.length - 1) {
-      setCurrentTransaction(currentTransaction + 1);
-    } else {
-      handleComplete();
-    }
-  };
-  
-  const handleComplete = () => {
-    setTimeout(() => {
-      toast({
-        title: "All Tasks Completed",
-        description: "All transactions have been processed. Task log updated in Karbon with status 'Logged for review'.",
-      });
-      
-      setShowResults(false);
-      setCurrentTransaction(0);
-      setCompletedTransactions([]);
-    }, 1000);
   };
 
   return (
@@ -125,119 +149,164 @@ const TaskAutomation = () => {
         <div>
           <h1 className="text-2xl font-semibold">Task Automation & Workflow Management</h1>
           <p className="text-muted-foreground mt-1">
-            AI-assisted transaction categorization and workflow management
+            Automate classification of transactions and assignment of review tasks
           </p>
         </div>
 
-        {!showResults && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckSquare className="h-5 w-5 text-primary" />
-                Task Automation Assistant
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleQuerySubmit} className="space-y-4">
-                <div>
-                  <Input
-                    placeholder="Type 'categorize transactions' or 'what's pending in task flow?'..."
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    className="w-full"
-                  />
-                </div>
-                <Button type="submit" disabled={isProcessing}>
-                  {isProcessing ? "Fetching recent transactions..." : "Process Tasks"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        )}
+        <Card>
+          <CardHeader className="border-b">
+            <CardTitle className="text-lg">System Configuration</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">CRM System</label>
+                <Select value={selectedCRM} onValueChange={setSelectedCRM}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select CRM" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="keap">Keap (InfusionSoft)</SelectItem>
+                    <SelectItem value="zoho">Zoho CRM</SelectItem>
+                    <SelectItem value="salesforce">Salesforce</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Accounting System</label>
+                <Select value={selectedAccounting} onValueChange={setSelectedAccounting}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select accounting system" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="myob">MYOB</SelectItem>
+                    <SelectItem value="xero">Xero</SelectItem>
+                    <SelectItem value="quickbooks">QuickBooks</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <Button onClick={handleProcessData} disabled={isProcessing}>
+              {isProcessing ? "Processing Transactions..." : "Process New Transactions"}
+            </Button>
+          </CardContent>
+        </Card>
 
-        {showResults && currentTransaction < transactions.length && (
-          <Card>
-            <CardHeader className="border-b">
-              <div className="flex items-center justify-between">
-                <CardTitle>Transaction Categorization</CardTitle>
-                <Badge variant="outline" className="bg-blue-50 text-blue-600">
-                  Transaction {currentTransaction + 1} of {transactions.length}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Description</p>
-                    <p className="font-medium">{transactions[currentTransaction].description}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Amount</p>
-                    <p className="font-medium">{transactions[currentTransaction].amount}</p>
+        {transactions.length > 0 && (
+          <>
+            <Card>
+              <CardHeader className="border-b">
+                <CardTitle className="text-lg">Live Feed: New Transactions</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="text-sm text-muted-foreground">
+                      <span className="font-medium">{transactions.length}</span> transactions imported from {selectedCRM}
+                    </div>
+                    <Badge className="bg-blue-50 text-blue-600">XGBoost ML Categorization Applied</Badge>
                   </div>
                 </div>
                 
-                <div>
-                  <p className="text-sm text-muted-foreground">Date</p>
-                  <p>{new Date(transactions[currentTransaction].date).toLocaleDateString()}</p>
+                <div className="border-t">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Suggested Category</TableHead>
+                        <TableHead>Confidence</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {transactions.map((tx) => (
+                        <TableRow key={tx.id} className={
+                          tx.status === "processed" ? "bg-green-50/30" : 
+                          tx.status === "review" ? "bg-amber-50/30" : ""
+                        }>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{tx.description}</div>
+                              <div className="text-sm text-muted-foreground">{new Date(tx.date).toLocaleDateString()}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>{tx.amount}</TableCell>
+                          <TableCell>{tx.suggestedCategory}</TableCell>
+                          <TableCell>
+                            <Badge className={
+                              tx.confidence >= 90 ? "bg-green-50 text-green-600" : 
+                              tx.confidence >= 75 ? "bg-amber-50 text-amber-600" : 
+                              "bg-red-50 text-red-600"
+                            }>
+                              {tx.confidence}%
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={
+                              tx.status === "processed" ? "bg-green-50 text-green-600" : 
+                              tx.status === "review" ? "bg-amber-50 text-amber-600" : 
+                              "bg-blue-50 text-blue-600"
+                            }>
+                              {tx.status === "processed" ? "Processed" : 
+                               tx.status === "review" ? "In Review" : 
+                               "Pending"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {tx.status === "pending" && (
+                              <div className="flex justify-end gap-2">
+                                <Button size="sm" variant="outline" onClick={() => handleAssignForReview(tx.id)}>
+                                  <User className="h-4 w-4 mr-1" />
+                                  Review
+                                </Button>
+                                <Button size="sm" onClick={() => handleAccept(tx.id)}>
+                                  <CheckCircle className="h-4 w-4 mr-1" />
+                                  Accept
+                                </Button>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
-                
-                <Separator />
-                
-                <div className="bg-green-50/30 p-4 rounded-md border border-green-100">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-green-700">Suggested Category</p>
-                    <Badge variant="outline" className="bg-green-50 text-green-600">
-                      <CheckCircle className="h-3 w-3 mr-1" /> ML Prediction
-                    </Badge>
-                  </div>
-                  <p className="text-green-800 font-medium mt-1">{transactions[currentTransaction].suggestedCategory}</p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="border-b">
+                <CardTitle className="text-lg">Task Logs</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="space-y-3">
+                  {taskLogs.map((log, index) => (
+                    <div key={index} className="flex items-center gap-3 text-sm">
+                      <Badge variant="outline" className="whitespace-nowrap">
+                        {log.timestamp}
+                      </Badge>
+                      <span className="font-medium">{log.user}:</span>
+                      <span>{log.action}</span>
+                    </div>
+                  ))}
                 </div>
-                
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Alternative Categories</p>
-                  <div className="flex flex-wrap gap-2">
-                    {transactions[currentTransaction].alternativeCategories.map((category, idx) => (
-                      <Button 
-                        key={idx} 
-                        variant="outline" 
-                        size="sm" 
-                        className="text-xs"
-                        onClick={() => handleChangeCategory(transactions[currentTransaction].id, category)}
-                      >
-                        {category}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-between border-t pt-4">
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  onClick={handleAssignForReview}
-                >
-                  <User className="h-4 w-4 mr-2" />
-                  Assign for Review
+              </CardContent>
+              <CardFooter className="border-t pt-4 pb-4 flex justify-between">
+                <Button variant="outline">
+                  <FileText className="h-4 w-4 mr-2" />
+                  View Full Activity Log
                 </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => handleChangeCategory(transactions[currentTransaction].id, "Custom Category")}
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Change Category
+                <Button variant="outline">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  View Classification Rules
                 </Button>
-              </div>
-              <Button 
-                onClick={() => handleAccept(transactions[currentTransaction].id)}
-              >
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Accept
-              </Button>
-            </CardFooter>
-          </Card>
+              </CardFooter>
+            </Card>
+          </>
         )}
       </div>
     </AppLayout>
