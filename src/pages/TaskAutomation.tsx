@@ -9,6 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AgentDataSourcePanel } from "@/components/data-access/AgentDataSourcePanel";
+import { getMockDataSources } from "@/components/data-access/mockDataUtils";
 
 interface Transaction {
   id: string;
@@ -28,6 +30,22 @@ const TaskAutomation = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [completedTransactions, setCompletedTransactions] = useState<string[]>([]);
   const { toast } = useToast();
+
+  // Get mock data sources for the automation agent
+  const dataSources = getMockDataSources("automation");
+
+  const handleRefreshDataSources = async () => {
+    // Simulate API call to refresh data sources
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        toast({
+          title: "Data sources refreshed",
+          description: "All connected systems have been successfully synchronized.",
+        });
+        resolve();
+      }, 1500);
+    });
+  };
 
   // Mock transactions
   const mockTransactions: Transaction[] = [
@@ -152,6 +170,13 @@ const TaskAutomation = () => {
             Automate classification of transactions and assignment of review tasks
           </p>
         </div>
+
+        {/* Data Source Panel */}
+        <AgentDataSourcePanel 
+          sources={dataSources}
+          agentType="automation"
+          onRefresh={handleRefreshDataSources}
+        />
 
         <Card>
           <CardHeader className="border-b">

@@ -10,6 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AgentDataSourcePanel } from "@/components/data-access/AgentDataSourcePanel";
+import { getMockDataSources } from "@/components/data-access/mockDataUtils";
 
 const ClientRecommendations = () => {
   const [selectedCRM, setSelectedCRM] = useState("odoo");
@@ -54,6 +56,22 @@ const ClientRecommendations = () => {
     "Generating recommendations",
     "Complete"
   ];
+
+  // Get mock data sources for the recommendations agent
+  const dataSources = getMockDataSources("recommendations");
+
+  const handleRefreshDataSources = async () => {
+    // Simulate API call to refresh data sources
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        toast({
+          title: "Data sources refreshed",
+          description: "All connected systems have been successfully synchronized.",
+        });
+        resolve();
+      }, 1500);
+    });
+  };
 
   const handleProcess = () => {
     setIsProcessing(true);
@@ -105,6 +123,13 @@ const ClientRecommendations = () => {
           </p>
         </div>
 
+        {/* Data Source Panel */}
+        <AgentDataSourcePanel 
+          sources={dataSources}
+          agentType="recommendations"
+          onRefresh={handleRefreshDataSources}
+        />
+
         <Card>
           <CardHeader className="border-b">
             <CardTitle className="text-lg">Data Source Configuration</CardTitle>
@@ -146,6 +171,7 @@ const ClientRecommendations = () => {
           </CardContent>
         </Card>
 
+        {/* Processing Steps Card */}
         {(isProcessing || currentStep > 0) && (
           <Card>
             <CardHeader className="border-b">
@@ -178,6 +204,7 @@ const ClientRecommendations = () => {
           </Card>
         )}
 
+        {/* Recommendations Card */}
         {recommendations.length > 0 && (
           <Card>
             <CardHeader className="border-b">

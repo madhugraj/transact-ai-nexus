@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -11,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AgentDataSourcePanel } from "@/components/data-access/AgentDataSourcePanel";
+import { getMockDataSources } from "@/components/data-access/mockDataUtils";
 
 interface ComplianceIssue {
   id: string;
@@ -33,6 +34,22 @@ const ComplianceMonitoring = () => {
   const [showSourceRecord, setShowSourceRecord] = useState(false);
   const [complianceIssues, setComplianceIssues] = useState<ComplianceIssue[]>([]);
   const { toast } = useToast();
+
+  // Get mock data sources for the compliance agent
+  const dataSources = getMockDataSources("compliance");
+
+  const handleRefreshDataSources = async () => {
+    // Simulate API call to refresh data sources
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        toast({
+          title: "Data sources refreshed",
+          description: "All connected systems have been successfully synchronized.",
+        });
+        resolve();
+      }, 1500);
+    });
+  };
 
   // Mock compliance issues
   const mockIssues: ComplianceIssue[] = [
@@ -193,6 +210,13 @@ const ComplianceMonitoring = () => {
             Scan CRM and accounting data for regulatory and policy violations
           </p>
         </div>
+
+        {/* Data Source Panel */}
+        <AgentDataSourcePanel 
+          sources={dataSources}
+          agentType="compliance"
+          onRefresh={handleRefreshDataSources}
+        />
 
         <Card>
           <CardHeader className="border-b">

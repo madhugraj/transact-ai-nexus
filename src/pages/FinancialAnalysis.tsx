@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { ChartContainer } from "@/components/ui/chart";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AgentDataSourcePanel } from "@/components/data-access/AgentDataSourcePanel";
+import { getMockDataSources } from "@/components/data-access/mockDataUtils";
 
 const FinancialAnalysis = () => {
   const [selectedCRM, setSelectedCRM] = useState("zoho");
@@ -73,6 +75,22 @@ const FinancialAnalysis = () => {
     category: ['Software', 'Hardware', 'Consulting', 'Support', 'Training'][i % 5]
   }));
 
+  // Get mock data sources for the financial analysis agent
+  const dataSources = getMockDataSources("financial");
+
+  const handleRefreshDataSources = async () => {
+    // Simulate API call to refresh data sources
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        toast({
+          title: "Data sources refreshed",
+          description: "All connected systems have been successfully synchronized.",
+        });
+        resolve();
+      }, 1500);
+    });
+  };
+
   const handleProcessData = () => {
     setIsProcessing(true);
     
@@ -125,6 +143,13 @@ const FinancialAnalysis = () => {
             Analyze historical sales and transactions to forecast trends and detect anomalies
           </p>
         </div>
+
+        {/* Data Source Panel */}
+        <AgentDataSourcePanel 
+          sources={dataSources}
+          agentType="financial"
+          onRefresh={handleRefreshDataSources}
+        />
 
         <Card>
           <CardHeader className="border-b">
