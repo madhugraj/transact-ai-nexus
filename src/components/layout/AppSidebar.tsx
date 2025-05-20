@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -15,7 +14,11 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
-  FileText
+  FileText,
+  Users,
+  TrendingUp,
+  CheckSquare,
+  AlertTriangle
 } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
@@ -63,7 +66,10 @@ const AppSidebar = () => {
     { label: "Upload", icon: Upload, href: "/upload" },
     { label: "Database", icon: Database, href: "/database" },
     { label: "Actions", icon: Send, href: "/actions" },
-    { label: "SAP Data", icon: File, href: "/sap-data" },
+    { label: "Client Recommendations", icon: Users, href: "/client-recommendations" },
+    { label: "Financial Analysis", icon: TrendingUp, href: "/financial-analysis" },
+    { label: "Task Automation", icon: CheckSquare, href: "/task-automation" },
+    { label: "Compliance Monitoring", icon: AlertTriangle, href: "/compliance-monitoring" },
     { label: "Settings", icon: Settings, href: "/settings" },
   ];
 
