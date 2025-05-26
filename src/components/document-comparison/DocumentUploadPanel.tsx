@@ -62,7 +62,7 @@ const DOCUMENT_CLASSIFICATION_PROMPT = `You are an expert AI assistant that proc
 
 8. **Education & Certification**
    - Student Application
-   - Exam Score Report
+   - Certificates
 
 ---
 
@@ -98,10 +98,10 @@ Refer to the following domains and supported subtypes:
 2. **Insurance & Claims** — Claim Form, Accident Report  
 3. **Banking & Loan Origination** — Loan Application, Property Appraisal  
 4. **Legal & Compliance** — Contract, Company Filings  
-5. **HR & Onboarding** — Offer Letter, Resume  
+5. **HR & Onboarding** — JD or Job Description, Resume  
 6. **Healthcare** — Prescription, Treatment Summary  
 7. **Trade & Export/Import** — Letter of Credit, Customs Declaration  
-8. **Education & Certification** — Student Application, Exam Score Report  
+8. **Education & Certification** — Student Application, Certificates 
 
 ---
 

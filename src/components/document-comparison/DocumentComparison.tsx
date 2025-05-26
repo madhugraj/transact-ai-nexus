@@ -84,9 +84,9 @@ Dynamically apply business logic for comparison based on the pair of documents.
 * Compare salary (CTC), date of joining, personal details
 * Match submitted ID proof with offer letter information
 
-#### B. Resume vs Background Check
-* Validate past employment history, education
-* Flag discrepancies in duration, company name, or degree
+#### B. JD vs Resume
+* Validate JD with resume on qulaification, experience, skillset, others
+* Flag discrepancies in qulalification, or degree 
 
 ---
 
