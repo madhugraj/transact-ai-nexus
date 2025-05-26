@@ -119,6 +119,106 @@ Based on your classification, extract the content into an appropriate **JSON** u
 
 Return ONLY a valid JSON object with the classification and extracted data. Do not include any additional text or markdown formatting.`;
 
+const COMPARISON_PROMPT = `You are an intelligent agent designed to compare a source document against one or more target documents. The comparison logic dynamically adjusts based on the document category and type (e.g., Invoice, PO, Claim Form, Offer Letter).
+
+---
+
+### 🔍 **Your Tasks:**
+
+#### 1. Classify Documents
+Identify the document type (e.g., PO, Invoice, Claim Form, etc.) and map it to the appropriate category:
+* **Procurement & Finance**: PO, Invoice, Delivery Note, Payment Advice
+* **Insurance & Claims**: Claim Form, Medical Bills, Accident Report
+* **HR & Onboarding**: Offer Letter, Resume, Submitted Documents
+
+#### 2. Parse and Normalize
+Extract relevant fields from each document into structured JSON.
+
+#### 3. Perform Comparison Logic
+Dynamically apply business logic for comparison based on the pair of documents.
+
+---
+
+### 🧾 **Procurement & Finance Use Cases**
+
+#### A. PO vs Invoices
+* Match PO number, vendor name
+* Compare line_items: check for quantity, rate, tax mismatches
+* Calculate % deviation in unit rate or total
+
+#### B. Invoice vs Delivery Note / GRN
+* Ensure line-item quantities and items match what was actually delivered
+* Highlight missing items or excess billing
+
+#### C. Payment Advice vs Invoices
+* Match invoice numbers
+* Check if each invoice is fully paid, partially paid, or unpaid
+* Return payment summary with status per invoice
+
+---
+
+### 🛡️ **Insurance & Claims Use Cases**
+
+#### A. Claim Form vs Medical Bills
+* Match treatment details, patient info, and claimed amount vs submitted bills
+* Flag over-claims or missing bills
+
+#### B. Claim Form vs Policy Terms
+* Ensure coverage for the claimed condition exists
+* Flag policy exclusions or claim rejection criteria
+
+#### C. Accident Report vs Photographic Evidence
+* Extract stated damage from report
+* Cross-check with image metadata and description
+
+---
+
+### 👨‍💼 **HR & Onboarding Use Cases**
+
+#### A. Offer Letter vs Submitted Documents
+* Compare salary (CTC), date of joining, personal details
+* Match submitted ID proof with offer letter information
+
+#### B. Resume vs Background Check
+* Validate past employment history, education
+* Flag discrepancies in duration, company name, or degree
+
+---
+
+### 📊 **Output Format**
+Return a JSON result for the dashboard:
+
+{
+  "comparison_summary": {
+    "source_doc": "source_document_title",
+    "target_docs": ["target_doc_1", "target_doc_2"],
+    "category": "Procurement & Finance",
+    "comparison_type": "PO vs Invoices",
+    "status": "Partial Match",
+    "issues_found": 2,
+    "match_score": 85
+  },
+  "detailed_comparison": [
+    {
+      "field": "vendor_name",
+      "source_value": "ABC Corp",
+      "target_value": "ABC Corporation",
+      "match": true,
+      "mismatch_type": null
+    }
+  ]
+}
+
+---
+
+### 🧠 Guidelines
+* Use fuzzy logic for text mismatches (e.g., "ABC Corp" vs "ABC Corporation")
+* Return match_score for each document pair
+* If document type is not known, classify based on layout and keywords
+
+Source Document JSON: {sourceDoc}
+Target Documents JSON: {targetDocs}`;
+
 // Enhanced JSON parsing function
 const parseGeminiResponse = (responseText: string): any => {
   console.log("Raw Gemini response:", responseText);
@@ -181,6 +281,26 @@ const parseGeminiResponse = (responseText: string): any => {
 // Global variable to store the current source document ID
 let currentSourceDocumentId: number | null = null;
 
+// Function to check if document already exists in database
+const checkDocumentExists = async (fileName: string, fileSize: number): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase
+      .from('compare_source_document')
+      .select('id')
+      .eq('doc_title', fileName);
+
+    if (error) {
+      console.error("Error checking document existence:", error);
+      return false;
+    }
+
+    return data && data.length > 0;
+  } catch (error) {
+    console.error("Error in checkDocumentExists:", error);
+    return false;
+  }
+};
+
 export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
   poFile,
   invoiceFiles,
@@ -195,6 +315,16 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
   const processAndStoreSourceDocument = async (file: File) => {
     try {
       console.log("Starting source document processing for:", file.name, "Size:", file.size, "Type:", file.type);
+      
+      // Check if document already exists
+      const exists = await checkDocumentExists(file.name, file.size);
+      if (exists) {
+        toast({
+          title: "Document Already Exists",
+          description: "This document has already been processed. Skipping duplicate processing.",
+        });
+        return;
+      }
       
       toast({
         title: "Processing Document",
