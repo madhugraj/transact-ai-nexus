@@ -77,6 +77,65 @@ Based on your classification, extract the content into an appropriate **JSON** u
 
 Return ONLY a valid JSON object with the classification and extracted data. Do not include any additional text or markdown formatting.`;
 
+// Enhanced JSON parsing function
+const parseGeminiResponse = (responseText: string): any => {
+  console.log("Raw Gemini response:", responseText);
+  
+  // Strategy 1: Try to parse as direct JSON
+  try {
+    return JSON.parse(responseText.trim());
+  } catch (error) {
+    console.log("Direct JSON parsing failed, trying extraction methods...");
+  }
+  
+  // Strategy 2: Extract JSON from markdown code blocks
+  const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/i;
+  const codeBlockMatch = responseText.match(codeBlockRegex);
+  
+  if (codeBlockMatch) {
+    try {
+      const extractedJson = JSON.parse(codeBlockMatch[1].trim());
+      console.log("Successfully extracted JSON from code block");
+      return extractedJson;
+    } catch (error) {
+      console.error("Failed to parse JSON from code block:", error);
+    }
+  }
+  
+  // Strategy 3: Find JSON object in the text (look for { to })
+  const jsonRegex = /\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}/;
+  const jsonMatch = responseText.match(jsonRegex);
+  
+  if (jsonMatch) {
+    try {
+      const extractedJson = JSON.parse(jsonMatch[0]);
+      console.log("Successfully extracted JSON using regex");
+      return extractedJson;
+    } catch (error) {
+      console.error("Failed to parse extracted JSON:", error);
+    }
+  }
+  
+  // Strategy 4: Try to clean and parse common formatting issues
+  let cleanedText = responseText
+    .replace(/^[^{]*/, '') // Remove text before first {
+    .replace(/[^}]*$/, '') // Remove text after last }
+    .replace(/,\s*}/g, '}') // Remove trailing commas
+    .replace(/,\s*]/g, ']'); // Remove trailing commas in arrays
+  
+  if (cleanedText.startsWith('{') && cleanedText.endsWith('}')) {
+    try {
+      const cleanedJson = JSON.parse(cleanedText);
+      console.log("Successfully parsed cleaned JSON");
+      return cleanedJson;
+    } catch (error) {
+      console.error("Failed to parse cleaned JSON:", error);
+    }
+  }
+  
+  throw new Error(`Unable to extract valid JSON from response. Raw response: ${responseText.substring(0, 200)}...`);
+};
+
 export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
   poFile,
   invoiceFiles,
@@ -109,13 +168,21 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
         throw new Error(response.error || "Failed to process document");
       }
 
-      // Parse the JSON response
+      // Parse the JSON response using enhanced parsing
       let extractedData;
       try {
-        extractedData = JSON.parse(response.data);
+        extractedData = parseGeminiResponse(response.data);
+        
+        // Validate that we have the basic structure we expect
+        if (!extractedData || typeof extractedData !== 'object') {
+          throw new Error("Parsed data is not a valid object");
+        }
+        
+        console.log("Successfully parsed document data:", extractedData);
+        
       } catch (parseError) {
-        console.error("Failed to parse Gemini response:", response.data);
-        throw new Error("Invalid response format from AI");
+        console.error("Enhanced parsing failed:", parseError);
+        throw new Error(`Failed to parse AI response: ${parseError instanceof Error ? parseError.message : "Invalid format"}`);
       }
 
       // Store in Supabase
@@ -123,7 +190,7 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
         .from('compare_source_document')
         .insert({
           doc_title: file.name,
-          doc_type: extractedData.document_type || "Unknown",
+          doc_type: extractedData.document_type || extractedData.classification || "Unknown",
           doc_json_extract: extractedData
         });
 
@@ -133,7 +200,7 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
 
       toast({
         title: "Document Processed",
-        description: `Successfully classified as: ${extractedData.document_type || "Unknown"}`,
+        description: `Successfully classified as: ${extractedData.document_type || extractedData.classification || "Unknown"}`,
       });
 
     } catch (error) {
