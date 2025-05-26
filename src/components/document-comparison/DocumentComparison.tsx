@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -349,7 +350,7 @@ const DocumentComparison = () => {
 
       if (comparisonData && comparisonData.comparison_summary && comparisonData.detailed_comparison) {
         // Convert detailed comparison to our format
-        const mockResults: ComparisonResult[] = comparisonData.detailed_comparison.map((item: any) => ({
+        const uiResults: ComparisonResult[] = comparisonData.detailed_comparison.map((item: any) => ({
           field: item.field || "Unknown Field",
           poValue: item.source_value || "N/A",
           invoiceValue: item.target_value || "N/A",
@@ -359,7 +360,7 @@ const DocumentComparison = () => {
         const percentage = comparisonData.comparison_summary.match_score || 0;
         
         console.log("Formatted comparison results:", {
-          resultsCount: mockResults.length,
+          resultsCount: uiResults.length,
           matchPercentage: percentage,
           summary: comparisonData.comparison_summary
         });
@@ -394,13 +395,15 @@ const DocumentComparison = () => {
           console.log("Successfully stored comparison results:", insertedResult);
         }
         
-        setComparisonResults(mockResults);
+        // Update UI state to show results
+        console.log("Setting UI state with results...");
+        setComparisonResults(uiResults);
         setMatchPercentage(percentage);
         setActiveTab("results");
         
         console.log("=== COMPARISON COMPLETED SUCCESSFULLY ===");
         console.log("Final results set in state:", {
-          resultsCount: mockResults.length,
+          resultsCount: uiResults.length,
           matchPercentage: percentage
         });
         
@@ -408,6 +411,17 @@ const DocumentComparison = () => {
           title: "Comparison Complete",
           description: `Documents compared with ${percentage}% match`,
         });
+
+        // Dispatch custom event to notify dashboard to refresh
+        window.dispatchEvent(new CustomEvent('comparisonComplete', {
+          detail: {
+            sourceDoc: sourceDoc,
+            targetDocs: targetDocsArray,
+            results: comparisonData,
+            matchPercentage: percentage
+          }
+        }));
+        
       } else {
         console.error("Invalid comparison response format:", comparisonData);
         throw new Error("Invalid comparison response format");
@@ -454,7 +468,7 @@ const DocumentComparison = () => {
         </TabsContent>
         
         <TabsContent value="results" className="mt-4 space-y-4">
-          {comparisonResults.length > 0 && (
+          {comparisonResults.length > 0 ? (
             <ComparisonResultsPanel
               poFile={poFile}
               invoiceFiles={invoiceFiles}
@@ -463,6 +477,10 @@ const DocumentComparison = () => {
               comparisonResults={comparisonResults}
               matchPercentage={matchPercentage}
             />
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              No comparison results available. Please run a comparison first.
+            </div>
           )}
         </TabsContent>
       </Tabs>

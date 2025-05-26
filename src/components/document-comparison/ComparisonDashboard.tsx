@@ -16,7 +16,7 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { AlertCircle, CheckCircle, Eye, FileText } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye, FileText, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -31,6 +31,7 @@ interface ComparisonData {
   match_score: number;
   issues_found: number;
   created_at: string;
+  detailed_results?: any;
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
@@ -38,61 +39,76 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 const ComparisonDashboard: React.FC = () => {
   const [comparisons, setComparisons] = useState<ComparisonData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchComparisons();
+    
+    // Listen for comparison complete events
+    const handleComparisonComplete = () => {
+      console.log("Dashboard received comparison complete event, refreshing...");
+      fetchComparisons();
+    };
+    
+    window.addEventListener('comparisonComplete', handleComparisonComplete);
+    
+    return () => {
+      window.removeEventListener('comparisonComplete', handleComparisonComplete);
+    };
   }, []);
 
   const fetchComparisons = async () => {
     try {
-      // Fetch source documents
-      const { data: sourceDocs, error: sourceError } = await supabase
-        .from('compare_source_document')
-        .select('*')
+      setRefreshing(true);
+      console.log("Fetching comparison data for dashboard...");
+      
+      // Fetch comparison results with source document details
+      const { data: comparisonResults, error: resultsError } = await supabase
+        .from('Doc_Compare_results')
+        .select(`
+          *,
+          compare_source_document!Doc_Compare_results_doc_id_compare_fkey (
+            doc_title,
+            doc_type,
+            created_at
+          )
+        `)
         .order('created_at', { ascending: false });
 
-      if (sourceError) throw sourceError;
+      if (resultsError) {
+        console.error("Error fetching comparison results:", resultsError);
+        throw resultsError;
+      }
 
-      // Fetch target documents
-      const { data: targetDocs, error: targetError } = await supabase
-        .from('compare_target_docs')
-        .select('*');
+      console.log("Raw comparison results:", comparisonResults);
 
-      if (targetError) throw targetError;
-
-      // Combine and format data
-      const combinedData: ComparisonData[] = sourceDocs?.map((source) => {
-        const targets = targetDocs?.find(t => t.id === source.id);
-        const targetTitles = [];
+      // Transform the data for dashboard display
+      const transformedData: ComparisonData[] = comparisonResults?.map((result) => {
+        const comparisonData = result.doc_compare_results as any;
+        const summary = comparisonData?.comparison_summary || {};
         
-        if (targets) {
-          for (let i = 1; i <= 5; i++) {
-            if (targets[`doc_title_${i}`]) {
-              targetTitles.push(targets[`doc_title_${i}`]);
-            }
-          }
-        }
-
-        // Determine category and comparison type based on document types
-        const category = getCategoryFromType(source.doc_type);
-        const comparison_type = getComparisonType(source.doc_type, targets);
+        // Extract target document names from comparison results
+        const targetDocs = summary.target_docs || [];
         
         return {
-          id: source.id,
-          source_doc: source.doc_title || 'Unknown',
-          source_type: source.doc_type || 'Unknown',
-          target_docs: targetTitles,
-          category,
-          comparison_type,
-          status: targetTitles.length > 0 ? 'Completed' : 'Pending',
-          match_score: Math.floor(Math.random() * 40) + 60, // Mock score for now
-          issues_found: Math.floor(Math.random() * 5),
-          created_at: source.created_at
+          id: result.id,
+          source_doc: summary.source_doc || result.compare_source_document?.doc_title || 'Unknown Document',
+          source_type: result.doc_type_source || 'Unknown',
+          target_docs: Array.isArray(targetDocs) ? targetDocs : [targetDocs].filter(Boolean),
+          category: summary.category || getCategoryFromType(result.doc_type_source),
+          comparison_type: summary.comparison_type || getComparisonType(result.doc_type_source, result.doc_type_target),
+          status: summary.status || 'Completed',
+          match_score: summary.match_score || comparisonData?.match_percentage || 0,
+          issues_found: summary.issues_found || 0,
+          created_at: result.created_at,
+          detailed_results: comparisonData
         };
       }) || [];
 
-      setComparisons(combinedData);
+      console.log("Transformed dashboard data:", transformedData);
+      setComparisons(transformedData);
+      
     } catch (error) {
       console.error('Error fetching comparisons:', error);
       toast({
@@ -102,37 +118,36 @@ const ComparisonDashboard: React.FC = () => {
       });
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
   const getCategoryFromType = (docType: string): string => {
     if (!docType) return 'Unknown';
     
-    if (docType.includes('Procurement') || docType.includes('Finance')) {
+    const type = docType.toLowerCase();
+    if (type.includes('purchase') || type.includes('invoice') || type.includes('payment') || type.includes('delivery')) {
       return 'Procurement & Finance';
-    } else if (docType.includes('Insurance') || docType.includes('Claims')) {
+    } else if (type.includes('claim') || type.includes('medical') || type.includes('accident') || type.includes('insurance')) {
       return 'Insurance & Claims';
-    } else if (docType.includes('HR') || docType.includes('Onboarding')) {
+    } else if (type.includes('offer') || type.includes('resume') || type.includes('employment') || type.includes('hr')) {
       return 'HR & Onboarding';
-    } else if (docType.includes('Healthcare')) {
-      return 'Healthcare';
-    } else if (docType.includes('Legal')) {
-      return 'Legal & Compliance';
     }
     
     return 'Other';
   };
 
-  const getComparisonType = (sourceType: string, targets: any): string => {
-    if (!sourceType || !targets) return 'Unknown';
+  const getComparisonType = (sourceType: string, targetType: string): string => {
+    if (!sourceType) return 'Unknown';
     
-    if (sourceType.includes('Purchase Order') || sourceType.includes('PO')) {
+    const source = sourceType.toLowerCase();
+    if (source.includes('purchase') || source.includes('po')) {
       return 'PO vs Invoices';
-    } else if (sourceType.includes('Invoice')) {
+    } else if (source.includes('invoice')) {
       return 'Invoice vs Delivery Notes';
-    } else if (sourceType.includes('Claim Form')) {
+    } else if (source.includes('claim')) {
       return 'Claim vs Medical Bills';
-    } else if (sourceType.includes('Offer Letter')) {
+    } else if (source.includes('offer')) {
       return 'Offer vs Documents';
     }
     
@@ -157,12 +172,12 @@ const ComparisonDashboard: React.FC = () => {
     const existing = acc.find(item => item.category === comp.category);
     if (existing) {
       existing.count += 1;
-      existing.avgScore = (existing.avgScore + comp.match_score) / 2;
+      existing.avgScore = Math.round((existing.avgScore * (existing.count - 1) + comp.match_score) / existing.count);
     } else {
       acc.push({
         category: comp.category,
         count: 1,
-        avgScore: comp.match_score
+        avgScore: Math.round(comp.match_score)
       });
     }
     return acc;
@@ -192,6 +207,19 @@ const ComparisonDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Comparison Dashboard</h2>
+        <Button 
+          onClick={fetchComparisons} 
+          disabled={refreshing}
+          variant="outline"
+          size="sm"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
@@ -203,7 +231,7 @@ const ComparisonDashboard: React.FC = () => {
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold">
-              {comparisons.filter(c => c.status === 'Completed').length}
+              {comparisons.filter(c => c.status !== 'Pending').length}
             </div>
             <div className="text-sm text-muted-foreground">Completed</div>
           </CardContent>
@@ -212,7 +240,7 @@ const ComparisonDashboard: React.FC = () => {
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold">
-              {Math.round(comparisons.reduce((acc, c) => acc + c.match_score, 0) / comparisons.length) || 0}%
+              {comparisons.length > 0 ? Math.round(comparisons.reduce((acc, c) => acc + c.match_score, 0) / comparisons.length) : 0}%
             </div>
             <div className="text-sm text-muted-foreground">Avg Match Score</div>
           </CardContent>
@@ -228,55 +256,57 @@ const ComparisonDashboard: React.FC = () => {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Comparisons by Category</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={categoryData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="category" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#8884d8" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+      {comparisons.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Comparisons by Category</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={categoryData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="category" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Match Status Distribution</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={statusData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  >
-                    {statusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Match Status Distribution</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={statusData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {statusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -295,6 +325,7 @@ const ComparisonDashboard: React.FC = () => {
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {comparison.target_docs.length} target document(s)
+                      {comparison.target_docs.length > 0 && `: ${comparison.target_docs.slice(0, 2).join(', ')}${comparison.target_docs.length > 2 ? '...' : ''}`}
                     </div>
                   </div>
                 </div>
@@ -309,7 +340,7 @@ const ComparisonDashboard: React.FC = () => {
                         </span>
                       </Badge>
                     </div>
-                    {comparison.status === 'Completed' && (
+                    {comparison.status !== 'Pending' && (
                       <div className="text-sm text-muted-foreground mt-1">
                         {comparison.issues_found} issues found
                       </div>
