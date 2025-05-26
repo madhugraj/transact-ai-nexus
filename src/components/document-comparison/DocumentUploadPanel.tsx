@@ -77,6 +77,48 @@ Based on your classification, extract the content into an appropriate **JSON** u
 
 Return ONLY a valid JSON object with the classification and extracted data. Do not include any additional text or markdown formatting.`;
 
+const TARGET_DOCUMENT_CLASSIFICATION_PROMPT = `You are an intelligent document processor. Your job is to **extract structured data** from one or more uploaded documents (up to 5) and store them in **schema-aware JSON format**, **ready for later comparison** with another document (source/reference).
+
+---
+
+### 🎯 OBJECTIVE
+
+1. Classify each uploaded document by its domain and subtype.
+2. Extract structured content into JSON using the appropriate format for that subtype.
+3. Prepare the results for downstream comparison (e.g., PO vs. Invoices, Claim vs. Evidence, etc.).
+
+---
+
+### 📚 SUPPORTED DOCUMENT TYPES:
+
+Refer to the following domains and supported subtypes:
+
+1. **Procurement & Finance** — Invoice, Purchase Order (PO), Payment Advice  
+2. **Insurance & Claims** — Claim Form, Accident Report  
+3. **Banking & Loan Origination** — Loan Application, Property Appraisal  
+4. **Legal & Compliance** — Contract, Company Filings  
+5. **HR & Onboarding** — Offer Letter, Resume  
+6. **Healthcare** — Prescription, Treatment Summary  
+7. **Trade & Export/Import** — Letter of Credit, Customs Declaration  
+8. **Education & Certification** — Student Application, Exam Score Report  
+
+---
+
+### 🧩 EXTRACTION FORMAT:
+
+For each uploaded document:
+
+- Identify its \`document_type\` as:  
+  \`"Domain - Subtype"\` (e.g., \`"Procurement & Finance - Invoice"\`).
+  
+- Extract key fields into **standardized JSON** based on subtype.
+- Do not hallucinate values if not found. Use null or omit the field.
+- Preserve all numeric and date formatting accurately.
+
+Based on your classification, extract the content into an appropriate **JSON** using **ONLY the schema relevant to the identified subtype**. Don't include irrelevant fields. Do not hallucinate missing data.
+
+Return ONLY a valid JSON object with the classification and extracted data. Do not include any additional text or markdown formatting.`;
+
 // Enhanced JSON parsing function
 const parseGeminiResponse = (responseText: string): any => {
   console.log("Raw Gemini response:", responseText);
@@ -136,6 +178,9 @@ const parseGeminiResponse = (responseText: string): any => {
   throw new Error(`Unable to extract valid JSON from response. Raw response: ${responseText.substring(0, 200)}...`);
 };
 
+// Global variable to store the current source document ID
+let currentSourceDocumentId: number | null = null;
+
 export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
   poFile,
   invoiceFiles,
@@ -149,7 +194,7 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
 
   const processAndStoreSourceDocument = async (file: File) => {
     try {
-      console.log("Starting document processing for:", file.name, "Size:", file.size, "Type:", file.type);
+      console.log("Starting source document processing for:", file.name, "Size:", file.size, "Type:", file.type);
       
       toast({
         title: "Processing Document",
@@ -195,22 +240,27 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
         throw new Error(`Failed to parse AI response: ${parseError instanceof Error ? parseError.message : "Invalid format"}`);
       }
 
-      // Store in Supabase
+      // Store in Supabase and get the ID
       console.log("Storing in Supabase...");
-      const { error } = await supabase
+      const { data: insertedData, error } = await supabase
         .from('compare_source_document')
         .insert({
           doc_title: file.name,
           doc_type: extractedData.document_type || extractedData.classification || "Unknown",
           doc_json_extract: extractedData
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) {
         console.error("Supabase insert error:", error);
         throw error;
       }
 
-      console.log("Document successfully processed and stored");
+      // Store the ID for linking target documents
+      currentSourceDocumentId = insertedData.id;
+      console.log("Source document successfully processed and stored with ID:", currentSourceDocumentId);
+      
       toast({
         title: "Document Processed",
         description: `Successfully classified as: ${extractedData.document_type || extractedData.classification || "Unknown"}`,
@@ -233,6 +283,100 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
     }
   };
 
+  const processAndStoreTargetDocuments = async (files: File[]) => {
+    try {
+      console.log("Starting target documents processing for:", files.length, "files");
+      
+      // Validate file count (1-5 files)
+      if (files.length < 1 || files.length > 5) {
+        throw new Error("Please upload between 1 and 5 target documents");
+      }
+
+      // Check if we have a source document ID to link to
+      if (!currentSourceDocumentId) {
+        throw new Error("Please upload and process a source document first");
+      }
+
+      toast({
+        title: "Processing Target Documents",
+        description: `Analyzing ${files.length} document(s) with AI...`,
+      });
+
+      const processedDocs = [];
+
+      // Process each file
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        console.log(`Processing target document ${i + 1}/${files.length}:`, file.name);
+
+        // Convert file to base64
+        const base64Image = await fileToBase64(file);
+        
+        // Process with Gemini using target document prompt
+        const response = await processImageWithGemini(
+          TARGET_DOCUMENT_CLASSIFICATION_PROMPT,
+          base64Image,
+          file.type
+        );
+
+        if (!response.success || !response.data) {
+          console.error(`Target document ${i + 1} processing failed:`, response.error);
+          throw new Error(`Failed to process document ${i + 1}: ${response.error || "Unknown error"}`);
+        }
+
+        // Parse the response
+        const extractedData = parseGeminiResponse(response.data);
+        
+        processedDocs.push({
+          title: file.name,
+          type: extractedData.document_type || extractedData.classification || "Unknown",
+          json: extractedData
+        });
+
+        console.log(`Target document ${i + 1} processed successfully:`, extractedData);
+      }
+
+      // Prepare data for insertion into compare_target_docs
+      const targetDocData: any = {
+        id: currentSourceDocumentId // Link to source document
+      };
+
+      // Map processed documents to the table structure (doc_title_1, doc_json_1, etc.)
+      processedDocs.forEach((doc, index) => {
+        const fieldIndex = index + 1;
+        targetDocData[`doc_title_${fieldIndex}`] = doc.title;
+        targetDocData[`doc_type_${fieldIndex}`] = doc.type;
+        targetDocData[`doc_json_${fieldIndex}`] = doc.json;
+      });
+
+      console.log("Storing target documents in Supabase with data:", targetDocData);
+
+      // Store in compare_target_docs table
+      const { error } = await supabase
+        .from('compare_target_docs')
+        .insert(targetDocData);
+
+      if (error) {
+        console.error("Supabase target docs insert error:", error);
+        throw error;
+      }
+
+      console.log("Target documents successfully processed and stored");
+      toast({
+        title: "Target Documents Processed",
+        description: `Successfully processed ${files.length} target document(s)`,
+      });
+
+    } catch (error) {
+      console.error("Error processing target documents:", error);
+      toast({
+        title: "Target Processing Failed",
+        description: error instanceof Error ? error.message : "Failed to process target documents",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSourceFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -245,11 +389,43 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
     }
   };
 
+  const handleTargetFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const fileArray = Array.from(files);
+      console.log("New target files selected:", fileArray.length, "files");
+      
+      // Validate file count before processing
+      if (fileArray.length > 5) {
+        toast({
+          title: "Too Many Files",
+          description: "Please select a maximum of 5 target documents",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Call the original handler first
+      handleInvoiceFileChange(e);
+      
+      // Then process and store the target documents
+      await processAndStoreTargetDocuments(fileArray);
+    }
+  };
+
   const handleReplaceFile = () => {
     console.log("Replace button clicked");
     const input = document.getElementById('po-upload') as HTMLInputElement;
     if (input) {
       input.value = ''; // Clear the input to allow selecting the same file again
+      input.click();
+    }
+  };
+
+  const handleAddMoreTargetFiles = () => {
+    console.log("Add more target files button clicked");
+    const input = document.getElementById('invoice-upload') as HTMLInputElement;
+    if (input) {
       input.click();
     }
   };
@@ -323,21 +499,23 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
                   </Button>
                 </div>
               ))}
-              <Button 
-                variant="outline" 
-                className="w-full mt-2" 
-                onClick={() => document.getElementById('invoice-upload')?.click()}
-              >
-                Add More Target Documents
-              </Button>
+              {invoiceFiles.length < 5 && (
+                <Button 
+                  variant="outline" 
+                  className="w-full mt-2" 
+                  onClick={handleAddMoreTargetFiles}
+                >
+                  Add More Target Documents ({invoiceFiles.length}/5)
+                </Button>
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center p-6 border-2 border-dashed rounded-md">
               <Upload className="h-10 w-10 text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground mb-4">Upload one or more Target documents</p>
+              <p className="text-sm text-muted-foreground mb-4">Upload 1-5 Target documents</p>
               <Button 
                 variant="outline" 
-                onClick={() => document.getElementById('invoice-upload')?.click()}
+                onClick={handleAddMoreTargetFiles}
               >
                 Reference Documents
               </Button>
@@ -347,7 +525,7 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
                 multiple 
                 className="hidden" 
                 accept=".pdf,.jpg,.jpeg,.png" 
-                onChange={handleInvoiceFileChange} 
+                onChange={handleTargetFileChange} 
               />
             </div>
           )}
