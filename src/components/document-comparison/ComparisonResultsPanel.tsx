@@ -433,39 +433,39 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
   comparisonType,
   category
 }) => {
-  const safeComparisonResults = Array.isArray(comparisonResults) ? comparisonResults : [];
-  const safeLineItems = Array.isArray(lineItems) ? lineItems : [];
+  const safeLineItems = Array.isArray(lineItems) ? lineItems.filter(i => i && typeof i === "object" && i.id) : [];
+  const safeComparisonResults = Array.isArray(comparisonResults) ? comparisonResults.filter(r => r && typeof r.match !== "undefined") : [];
   const hasLineItems = safeLineItems.length > 0;
 
   const matchStatusData = hasLineItems
     ? [
         {
           name: "Matches",
-          value: safeLineItems.filter(i => i?.quantityMatch && i?.priceMatch && i?.totalMatch).length
+          value: safeLineItems.filter(i => i.quantityMatch && i.priceMatch && i.totalMatch).length
         },
         {
           name: "Quantity Mismatch",
-          value: safeLineItems.filter(i => !i?.quantityMatch && i?.priceMatch).length
+          value: safeLineItems.filter(i => !i.quantityMatch && i.priceMatch).length
         },
         {
           name: "Price Mismatch",
-          value: safeLineItems.filter(i => i?.quantityMatch && !i?.priceMatch).length
+          value: safeLineItems.filter(i => i.quantityMatch && !i.priceMatch).length
         },
         {
           name: "Multiple Issues",
-          value: safeLineItems.filter(i => !i?.quantityMatch && !i?.priceMatch).length
+          value: safeLineItems.filter(i => !i.quantityMatch && !i.priceMatch).length
         }
       ]
     : [];
 
   const quantityComparisonData = safeLineItems.map(i => ({
-    name: i?.itemName?.split(' ').slice(0, 2).join(' ') || `Item-${i?.id}`,
-    poQuantity: i?.poQuantity ?? 0,
-    invoiceQuantity: i?.invoiceQuantity ?? 0
+    name: i.itemName?.split(' ').slice(0, 2).join(' ') || `Item-${i.id}`,
+    poQuantity: i.poQuantity ?? 0,
+    invoiceQuantity: i.invoiceQuantity ?? 0
   }));
 
-  const poTotal = safeLineItems.reduce((sum, i) => sum + (i?.poTotal || 0), 0);
-  const invoiceTotal = safeLineItems.reduce((sum, i) => sum + (i?.invoiceTotal || 0), 0);
+  const poTotal = safeLineItems.reduce((sum, i) => sum + (i.poTotal || 0), 0);
+  const invoiceTotal = safeLineItems.reduce((sum, i) => sum + (i.invoiceTotal || 0), 0);
   const totalDifference = Math.abs(poTotal - invoiceTotal);
   const percentageDifference = poTotal > 0 ? (totalDifference / poTotal) * 100 : 0;
 
@@ -548,7 +548,7 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
                 </div>
               </div>
 
-              {/* Financial Summary */}
+              {/* Totals */}
               <div className="mt-6 grid md:grid-cols-3 gap-4">
                 <div className="bg-blue-50 p-4 rounded-md">
                   <div className="text-sm font-medium text-blue-600">PO Total</div>
@@ -568,7 +568,7 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
                 </div>
               </div>
 
-              {/* Line Item Table */}
+              {/* Line Items Table */}
               <div className="mt-6">
                 <h3 className="text-md font-semibold mb-2">Line Item Comparison</h3>
                 <div className="overflow-x-auto">
@@ -586,31 +586,28 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {safeLineItems.map((item) => {
-                        if (!item || typeof item.totalMatch === "undefined") return null;
-                        return (
-                          <TableRow key={item.id}>
-                            <TableCell>{item.itemName}</TableCell>
-                            <TableCell className="text-right">{item.poQuantity}</TableCell>
-                            <TableCell className="text-right">{item.invoiceQuantity}</TableCell>
-                            <TableCell className="text-right">${item.poUnitPrice.toFixed(2)}</TableCell>
-                            <TableCell className="text-right">${item.invoiceUnitPrice.toFixed(2)}</TableCell>
-                            <TableCell className="text-right">${item.poTotal.toFixed(2)}</TableCell>
-                            <TableCell className="text-right">${item.invoiceTotal.toFixed(2)}</TableCell>
-                            <TableCell>
-                              {item.totalMatch ? (
-                                <div className="text-green-600 flex items-center">
-                                  <CheckCircle className="h-4 w-4 mr-1" /> Match
-                                </div>
-                              ) : (
-                                <div className="text-red-600 flex items-center">
-                                  <AlertCircle className="h-4 w-4 mr-1" /> Mismatch
-                                </div>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                      {safeLineItems.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>{item.itemName}</TableCell>
+                          <TableCell className="text-right">{item.poQuantity}</TableCell>
+                          <TableCell className="text-right">{item.invoiceQuantity}</TableCell>
+                          <TableCell className="text-right">${item.poUnitPrice.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">${item.invoiceUnitPrice.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">${item.poTotal.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">${item.invoiceTotal.toFixed(2)}</TableCell>
+                          <TableCell>
+                            {item.totalMatch ? (
+                              <div className="text-green-600 flex items-center">
+                                <CheckCircle className="h-4 w-4 mr-1" /> Match
+                              </div>
+                            ) : (
+                              <div className="text-red-600 flex items-center">
+                                <AlertCircle className="h-4 w-4 mr-1" /> Mismatch
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                 </div>
@@ -620,7 +617,7 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
         </CardContent>
       </Card>
 
-      {/* Header Comparison Table */}
+      {/* Header Fields Comparison */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Header Fields</CardTitle>
@@ -637,34 +634,31 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {safeComparisonResults.map((result, index) => {
-                  if (!result || typeof result.match === "undefined") return null;
-                  return (
-                    <TableRow key={index}>
-                      <TableCell>{result.field}</TableCell>
-                      <TableCell>{result.poValue}</TableCell>
-                      <TableCell>{result.invoiceValue}</TableCell>
-                      <TableCell>
-                        {result.match ? (
-                          <div className="text-green-600 flex items-center">
-                            <CheckCircle className="h-4 w-4 mr-1" /> Match
-                          </div>
-                        ) : (
-                          <div className="text-red-600 flex items-center">
-                            <AlertCircle className="h-4 w-4 mr-1" /> Mismatch
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {safeComparisonResults.map((result, index) => (
+                  <TableRow key={index}>
+                    <TableCell>{result.field}</TableCell>
+                    <TableCell>{result.poValue}</TableCell>
+                    <TableCell>{result.invoiceValue}</TableCell>
+                    <TableCell>
+                      {result.match ? (
+                        <div className="text-green-600 flex items-center">
+                          <CheckCircle className="h-4 w-4 mr-1" /> Match
+                        </div>
+                      ) : (
+                        <div className="text-red-600 flex items-center">
+                          <AlertCircle className="h-4 w-4 mr-1" /> Mismatch
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </div>
         </CardContent>
       </Card>
 
-      {/* Actions */}
+      {/* Footer Actions */}
       <div className="flex justify-between">
         <Button variant="outline">Request Approval</Button>
         <Button>
