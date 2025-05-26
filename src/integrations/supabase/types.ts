@@ -93,6 +93,36 @@ export type Database = {
         }
         Relationships: []
       }
+      Doc_Compare_results: {
+        Row: {
+          created_at: string
+          doc_compare_count_targets: number | null
+          doc_compare_results: Json | null
+          doc_id_compare: number | null
+          doc_type_source: string | null
+          doc_type_target: string | null
+          id: number
+        }
+        Insert: {
+          created_at?: string
+          doc_compare_count_targets?: number | null
+          doc_compare_results?: Json | null
+          doc_id_compare?: number | null
+          doc_type_source?: string | null
+          doc_type_target?: string | null
+          id?: number
+        }
+        Update: {
+          created_at?: string
+          doc_compare_count_targets?: number | null
+          doc_compare_results?: Json | null
+          doc_id_compare?: number | null
+          doc_type_source?: string | null
+          doc_type_target?: string | null
+          id?: number
+        }
+        Relationships: []
+      }
       extracted_json: {
         Row: {
           created_at: string

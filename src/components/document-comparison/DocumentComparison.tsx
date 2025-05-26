@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,7 +30,7 @@ const COMPARISON_PROMPT = `You are an intelligent agent designed to compare a so
 ### 🔍 **Your Tasks:**
 
 #### 1. Classify Documents
-Identify the document type (e.g., PO, Invoice, Claim Form, etc.) and map it to the appropriate category:
+Identify the document type (e.g., PO, Invoice, Delivery Note, Payment Advice)
 * **Procurement & Finance**: PO, Invoice, Delivery Note, Payment Advice
 * **Insurance & Claims**: Claim Form, Medical Bills, Accident Report
 * **HR & Onboarding**: Offer Letter, Resume, Submitted Documents
@@ -206,7 +205,10 @@ const DocumentComparison = () => {
 
   // Compare documents using AI and database data (TEXT-ONLY)
   const compareDocuments = async () => {
+    console.log("=== STARTING DOCUMENT COMPARISON ===");
+    
     if (!poFile || invoiceFiles.length === 0) {
+      console.error("Missing files - PO file:", !!poFile, "Invoice files:", invoiceFiles.length);
       toast({
         title: "Missing Documents",
         description: "Please upload both source and at least one target document",
@@ -218,9 +220,12 @@ const DocumentComparison = () => {
     setIsComparing(true);
     
     try {
-      console.log("Starting text-only comparison using database data...");
+      console.log("Starting comparison process...");
+      console.log("Source file:", poFile.name);
+      console.log("Target files:", invoiceFiles.map(f => f.name));
       
       // Get the latest source document from database
+      console.log("Fetching source document from database...");
       const { data: sourceDoc, error: sourceError } = await supabase
         .from('compare_source_document')
         .select('*')
@@ -229,49 +234,68 @@ const DocumentComparison = () => {
         .limit(1)
         .maybeSingle();
 
+      console.log("Source document query result:", { sourceDoc, sourceError });
+
       if (sourceError || !sourceDoc) {
+        console.error("Source document error:", sourceError);
         throw new Error("Source document not found in database. Please upload and process it first.");
       }
 
-      console.log("Found source document:", sourceDoc);
+      console.log("Found source document:", {
+        id: sourceDoc.id,
+        title: sourceDoc.doc_title,
+        type: sourceDoc.doc_type,
+        hasJsonData: !!sourceDoc.doc_json_extract
+      });
 
       // Get target documents from database using the source document ID
+      console.log("Fetching target documents for source ID:", sourceDoc.id);
       const { data: targetDocs, error: targetError } = await supabase
         .from('compare_target_docs')
         .select('*')
         .eq('id', sourceDoc.id)
         .maybeSingle();
 
+      console.log("Target documents query result:", { targetDocs, targetError });
+
       if (targetError || !targetDocs) {
+        console.error("Target documents error:", targetError);
         throw new Error("Target documents not found. Please upload and process target documents first.");
       }
 
-      console.log("Found target documents:", targetDocs);
-
       // Prepare target documents array
+      console.log("Preparing target documents array...");
       const targetDocsArray = [];
       for (let i = 1; i <= 5; i++) {
         if (targetDocs[`doc_json_${i}`]) {
-          targetDocsArray.push({
+          const targetDoc = {
             title: targetDocs[`doc_title_${i}`],
             type: targetDocs[`doc_type_${i}`],
             json: targetDocs[`doc_json_${i}`]
+          };
+          targetDocsArray.push(targetDoc);
+          console.log(`Target document ${i}:`, {
+            title: targetDoc.title,
+            type: targetDoc.type,
+            hasJsonData: !!targetDoc.json
           });
         }
       }
 
       if (targetDocsArray.length === 0) {
+        console.error("No target documents found for comparison");
         throw new Error("No target documents found for comparison.");
       }
 
-      console.log("Target documents prepared for comparison:", targetDocsArray);
+      console.log("Total target documents prepared:", targetDocsArray.length);
 
       // Create comparison prompt with actual data
       const comparisonPrompt = COMPARISON_PROMPT
         .replace('{sourceDoc}', JSON.stringify(sourceDoc.doc_json_extract))
         .replace('{targetDocs}', JSON.stringify(targetDocsArray));
 
-      console.log("Sending TEXT-ONLY comparison request to Gemini...");
+      console.log("Comparison prompt prepared, length:", comparisonPrompt.length);
+      console.log("Sending comparison request to Gemini API...");
       
       // Use Gemini to perform the comparison - TEXT ONLY, NO IMAGES
       const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent', {
@@ -295,24 +319,33 @@ const DocumentComparison = () => {
         })
       });
 
+      console.log("Gemini API response status:", response.status);
+
       if (!response.ok) {
         const errorData = await response.text();
-        console.error("Gemini API error:", response.status, errorData);
+        console.error("Gemini API error details:", {
+          status: response.status,
+          statusText: response.statusText,
+          errorData: errorData
+        });
         throw new Error(`Gemini API error: ${response.status} - ${errorData}`);
       }
 
       const responseData = await response.json();
-      console.log("Gemini API response:", responseData);
+      console.log("Gemini API response data:", responseData);
 
       if (!responseData.candidates || !responseData.candidates[0] || !responseData.candidates[0].content) {
+        console.error("Invalid Gemini response structure:", responseData);
         throw new Error("Invalid response structure from Gemini API");
       }
 
       const responseText = responseData.candidates[0].content.parts[0].text;
+      console.log("Raw Gemini response text:", responseText);
       
       // Parse the comparison results
+      console.log("Parsing comparison results...");
       const comparisonData = parseGeminiResponse(responseText);
-      console.log("Comparison results:", comparisonData);
+      console.log("Parsed comparison data:", comparisonData);
 
       if (comparisonData && comparisonData.comparison_summary && comparisonData.detailed_comparison) {
         // Convert detailed comparison to our format
@@ -325,20 +358,68 @@ const DocumentComparison = () => {
 
         const percentage = comparisonData.comparison_summary.match_score || 0;
         
+        console.log("Formatted comparison results:", {
+          resultsCount: mockResults.length,
+          matchPercentage: percentage,
+          summary: comparisonData.comparison_summary
+        });
+
+        // Store results in Supabase doc_compare_results table
+        console.log("Storing comparison results in database...");
+        const { data: insertedResult, error: insertError } = await supabase
+          .from('Doc_Compare_results')
+          .insert({
+            doc_id_compare: sourceDoc.id,
+            doc_type_source: sourceDoc.doc_type,
+            doc_type_target: targetDocsArray.map(doc => doc.type).join(', '),
+            doc_compare_count_targets: targetDocsArray.length,
+            doc_compare_results: {
+              comparison_summary: comparisonData.comparison_summary,
+              detailed_comparison: comparisonData.detailed_comparison,
+              match_percentage: percentage,
+              processed_at: new Date().toISOString()
+            }
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error("Error storing comparison results:", insertError);
+          toast({
+            title: "Warning",
+            description: "Comparison successful but failed to save results to database",
+            variant: "destructive",
+          });
+        } else {
+          console.log("Successfully stored comparison results:", insertedResult);
+        }
+        
         setComparisonResults(mockResults);
         setMatchPercentage(percentage);
         setActiveTab("results");
+        
+        console.log("=== COMPARISON COMPLETED SUCCESSFULLY ===");
+        console.log("Final results set in state:", {
+          resultsCount: mockResults.length,
+          matchPercentage: percentage
+        });
         
         toast({
           title: "Comparison Complete",
           description: `Documents compared with ${percentage}% match`,
         });
       } else {
+        console.error("Invalid comparison response format:", comparisonData);
         throw new Error("Invalid comparison response format");
       }
 
     } catch (error) {
-      console.error("Comparison error:", error);
+      console.error("=== COMPARISON ERROR ===");
+      console.error("Error details:", {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString()
+      });
       toast({
         title: "Comparison Failed",
         description: error instanceof Error ? error.message : "Failed to compare documents",
@@ -346,6 +427,7 @@ const DocumentComparison = () => {
       });
     } finally {
       setIsComparing(false);
+      console.log("=== COMPARISON PROCESS ENDED ===");
     }
   };
 
