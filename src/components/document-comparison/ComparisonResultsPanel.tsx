@@ -23,6 +23,8 @@ export interface ComparisonResultsPanelProps {
   detailedResults: DetailedComparisonResult; // ✅ Passed as prop
 }
 
+// ...all previous imports remain unchanged
+
 export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
   poFile,
   invoiceFiles,
@@ -83,38 +85,41 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
         <Progress value={matchPercentage} />
       </div>
 
-      <div className="mt-6">
-        <div className="text-base font-semibold mb-2">Detailed Comparison</div>
-        {detailedResults.matchedFields.map((field, index) => (
-          <div key={index} className="mb-2">
-            <div className="text-sm font-medium text-green-600">
-              ✅ {field.fieldName}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              PO: {field.poValue} | Invoice: {field.invoiceValue}
-            </div>
-          </div>
-        ))}
+      {detailedResults && (
+        <div className="mt-6">
+          <div className="text-base font-semibold mb-2">Detailed Comparison</div>
 
-        {detailedResults.mismatchedFields.length > 0 && (
-          <>
-            <Separator className="my-4" />
-            <div className="text-base font-semibold mb-2 text-red-600">
-              Mismatches
-            </div>
-            {detailedResults.mismatchedFields.map((field, index) => (
-              <div key={index} className="mb-2">
-                <div className="text-sm font-medium text-red-600">
-                  ❌ {field.fieldName}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  PO: {field.poValue} | Invoice: {field.invoiceValue}
-                </div>
+          {detailedResults.matchedFields?.map((field, index) => (
+            <div key={index} className="mb-2">
+              <div className="text-sm font-medium text-green-600">
+                ✅ {field.fieldName}
               </div>
-            ))}
-          </>
-        )}
-      </div>
+              <div className="text-xs text-muted-foreground">
+                PO: {field.poValue} | Invoice: {field.invoiceValue}
+              </div>
+            </div>
+          ))}
+
+          {detailedResults.mismatchedFields?.length > 0 && (
+            <>
+              <Separator className="my-4" />
+              <div className="text-base font-semibold mb-2 text-red-600">
+                Mismatches
+              </div>
+              {detailedResults.mismatchedFields.map((field, index) => (
+                <div key={index} className="mb-2">
+                  <div className="text-sm font-medium text-red-600">
+                    ❌ {field.fieldName}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    PO: {field.poValue} | Invoice: {field.invoiceValue}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
 
       <div className="mt-6">
         <Button variant="outline">
