@@ -7,7 +7,6 @@ import { useToast } from "@/hooks/use-toast";
 import { DocumentUploadPanel } from "./DocumentUploadPanel";
 import { ComparisonResultsPanel } from "./ComparisonResultsPanel";
 import { supabase } from "@/integrations/supabase/client";
-import { processImageWithGemini } from "@/services/api/geminiService";
 
 // Types for document comparison
 interface DocumentDetails {
@@ -205,7 +204,7 @@ const DocumentComparison = () => {
     throw new Error(`Unable to extract valid JSON from response. Raw response: ${responseText.substring(0, 200)}...`);
   };
 
-  // Compare documents using AI and database data
+  // Compare documents using AI and database data (TEXT-ONLY)
   const compareDocuments = async () => {
     if (!poFile || invoiceFiles.length === 0) {
       toast({
@@ -219,6 +218,8 @@ const DocumentComparison = () => {
     setIsComparing(true);
     
     try {
+      console.log("Starting text-only comparison using database data...");
+      
       // Get the latest source document from database
       const { data: sourceDoc, error: sourceError } = await supabase
         .from('compare_source_document')
@@ -226,22 +227,26 @@ const DocumentComparison = () => {
         .eq('doc_title', poFile.name)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (sourceError || !sourceDoc) {
         throw new Error("Source document not found in database. Please upload and process it first.");
       }
+
+      console.log("Found source document:", sourceDoc);
 
       // Get target documents from database using the source document ID
       const { data: targetDocs, error: targetError } = await supabase
         .from('compare_target_docs')
         .select('*')
         .eq('id', sourceDoc.id)
-        .single();
+        .maybeSingle();
 
       if (targetError || !targetDocs) {
         throw new Error("Target documents not found. Please upload and process target documents first.");
       }
+
+      console.log("Found target documents:", targetDocs);
 
       // Prepare target documents array
       const targetDocsArray = [];
@@ -259,26 +264,54 @@ const DocumentComparison = () => {
         throw new Error("No target documents found for comparison.");
       }
 
+      console.log("Target documents prepared for comparison:", targetDocsArray);
+
       // Create comparison prompt with actual data
       const comparisonPrompt = COMPARISON_PROMPT
         .replace('{sourceDoc}', JSON.stringify(sourceDoc.doc_json_extract))
         .replace('{targetDocs}', JSON.stringify(targetDocsArray));
 
-      console.log("Sending comparison request to Gemini...");
+      console.log("Sending TEXT-ONLY comparison request to Gemini...");
       
-      // Use Gemini to perform the comparison
-      const response = await processImageWithGemini(
-        comparisonPrompt,
-        "", // No image needed for text comparison
-        "text/plain"
-      );
+      // Use Gemini to perform the comparison - TEXT ONLY, NO IMAGES
+      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': localStorage.getItem('Gemini_key') || 'AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk'
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: comparisonPrompt
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.1,
+            topK: 32,
+            topP: 1,
+            maxOutputTokens: 2048,
+          }
+        })
+      });
 
-      if (!response.success || !response.data) {
-        throw new Error(response.error || "Failed to perform comparison");
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error("Gemini API error:", response.status, errorData);
+        throw new Error(`Gemini API error: ${response.status} - ${errorData}`);
       }
 
+      const responseData = await response.json();
+      console.log("Gemini API response:", responseData);
+
+      if (!responseData.candidates || !responseData.candidates[0] || !responseData.candidates[0].content) {
+        throw new Error("Invalid response structure from Gemini API");
+      }
+
+      const responseText = responseData.candidates[0].content.parts[0].text;
+      
       // Parse the comparison results
-      const comparisonData = parseGeminiResponse(response.data);
+      const comparisonData = parseGeminiResponse(responseText);
       console.log("Comparison results:", comparisonData);
 
       if (comparisonData && comparisonData.comparison_summary && comparisonData.detailed_comparison) {

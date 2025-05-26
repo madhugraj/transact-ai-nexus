@@ -119,106 +119,6 @@ Based on your classification, extract the content into an appropriate **JSON** u
 
 Return ONLY a valid JSON object with the classification and extracted data. Do not include any additional text or markdown formatting.`;
 
-const COMPARISON_PROMPT = `You are an intelligent agent designed to compare a source document against one or more target documents. The comparison logic dynamically adjusts based on the document category and type (e.g., Invoice, PO, Claim Form, Offer Letter).
-
----
-
-### 🔍 **Your Tasks:**
-
-#### 1. Classify Documents
-Identify the document type (e.g., PO, Invoice, Claim Form, etc.) and map it to the appropriate category:
-* **Procurement & Finance**: PO, Invoice, Delivery Note, Payment Advice
-* **Insurance & Claims**: Claim Form, Medical Bills, Accident Report
-* **HR & Onboarding**: Offer Letter, Resume, Submitted Documents
-
-#### 2. Parse and Normalize
-Extract relevant fields from each document into structured JSON.
-
-#### 3. Perform Comparison Logic
-Dynamically apply business logic for comparison based on the pair of documents.
-
----
-
-### 🧾 **Procurement & Finance Use Cases**
-
-#### A. PO vs Invoices
-* Match PO number, vendor name
-* Compare line_items: check for quantity, rate, tax mismatches
-* Calculate % deviation in unit rate or total
-
-#### B. Invoice vs Delivery Note / GRN
-* Ensure line-item quantities and items match what was actually delivered
-* Highlight missing items or excess billing
-
-#### C. Payment Advice vs Invoices
-* Match invoice numbers
-* Check if each invoice is fully paid, partially paid, or unpaid
-* Return payment summary with status per invoice
-
----
-
-### 🛡️ **Insurance & Claims Use Cases**
-
-#### A. Claim Form vs Medical Bills
-* Match treatment details, patient info, and claimed amount vs submitted bills
-* Flag over-claims or missing bills
-
-#### B. Claim Form vs Policy Terms
-* Ensure coverage for the claimed condition exists
-* Flag policy exclusions or claim rejection criteria
-
-#### C. Accident Report vs Photographic Evidence
-* Extract stated damage from report
-* Cross-check with image metadata and description
-
----
-
-### 👨‍💼 **HR & Onboarding Use Cases**
-
-#### A. Offer Letter vs Submitted Documents
-* Compare salary (CTC), date of joining, personal details
-* Match submitted ID proof with offer letter information
-
-#### B. Resume vs Background Check
-* Validate past employment history, education
-* Flag discrepancies in duration, company name, or degree
-
----
-
-### 📊 **Output Format**
-Return a JSON result for the dashboard:
-
-{
-  "comparison_summary": {
-    "source_doc": "source_document_title",
-    "target_docs": ["target_doc_1", "target_doc_2"],
-    "category": "Procurement & Finance",
-    "comparison_type": "PO vs Invoices",
-    "status": "Partial Match",
-    "issues_found": 2,
-    "match_score": 85
-  },
-  "detailed_comparison": [
-    {
-      "field": "vendor_name",
-      "source_value": "ABC Corp",
-      "target_value": "ABC Corporation",
-      "match": true,
-      "mismatch_type": null
-    }
-  ]
-}
-
----
-
-### 🧠 Guidelines
-* Use fuzzy logic for text mismatches (e.g., "ABC Corp" vs "ABC Corporation")
-* Return match_score for each document pair
-* If document type is not known, classify based on layout and keywords
-
-Source Document JSON: {sourceDoc}
-Target Documents JSON: {targetDocs}`;
-
 // Enhanced JSON parsing function
 const parseGeminiResponse = (responseText: string): any => {
   console.log("Raw Gemini response:", responseText);
@@ -281,23 +181,65 @@ const parseGeminiResponse = (responseText: string): any => {
 // Global variable to store the current source document ID
 let currentSourceDocumentId: number | null = null;
 
-// Function to check if document already exists in database
-const checkDocumentExists = async (fileName: string, fileSize: number): Promise<boolean> => {
+// Function to check if source document already exists in database
+const checkSourceDocumentExists = async (fileName: string): Promise<{ exists: boolean; id?: number }> => {
   try {
     const { data, error } = await supabase
       .from('compare_source_document')
       .select('id')
-      .eq('doc_title', fileName);
+      .eq('doc_title', fileName)
+      .maybeSingle();
 
     if (error) {
-      console.error("Error checking document existence:", error);
-      return false;
+      console.error("Error checking source document existence:", error);
+      return { exists: false };
     }
 
-    return data && data.length > 0;
+    if (data) {
+      return { exists: true, id: data.id };
+    }
+
+    return { exists: false };
   } catch (error) {
-    console.error("Error in checkDocumentExists:", error);
-    return false;
+    console.error("Error in checkSourceDocumentExists:", error);
+    return { exists: false };
+  }
+};
+
+// Function to check if target documents already exist for a source document
+const checkTargetDocumentsExist = async (sourceDocId: number, fileNames: string[]): Promise<{ exists: boolean; existingFiles: string[] }> => {
+  try {
+    const { data, error } = await supabase
+      .from('compare_target_docs')
+      .select('*')
+      .eq('id', sourceDocId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error checking target documents existence:", error);
+      return { exists: false, existingFiles: [] };
+    }
+
+    if (!data) {
+      return { exists: false, existingFiles: [] };
+    }
+
+    // Check which files already exist
+    const existingFiles: string[] = [];
+    for (let i = 1; i <= 5; i++) {
+      const title = data[`doc_title_${i}`];
+      if (title && fileNames.includes(title)) {
+        existingFiles.push(title);
+      }
+    }
+
+    return { 
+      exists: existingFiles.length > 0, 
+      existingFiles 
+    };
+  } catch (error) {
+    console.error("Error in checkTargetDocumentsExist:", error);
+    return { exists: false, existingFiles: [] };
   }
 };
 
@@ -317,11 +259,12 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
       console.log("Starting source document processing for:", file.name, "Size:", file.size, "Type:", file.type);
       
       // Check if document already exists
-      const exists = await checkDocumentExists(file.name, file.size);
-      if (exists) {
+      const existsResult = await checkSourceDocumentExists(file.name);
+      if (existsResult.exists) {
+        currentSourceDocumentId = existsResult.id!;
         toast({
           title: "Document Already Exists",
-          description: "This document has already been processed. Skipping duplicate processing.",
+          description: "This source document has already been processed. Using existing data.",
         });
         return;
       }
@@ -427,14 +370,49 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
         throw new Error("Please upload and process a source document first");
       }
 
+      // Check for duplicate target documents
+      const fileNames = files.map(f => f.name);
+      const duplicateCheck = await checkTargetDocumentsExist(currentSourceDocumentId, fileNames);
+      
+      if (duplicateCheck.exists) {
+        toast({
+          title: "Duplicate Documents Found",
+          description: `The following documents have already been processed: ${duplicateCheck.existingFiles.join(', ')}. Skipping duplicate processing.`,
+        });
+        
+        // Filter out duplicate files
+        const newFiles = files.filter(f => !duplicateCheck.existingFiles.includes(f.name));
+        if (newFiles.length === 0) {
+          toast({
+            title: "All Documents Already Processed",
+            description: "All selected documents have already been processed.",
+          });
+          return;
+        }
+        
+        // Continue with only new files
+        files = newFiles;
+      }
+
       toast({
         title: "Processing Target Documents",
-        description: `Analyzing ${files.length} document(s) with AI...`,
+        description: `Analyzing ${files.length} new document(s) with AI...`,
       });
+
+      // Get existing target documents data first
+      const { data: existingData, error: fetchError } = await supabase
+        .from('compare_target_docs')
+        .select('*')
+        .eq('id', currentSourceDocumentId)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error("Error fetching existing target documents:", fetchError);
+      }
 
       const processedDocs = [];
 
-      // Process each file
+      // Process each new file
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         console.log(`Processing target document ${i + 1}/${files.length}:`, file.name);
@@ -466,35 +444,63 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
         console.log(`Target document ${i + 1} processed successfully:`, extractedData);
       }
 
-      // Prepare data for insertion into compare_target_docs
-      const targetDocData: any = {
+      // Prepare data for insertion/update into compare_target_docs
+      let targetDocData: any = {
         id: currentSourceDocumentId // Link to source document
       };
 
-      // Map processed documents to the table structure (doc_title_1, doc_json_1, etc.)
+      // If there's existing data, start with that
+      if (existingData) {
+        targetDocData = { ...existingData };
+      }
+
+      // Find the next available slot and add new documents
+      let nextSlot = 1;
+      if (existingData) {
+        // Find the first empty slot
+        for (let i = 1; i <= 5; i++) {
+          if (!existingData[`doc_title_${i}`]) {
+            nextSlot = i;
+            break;
+          }
+        }
+        // If no empty slots found, find the last used slot + 1
+        if (nextSlot === 1) {
+          for (let i = 5; i >= 1; i--) {
+            if (existingData[`doc_title_${i}`]) {
+              nextSlot = i + 1;
+              break;
+            }
+          }
+        }
+      }
+
+      // Map processed documents to the table structure
       processedDocs.forEach((doc, index) => {
-        const fieldIndex = index + 1;
-        targetDocData[`doc_title_${fieldIndex}`] = doc.title;
-        targetDocData[`doc_type_${fieldIndex}`] = doc.type;
-        targetDocData[`doc_json_${fieldIndex}`] = doc.json;
+        const fieldIndex = nextSlot + index;
+        if (fieldIndex <= 5) {
+          targetDocData[`doc_title_${fieldIndex}`] = doc.title;
+          targetDocData[`doc_type_${fieldIndex}`] = doc.type;
+          targetDocData[`doc_json_${fieldIndex}`] = doc.json;
+        }
       });
 
-      console.log("Storing target documents in Supabase with data:", targetDocData);
+      console.log("Upserting target documents in Supabase with data:", targetDocData);
 
-      // Store in compare_target_docs table
+      // Upsert in compare_target_docs table
       const { error } = await supabase
         .from('compare_target_docs')
-        .insert(targetDocData);
+        .upsert(targetDocData);
 
       if (error) {
-        console.error("Supabase target docs insert error:", error);
+        console.error("Supabase target docs upsert error:", error);
         throw error;
       }
 
       console.log("Target documents successfully processed and stored");
       toast({
         title: "Target Documents Processed",
-        description: `Successfully processed ${files.length} target document(s)`,
+        description: `Successfully processed ${files.length} new target document(s)`,
       });
 
     } catch (error) {
