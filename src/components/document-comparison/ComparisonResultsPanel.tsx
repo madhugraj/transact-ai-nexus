@@ -377,7 +377,6 @@
 
 
 
-// imports remain unchanged
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -398,7 +397,6 @@ import {
 } from "recharts";
 import { ComparisonResult } from "./DocumentComparison";
 
-// Interfaces
 export interface LineItemComparison {
   id: string;
   itemName: string;
@@ -425,7 +423,6 @@ interface ComparisonResultsPanelProps {
   category?: string;
 }
 
-// Color palette
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
@@ -439,35 +436,35 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
   comparisonType,
   category
 }) => {
-  const hasLineItems = lineItems.length > 0;
+  const hasLineItems = Array.isArray(lineItems) && lineItems.length > 0;
 
   const matchStatusData = hasLineItems ? [
     {
       name: "Matches",
-      value: lineItems.filter(i => i.quantityMatch && i.priceMatch && i.totalMatch).length
+      value: lineItems.filter(i => i?.quantityMatch && i?.priceMatch && i?.totalMatch).length
     },
     {
       name: "Quantity Mismatch",
-      value: lineItems.filter(i => !i.quantityMatch && i.priceMatch).length
+      value: lineItems.filter(i => !i?.quantityMatch && i?.priceMatch).length
     },
     {
       name: "Price Mismatch",
-      value: lineItems.filter(i => i.quantityMatch && !i.priceMatch).length
+      value: lineItems.filter(i => i?.quantityMatch && !i?.priceMatch).length
     },
     {
       name: "Multiple Issues",
-      value: lineItems.filter(i => !i.quantityMatch && !i.priceMatch).length
+      value: lineItems.filter(i => !i?.quantityMatch && !i?.priceMatch).length
     }
   ] : [];
 
   const quantityComparisonData = lineItems.map(i => ({
-    name: i.itemName.split(' ').slice(0, 2).join(' '),
-    poQuantity: i.poQuantity,
-    invoiceQuantity: i.invoiceQuantity
+    name: i?.itemName?.split(' ').slice(0, 2).join(' ') || `Item-${i?.id}`,
+    poQuantity: i?.poQuantity ?? 0,
+    invoiceQuantity: i?.invoiceQuantity ?? 0
   }));
 
-  const poTotal = lineItems.reduce((acc, i) => acc + i.poTotal, 0);
-  const invoiceTotal = lineItems.reduce((acc, i) => acc + i.invoiceTotal, 0);
+  const poTotal = lineItems.reduce((sum, i) => sum + (i?.poTotal || 0), 0);
+  const invoiceTotal = lineItems.reduce((sum, i) => sum + (i?.invoiceTotal || 0), 0);
   const totalDifference = Math.abs(poTotal - invoiceTotal);
   const percentageDifference = poTotal > 0 ? (totalDifference / poTotal) * 100 : 0;
 
@@ -504,7 +501,7 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
         <CardContent>
           {hasLineItems && (
             <>
-              {/* Chart Section */}
+              {/* Charts */}
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <h3 className="text-md font-semibold mb-2 text-center">Line Items Match Status</h3>
@@ -588,28 +585,31 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {lineItems.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell>{item.itemName}</TableCell>
-                          <TableCell className="text-right">{item.poQuantity}</TableCell>
-                          <TableCell className="text-right">{item.invoiceQuantity}</TableCell>
-                          <TableCell className="text-right">${item.poUnitPrice.toFixed(2)}</TableCell>
-                          <TableCell className="text-right">${item.invoiceUnitPrice.toFixed(2)}</TableCell>
-                          <TableCell className="text-right">${item.poTotal.toFixed(2)}</TableCell>
-                          <TableCell className="text-right">${item.invoiceTotal.toFixed(2)}</TableCell>
-                          <TableCell>
-                            {item.totalMatch ? (
-                              <div className="text-green-600 flex items-center">
-                                <CheckCircle className="h-4 w-4 mr-1" /> Match
-                              </div>
-                            ) : (
-                              <div className="text-red-600 flex items-center">
-                                <AlertCircle className="h-4 w-4 mr-1" /> Mismatch
-                              </div>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {lineItems.map((item, index) => {
+                        if (!item || typeof item.totalMatch === "undefined") return null;
+                        return (
+                          <TableRow key={item.id}>
+                            <TableCell>{item.itemName}</TableCell>
+                            <TableCell className="text-right">{item.poQuantity}</TableCell>
+                            <TableCell className="text-right">{item.invoiceQuantity}</TableCell>
+                            <TableCell className="text-right">${item.poUnitPrice.toFixed(2)}</TableCell>
+                            <TableCell className="text-right">${item.invoiceUnitPrice.toFixed(2)}</TableCell>
+                            <TableCell className="text-right">${item.poTotal.toFixed(2)}</TableCell>
+                            <TableCell className="text-right">${item.invoiceTotal.toFixed(2)}</TableCell>
+                            <TableCell>
+                              {item.totalMatch ? (
+                                <div className="text-green-600 flex items-center">
+                                  <CheckCircle className="h-4 w-4 mr-1" /> Match
+                                </div>
+                              ) : (
+                                <div className="text-red-600 flex items-center">
+                                  <AlertCircle className="h-4 w-4 mr-1" /> Mismatch
+                                </div>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -619,7 +619,7 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
         </CardContent>
       </Card>
 
-      {/* Header Fields Table - Always Show */}
+      {/* Header Comparison Table */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Header Fields</CardTitle>
@@ -636,24 +636,27 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {comparisonResults.map((result, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{result.field}</TableCell>
-                    <TableCell>{result.poValue}</TableCell>
-                    <TableCell>{result.invoiceValue}</TableCell>
-                    <TableCell>
-                      {result.match ? (
-                        <div className="text-green-600 flex items-center">
-                          <CheckCircle className="h-4 w-4 mr-1" /> Match
-                        </div>
-                      ) : (
-                        <div className="text-red-600 flex items-center">
-                          <AlertCircle className="h-4 w-4 mr-1" /> Mismatch
-                        </div>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {comparisonResults.map((result, index) => {
+                  if (!result || typeof result.match === "undefined") return null;
+                  return (
+                    <TableRow key={index}>
+                      <TableCell>{result.field}</TableCell>
+                      <TableCell>{result.poValue}</TableCell>
+                      <TableCell>{result.invoiceValue}</TableCell>
+                      <TableCell>
+                        {result.match ? (
+                          <div className="text-green-600 flex items-center">
+                            <CheckCircle className="h-4 w-4 mr-1" /> Match
+                          </div>
+                        ) : (
+                          <div className="text-red-600 flex items-center">
+                            <AlertCircle className="h-4 w-4 mr-1" /> Mismatch
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
