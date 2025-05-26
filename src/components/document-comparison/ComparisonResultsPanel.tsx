@@ -374,9 +374,6 @@
 
 
 
-
-
-
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -436,35 +433,39 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
   comparisonType,
   category
 }) => {
-  const hasLineItems = Array.isArray(lineItems) && lineItems.length > 0;
+  const safeComparisonResults = Array.isArray(comparisonResults) ? comparisonResults : [];
+  const safeLineItems = Array.isArray(lineItems) ? lineItems : [];
+  const hasLineItems = safeLineItems.length > 0;
 
-  const matchStatusData = hasLineItems ? [
-    {
-      name: "Matches",
-      value: lineItems.filter(i => i?.quantityMatch && i?.priceMatch && i?.totalMatch).length
-    },
-    {
-      name: "Quantity Mismatch",
-      value: lineItems.filter(i => !i?.quantityMatch && i?.priceMatch).length
-    },
-    {
-      name: "Price Mismatch",
-      value: lineItems.filter(i => i?.quantityMatch && !i?.priceMatch).length
-    },
-    {
-      name: "Multiple Issues",
-      value: lineItems.filter(i => !i?.quantityMatch && !i?.priceMatch).length
-    }
-  ] : [];
+  const matchStatusData = hasLineItems
+    ? [
+        {
+          name: "Matches",
+          value: safeLineItems.filter(i => i?.quantityMatch && i?.priceMatch && i?.totalMatch).length
+        },
+        {
+          name: "Quantity Mismatch",
+          value: safeLineItems.filter(i => !i?.quantityMatch && i?.priceMatch).length
+        },
+        {
+          name: "Price Mismatch",
+          value: safeLineItems.filter(i => i?.quantityMatch && !i?.priceMatch).length
+        },
+        {
+          name: "Multiple Issues",
+          value: safeLineItems.filter(i => !i?.quantityMatch && !i?.priceMatch).length
+        }
+      ]
+    : [];
 
-  const quantityComparisonData = lineItems.map(i => ({
+  const quantityComparisonData = safeLineItems.map(i => ({
     name: i?.itemName?.split(' ').slice(0, 2).join(' ') || `Item-${i?.id}`,
     poQuantity: i?.poQuantity ?? 0,
     invoiceQuantity: i?.invoiceQuantity ?? 0
   }));
 
-  const poTotal = lineItems.reduce((sum, i) => sum + (i?.poTotal || 0), 0);
-  const invoiceTotal = lineItems.reduce((sum, i) => sum + (i?.invoiceTotal || 0), 0);
+  const poTotal = safeLineItems.reduce((sum, i) => sum + (i?.poTotal || 0), 0);
+  const invoiceTotal = safeLineItems.reduce((sum, i) => sum + (i?.invoiceTotal || 0), 0);
   const totalDifference = Math.abs(poTotal - invoiceTotal);
   const percentageDifference = poTotal > 0 ? (totalDifference / poTotal) * 100 : 0;
 
@@ -585,7 +586,7 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {lineItems.map((item, index) => {
+                      {safeLineItems.map((item) => {
                         if (!item || typeof item.totalMatch === "undefined") return null;
                         return (
                           <TableRow key={item.id}>
@@ -636,9 +637,7 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                
-                {(comparisonResults || []).map((result, index) => {
-
+                {safeComparisonResults.map((result, index) => {
                   if (!result || typeof result.match === "undefined") return null;
                   return (
                     <TableRow key={index}>
