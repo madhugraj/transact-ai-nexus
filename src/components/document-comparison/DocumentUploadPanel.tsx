@@ -72,9 +72,7 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
             </div> : <div className="flex flex-col items-center p-6 border-2 border-dashed rounded-md">
               <Upload className="h-10 w-10 text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground mb-4">Upload one or more Invoice documents</p>
-              <Button variant="outline" onClick={() => document.getElementById('invoice-upload')?.click()}>
-                Select Invoice(s)
-              </Button>
+              <Button variant="outline" onClick={() => document.getElementById('invoice-upload')?.click()}>Reference Documents</Button>
               <input id="invoice-upload" type="file" multiple className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={handleInvoiceFileChange} />
             </div>}
         </CardContent>
