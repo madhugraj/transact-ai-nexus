@@ -149,28 +149,37 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
 
   const processAndStoreSourceDocument = async (file: File) => {
     try {
+      console.log("Starting document processing for:", file.name, "Size:", file.size, "Type:", file.type);
+      
       toast({
         title: "Processing Document",
         description: "Analyzing document with AI...",
       });
 
       // Convert file to base64 for Gemini processing
+      console.log("Converting file to base64...");
       const base64Image = await fileToBase64(file);
+      console.log("Base64 conversion complete, length:", base64Image.length);
       
       // Process with Gemini
+      console.log("Sending to Gemini API...");
       const response = await processImageWithGemini(
         DOCUMENT_CLASSIFICATION_PROMPT,
         base64Image,
         file.type
       );
 
+      console.log("Gemini API response:", response);
+
       if (!response.success || !response.data) {
+        console.error("Gemini API failed:", response.error);
         throw new Error(response.error || "Failed to process document");
       }
 
       // Parse the JSON response using enhanced parsing
       let extractedData;
       try {
+        console.log("Attempting to parse Gemini response...");
         extractedData = parseGeminiResponse(response.data);
         
         // Validate that we have the basic structure we expect
@@ -182,10 +191,12 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
         
       } catch (parseError) {
         console.error("Enhanced parsing failed:", parseError);
+        console.error("Raw response that failed to parse:", response.data);
         throw new Error(`Failed to parse AI response: ${parseError instanceof Error ? parseError.message : "Invalid format"}`);
       }
 
       // Store in Supabase
+      console.log("Storing in Supabase...");
       const { error } = await supabase
         .from('compare_source_document')
         .insert({
@@ -195,9 +206,11 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
         });
 
       if (error) {
+        console.error("Supabase insert error:", error);
         throw error;
       }
 
+      console.log("Document successfully processed and stored");
       toast({
         title: "Document Processed",
         description: `Successfully classified as: ${extractedData.document_type || extractedData.classification || "Unknown"}`,
@@ -205,6 +218,13 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
 
     } catch (error) {
       console.error("Error processing source document:", error);
+      console.error("Error details:", {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type
+      });
       toast({
         title: "Processing Failed",
         description: error instanceof Error ? error.message : "Failed to process document",
@@ -216,11 +236,21 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
   const handleSourceFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      console.log("New source file selected:", file.name);
       // Call the original handler first
       handlePoFileChange(e);
       
       // Then process and store the document
       await processAndStoreSourceDocument(file);
+    }
+  };
+
+  const handleReplaceFile = () => {
+    console.log("Replace button clicked");
+    const input = document.getElementById('po-upload') as HTMLInputElement;
+    if (input) {
+      input.value = ''; // Clear the input to allow selecting the same file again
+      input.click();
     }
   };
 
@@ -244,7 +274,7 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
               <Button 
                 variant="ghost" 
                 size="sm" 
-                onClick={() => document.getElementById('po-upload')?.click()}
+                onClick={handleReplaceFile}
               >
                 Replace
               </Button>
