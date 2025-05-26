@@ -636,7 +636,9 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {comparisonResults.map((result, index) => {
+                
+                {(comparisonResults || []).map((result, index) => {
+
                   if (!result || typeof result.match === "undefined") return null;
                   return (
                     <TableRow key={index}>
