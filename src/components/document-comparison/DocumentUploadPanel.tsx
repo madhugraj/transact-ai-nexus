@@ -1,7 +1,12 @@
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, File, FileSearch, Upload } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { fileToBase64, processImageWithGemini } from "@/services/api/geminiService";
+
 interface DocumentUploadPanelProps {
   poFile: File | null;
   invoiceFiles: File[];
@@ -11,6 +16,67 @@ interface DocumentUploadPanelProps {
   compareDocuments: () => void;
   isComparing: boolean;
 }
+
+const DOCUMENT_CLASSIFICATION_PROMPT = `You are an expert AI assistant that processes business documents. Your responsibilities include:
+
+---
+
+### 🎯 OBJECTIVES:
+
+1. **Classify** the input document into one of the below predefined types and subtypes.
+2. **Extract key content** into a structured **JSON format**, using the appropriate schema that fits the classified document type.
+
+---
+
+### 📚 DOCUMENT TYPES & SUBTYPES:
+
+1. **Procurement & Finance**
+   - Purchase Order (PO)
+   - Invoice
+   - Payment Advice
+
+2. **Insurance & Claims**
+   - Claim Form
+   - Accident Report
+
+3. **Banking & Loan Origination**
+   - Loan Application
+   - Property Appraisal
+
+4. **Legal & Compliance**
+   - Contract
+   - Company Filings
+
+5. **HR & Onboarding**
+   - Offer Letter
+   - Resume
+
+6. **Healthcare**
+   - Prescription
+   - Treatment Summary
+
+7. **Trade & Export/Import**
+   - Letter of Credit
+   - Customs Declarations
+
+8. **Education & Certification**
+   - Student Application
+   - Exam Score Report
+
+---
+
+### 🧠 CLASSIFICATION:
+
+Classify the document based on its layout, keywords, structure, headings, or tabular content. Identify the **domain** and **document subtype** (e.g., "Procurement & Finance - Invoice").
+
+---
+
+### 🧩 EXTRACTION FORMAT:
+
+Based on your classification, extract the content into an appropriate **JSON** using **ONLY the schema relevant to the identified subtype**. Don't include irrelevant fields. Do not hallucinate missing data.
+
+Return ONLY a valid JSON object with the classification and extracted data. Do not include any additional text or markdown formatting.`;
+
 export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
   poFile,
   invoiceFiles,
@@ -20,44 +86,137 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
   compareDocuments,
   isComparing
 }) => {
-  return <div className="grid md:grid-cols-2 gap-4">
-      {/* Purchase Order Upload */}
+  const { toast } = useToast();
+
+  const processAndStoreSourceDocument = async (file: File) => {
+    try {
+      toast({
+        title: "Processing Document",
+        description: "Analyzing document with AI...",
+      });
+
+      // Convert file to base64 for Gemini processing
+      const base64Image = await fileToBase64(file);
+      
+      // Process with Gemini
+      const response = await processImageWithGemini(
+        DOCUMENT_CLASSIFICATION_PROMPT,
+        base64Image,
+        file.type
+      );
+
+      if (!response.success || !response.data) {
+        throw new Error(response.error || "Failed to process document");
+      }
+
+      // Parse the JSON response
+      let extractedData;
+      try {
+        extractedData = JSON.parse(response.data);
+      } catch (parseError) {
+        console.error("Failed to parse Gemini response:", response.data);
+        throw new Error("Invalid response format from AI");
+      }
+
+      // Store in Supabase
+      const { error } = await supabase
+        .from('compare_source_document')
+        .insert({
+          doc_title: file.name,
+          doc_type: extractedData.document_type || "Unknown",
+          doc_json_extract: extractedData
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Document Processed",
+        description: `Successfully classified as: ${extractedData.document_type || "Unknown"}`,
+      });
+
+    } catch (error) {
+      console.error("Error processing source document:", error);
+      toast({
+        title: "Processing Failed",
+        description: error instanceof Error ? error.message : "Failed to process document",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSourceFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Call the original handler first
+      handlePoFileChange(e);
+      
+      // Then process and store the document
+      await processAndStoreSourceDocument(file);
+    }
+  };
+
+  return (
+    <div className="grid md:grid-cols-2 gap-4">
+      {/* Source Document Upload */}
       <Card className="overflow-hidden">
         <CardHeader className="bg-blue-50 dark:bg-blue-950/20 pb-2">
           <CardTitle className="text-lg flex items-center gap-2">
             <File className="h-5 w-5" />
-            Purchase Order
+            Source Document
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-4">
-          {poFile ? <div className="flex items-center justify-between p-2 border rounded-md">
+          {poFile ? (
+            <div className="flex items-center justify-between p-2 border rounded-md">
               <div className="flex items-center space-x-2">
                 <FileText className="h-5 w-5 text-blue-500" />
                 <span className="truncate max-w-[200px]">{poFile.name}</span>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => document.getElementById('po-upload')?.click()}>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => document.getElementById('po-upload')?.click()}
+              >
                 Replace
               </Button>
-            </div> : <div className="flex flex-col items-center p-6 border-2 border-dashed rounded-md">
+            </div>
+          ) : (
+            <div className="flex flex-col items-center p-6 border-2 border-dashed rounded-md">
               <Upload className="h-10 w-10 text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground mb-4">Upload your Source document</p>
-              <Button variant="outline" onClick={() => document.getElementById('po-upload')?.click()}>Primary Document </Button>
-              <input id="po-upload" type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={handlePoFileChange} />
-            </div>}
+              <Button 
+                variant="outline" 
+                onClick={() => document.getElementById('po-upload')?.click()}
+              >
+                Primary Document
+              </Button>
+              <input 
+                id="po-upload" 
+                type="file" 
+                className="hidden" 
+                accept=".pdf,.jpg,.jpeg,.png" 
+                onChange={handleSourceFileChange}
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
       
-      {/* Invoice Upload */}
+      {/* Target Documents Upload */}
       <Card className="overflow-hidden">
         <CardHeader className="bg-amber-50 dark:bg-amber-950/20 pb-2">
           <CardTitle className="text-lg flex items-center gap-2">
             <File className="h-5 w-5" />
-            Invoice(s)
+            Target Documents
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-4">
-          {invoiceFiles.length > 0 ? <div className="space-y-2">
-              {invoiceFiles.map((file, index) => <div key={index} className="flex items-center justify-between p-2 border rounded-md">
+          {invoiceFiles.length > 0 ? (
+            <div className="space-y-2">
+              {invoiceFiles.map((file, index) => (
+                <div key={index} className="flex items-center justify-between p-2 border rounded-md">
                   <div className="flex items-center space-x-2">
                     <FileText className="h-5 w-5 text-amber-500" />
                     <span className="truncate max-w-[200px]">{file.name}</span>
@@ -65,25 +224,51 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
                   <Button variant="ghost" size="sm" onClick={() => removeInvoiceFile(index)}>
                     Remove
                   </Button>
-                </div>)}
-              <Button variant="outline" className="w-full mt-2" onClick={() => document.getElementById('invoice-upload')?.click()}>
-                Add More Invoices
+                </div>
+              ))}
+              <Button 
+                variant="outline" 
+                className="w-full mt-2" 
+                onClick={() => document.getElementById('invoice-upload')?.click()}
+              >
+                Add More Target Documents
               </Button>
-            </div> : <div className="flex flex-col items-center p-6 border-2 border-dashed rounded-md">
+            </div>
+          ) : (
+            <div className="flex flex-col items-center p-6 border-2 border-dashed rounded-md">
               <Upload className="h-10 w-10 text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground mb-4">Upload one or more Target documents</p>
-              <Button variant="outline" onClick={() => document.getElementById('invoice-upload')?.click()}>Reference Documents</Button>
-              <input id="invoice-upload" type="file" multiple className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={handleInvoiceFileChange} />
-            </div>}
+              <Button 
+                variant="outline" 
+                onClick={() => document.getElementById('invoice-upload')?.click()}
+              >
+                Reference Documents
+              </Button>
+              <input 
+                id="invoice-upload" 
+                type="file" 
+                multiple 
+                className="hidden" 
+                accept=".pdf,.jpg,.jpeg,.png" 
+                onChange={handleInvoiceFileChange} 
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
       
       {/* Comparison Button */}
       <div className="md:col-span-2 flex justify-center">
-        <Button size="lg" className="gap-2" disabled={!poFile || invoiceFiles.length === 0 || isComparing} onClick={compareDocuments}>
+        <Button 
+          size="lg" 
+          className="gap-2" 
+          disabled={!poFile || invoiceFiles.length === 0 || isComparing} 
+          onClick={compareDocuments}
+        >
           <FileSearch className="h-5 w-5" />
           {isComparing ? "Processing..." : "Compare Documents"}
         </Button>
       </div>
-    </div>;
+    </div>
+  );
 };

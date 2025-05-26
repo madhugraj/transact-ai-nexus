@@ -9,6 +9,90 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      compare_source_document: {
+        Row: {
+          created_at: string
+          doc_json_extract: Json | null
+          doc_title: string | null
+          doc_type: string | null
+          id: number
+        }
+        Insert: {
+          created_at?: string
+          doc_json_extract?: Json | null
+          doc_title?: string | null
+          doc_type?: string | null
+          id?: number
+        }
+        Update: {
+          created_at?: string
+          doc_json_extract?: Json | null
+          doc_title?: string | null
+          doc_type?: string | null
+          id?: number
+        }
+        Relationships: []
+      }
+      compare_target_docs: {
+        Row: {
+          created_at: string
+          doc_json_1: Json | null
+          doc_json_2: Json | null
+          doc_json_3: Json | null
+          doc_json_4: Json | null
+          doc_json_5: Json | null
+          doc_title_1: string | null
+          doc_title_2: string | null
+          doc_title_3: string | null
+          doc_title_4: string | null
+          doc_title_5: string | null
+          doc_type_1: string | null
+          doc_type_2: string | null
+          doc_type_3: string | null
+          doc_type_4: string | null
+          doc_type_5: string | null
+          id: number
+        }
+        Insert: {
+          created_at?: string
+          doc_json_1?: Json | null
+          doc_json_2?: Json | null
+          doc_json_3?: Json | null
+          doc_json_4?: Json | null
+          doc_json_5?: Json | null
+          doc_title_1?: string | null
+          doc_title_2?: string | null
+          doc_title_3?: string | null
+          doc_title_4?: string | null
+          doc_title_5?: string | null
+          doc_type_1?: string | null
+          doc_type_2?: string | null
+          doc_type_3?: string | null
+          doc_type_4?: string | null
+          doc_type_5?: string | null
+          id?: number
+        }
+        Update: {
+          created_at?: string
+          doc_json_1?: Json | null
+          doc_json_2?: Json | null
+          doc_json_3?: Json | null
+          doc_json_4?: Json | null
+          doc_json_5?: Json | null
+          doc_title_1?: string | null
+          doc_title_2?: string | null
+          doc_title_3?: string | null
+          doc_title_4?: string | null
+          doc_title_5?: string | null
+          doc_type_1?: string | null
+          doc_type_2?: string | null
+          doc_type_3?: string | null
+          doc_type_4?: string | null
+          doc_type_5?: string | null
+          id?: number
+        }
+        Relationships: []
+      }
       extracted_json: {
         Row: {
           created_at: string
