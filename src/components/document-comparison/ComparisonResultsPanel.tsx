@@ -1,6 +1,13 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface ComparisonResult {
   field: string;
@@ -10,13 +17,10 @@ interface ComparisonResult {
 }
 
 interface RowComparison {
-  fieldValues: {
-    [field: string]: {
-      sourceValue: string | number;
-      targetValue: string | number;
-      isMatch: boolean;
-    };
-  };
+  field: string;
+  sourceValue: string | number;
+  targetValue: string | number;
+  isMatch: boolean;
   remarks?: string;
 }
 
@@ -40,7 +44,9 @@ const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({ result 
     <div className="space-y-6">
       <Card>
         <CardContent className="p-4">
-          <h3 className="text-xl font-semibold mb-2">Overall Match: {result.overallMatch}%</h3>
+          <h3 className="text-xl font-semibold mb-2">
+            Overall Match: {result.overallMatch}%
+          </h3>
 
           <h4 className="text-lg font-semibold mt-4 mb-2">Header Comparison</h4>
           <Table>
@@ -86,22 +92,20 @@ const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({ result 
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {section.rows.map((row, rowIndex) =>
-                  Object.entries(row.fieldValues).map(([field, values], fieldIndex) => (
-                    <TableRow key={`${rowIndex}-${fieldIndex}`}>
-                      <TableCell>{field}</TableCell>
-                      <TableCell>{values.sourceValue}</TableCell>
-                      <TableCell>{values.targetValue}</TableCell>
-                      <TableCell>
-                        {values.isMatch ? (
-                          <span className="text-green-600 font-bold">✓</span>
-                        ) : (
-                          <span className="text-red-600 font-bold">✗</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
+                {section.rows.map((row, rowIndex) => (
+                  <TableRow key={rowIndex}>
+                    <TableCell>{row.field}</TableCell>
+                    <TableCell>{row.sourceValue}</TableCell>
+                    <TableCell>{row.targetValue}</TableCell>
+                    <TableCell>
+                      {row.isMatch ? (
+                        <span className="text-green-600 font-bold">✓</span>
+                      ) : (
+                        <span className="text-red-600 font-bold">✗</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </CardContent>
