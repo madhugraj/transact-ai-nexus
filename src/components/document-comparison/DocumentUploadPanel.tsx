@@ -50,6 +50,7 @@ const DOCUMENT_CLASSIFICATION_PROMPT = `You are an expert AI assistant that proc
 5. **HR & Onboarding**
    - Offer Letter
    - Resume
+   - Job Description
 
 6. **Healthcare**
    - Prescription
