@@ -8,7 +8,6 @@ import { DocumentUploadPanel } from "./DocumentUploadPanel";
 import { ComparisonResultsPanel } from "./ComparisonResultsPanel";
 import { supabase } from "@/integrations/supabase/client";
 
-
 // Types for document comparison
 interface DocumentDetails {
   vendor?: string;
@@ -490,6 +489,3 @@ const DocumentComparison = () => {
 };
 
 export default DocumentComparison;
-
-
-

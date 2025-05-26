@@ -368,5 +368,3 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
   );
 };
 
-
-
