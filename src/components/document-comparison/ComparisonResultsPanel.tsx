@@ -1,118 +1,127 @@
 import React from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import { FileIcon, InfoIcon } from "lucide-react";
+import { ComparisonResult, DetailedComparisonResult } from "@/types/comparison";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
-interface ComparisonResult {
-  field: string;
-  sourceValue: string | number;
-  targetValue: string | number;
-  isMatch: boolean;
+export interface ComparisonResultsPanelProps {
+  poFile: File | null;
+  invoiceFiles: File[];
+  activeInvoiceIndex: number;
+  setActiveInvoiceIndex: (index: number) => void;
+  comparisonResults: ComparisonResult[];
+  matchPercentage: number;
+  detailedResults: DetailedComparisonResult; // ✅ Passed as prop
 }
 
-interface RowComparison {
-  field: string;
-  sourceValue: string | number;
-  targetValue: string | number;
-  isMatch: boolean;
-  remarks?: string;
-}
-
-interface SectionComparison {
-  sectionName: string;
-  rows: RowComparison[];
-}
-
-interface DetailedComparisonResult {
-  overallMatch: number;
-  headerResults: ComparisonResult[];
-  sections: SectionComparison[];
-}
-
-interface ComparisonResultsPanelProps {
-  result: DetailedComparisonResult;
-}
-
-const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({ result }) => {
+export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
+  poFile,
+  invoiceFiles,
+  activeInvoiceIndex,
+  setActiveInvoiceIndex,
+  comparisonResults,
+  matchPercentage,
+  detailedResults,
+}) => {
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardContent className="p-4">
-          <h3 className="text-xl font-semibold mb-2">
-            Overall Match: {result.overallMatch}%
-          </h3>
+    <div className="flex h-full flex-col gap-4 p-4">
+      <div className="text-lg font-semibold">Comparison Results</div>
 
-          <h4 className="text-lg font-semibold mt-4 mb-2">Header Comparison</h4>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Field</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead>Target</TableHead>
-                <TableHead>Match</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {result.headerResults.map((item, index) => (
-                <TableRow key={index}>
-                  <TableCell>{item.field}</TableCell>
-                  <TableCell>{item.sourceValue}</TableCell>
-                  <TableCell>{item.targetValue}</TableCell>
-                  <TableCell>
-                    {item.isMatch ? (
-                      <span className="text-green-600 font-bold">✓</span>
-                    ) : (
-                      <span className="text-red-600 font-bold">✗</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <Tabs value={`invoice-${activeInvoiceIndex}`} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="po">PO</TabsTrigger>
+          {invoiceFiles.map((file, index) => (
+            <TabsTrigger
+              key={index}
+              value={`invoice-${index}`}
+              onClick={() => setActiveInvoiceIndex(index)}
+              className={cn({
+                "bg-muted": index === activeInvoiceIndex,
+              })}
+            >
+              Invoice {index + 1}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      {result.sections.map((section, i) => (
-        <Card key={i}>
-          <CardContent className="p-4">
-            <h4 className="text-lg font-semibold mb-2">{section.sectionName}</h4>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Field</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Target</TableHead>
-                  <TableHead>Match</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {section.rows.map((row, rowIndex) => (
-                  <TableRow key={rowIndex}>
-                    <TableCell>{row.field}</TableCell>
-                    <TableCell>{row.sourceValue}</TableCell>
-                    <TableCell>{row.targetValue}</TableCell>
-                    <TableCell>
-                      {row.isMatch ? (
-                        <span className="text-green-600 font-bold">✓</span>
-                      ) : (
-                        <span className="text-red-600 font-bold">✗</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      ))}
+        <TabsContent value="po">
+          <ScrollArea className="h-[300px] w-full rounded-md border p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <FileIcon className="h-4 w-4" />
+              <span className="text-sm font-medium">{poFile?.name}</span>
+            </div>
+            <div className="text-sm">PO Details will be shown here.</div>
+          </ScrollArea>
+        </TabsContent>
+
+        {invoiceFiles.map((file, index) => (
+          <TabsContent key={index} value={`invoice-${index}`}>
+            <ScrollArea className="h-[300px] w-full rounded-md border p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <FileIcon className="h-4 w-4" />
+                <span className="text-sm font-medium">{file.name}</span>
+              </div>
+              <div className="text-sm">Invoice {index + 1} Details will be shown here.</div>
+            </ScrollArea>
+          </TabsContent>
+        ))}
+      </Tabs>
+
+      <div className="mt-4">
+        <div className="text-sm font-medium mb-1">
+          Match Percentage: {matchPercentage}%
+        </div>
+        <Progress value={matchPercentage} />
+      </div>
+
+      <div className="mt-6">
+        <div className="text-base font-semibold mb-2">Detailed Comparison</div>
+        {detailedResults.matchedFields.map((field, index) => (
+          <div key={index} className="mb-2">
+            <div className="text-sm font-medium text-green-600">
+              ✅ {field.fieldName}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              PO: {field.poValue} | Invoice: {field.invoiceValue}
+            </div>
+          </div>
+        ))}
+
+        {detailedResults.mismatchedFields.length > 0 && (
+          <>
+            <Separator className="my-4" />
+            <div className="text-base font-semibold mb-2 text-red-600">
+              Mismatches
+            </div>
+            {detailedResults.mismatchedFields.map((field, index) => (
+              <div key={index} className="mb-2">
+                <div className="text-sm font-medium text-red-600">
+                  ❌ {field.fieldName}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  PO: {field.poValue} | Invoice: {field.invoiceValue}
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+
+      <div className="mt-6">
+        <Button variant="outline">
+          <InfoIcon className="mr-2 h-4 w-4" />
+          View Full Comparison Report
+        </Button>
+      </div>
     </div>
   );
 };
-
-export default ComparisonResultsPanel;
