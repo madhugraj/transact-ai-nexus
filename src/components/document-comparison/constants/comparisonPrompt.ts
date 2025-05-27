@@ -135,8 +135,7 @@ A structured JSON object summarizing the comparison, detailing field results, op
 Perform a comprehensive comparison and return detailed JSON results.
 `;
 
-Streamlined Document Comparison Prompt for TSX
-This prompt defines an intelligent document comparison agent for three document comparisons: Procurement (PO vs. Invoice), HR (JD vs. CV), and Insurance (Claim vs. Supporting Documents). It is optimized for a TSX file, with a compact Business Rules Table, and designed for a RAGFlow-like system in a financial regulatory compliance context.
+
 const COMPARISON_PROMPT: string = `
 You are an intelligent document comparison agent that analyzes and compares documents for:
 1. Procurement & Finance: Purchase Order (PO) vs. Invoice
