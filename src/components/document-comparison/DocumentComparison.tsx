@@ -35,7 +35,7 @@ export interface DetailedComparisonResult {
   targetDocuments: any[];
   comparisonSummary: any;
 }
-const COMPARISON_PROMPT = `
+const COMPARISON_PROMPT: string = `
 You are an intelligent document comparison agent that analyzes and compares documents across the following categories and subtypes:
 1. Procurement & Finance: Purchase Order (PO), Invoice, Payment Advice
 2. Insurance & Claims: Claim Form, Accident Report
@@ -48,7 +48,7 @@ You are an intelligent document comparison agent that analyzes and compares docu
 
 Your task is to perform context-aware comparisons and deliver JSON results.
 
-### 🔍 Core Functions:
+### Core Functions:
 
 #### 1. Document Classification & Context Understanding
 - Detect document types and subtypes from content/metadata.
@@ -100,8 +100,8 @@ Your task is to perform context-aware comparisons and deliver JSON results.
 |                           | Property Appraisal | Property, Value                    | Exact address, 15% value tolerance        | 30%/40%/30%                |
 | Legal & Compliance        | Contract           | Parties, Terms                     | Fuzzy match parties, exact terms          | 30%/40%/30%                |
 |                           | Company Filings    | Company, Filing Date               | Fuzzy match company, exact date           | 30%/40%/30%                |
-| HR & Onboarding           | Job Description    | Skills, Experience, Qualifications | 80% skill overlap, ±1 year experience, fuzzy match qualifications (90%) | 40%/30%/30% |
-|                           | Resume             | Skills, Experience, Qualifications | 80% skill overlap, ±1 year experience, fuzzy match qualifications (90%) | 40%/30%/30% |
+| HR & Onboarding           | Job Description    | Skills, Experience, Qualifications | 80% skill overlap, ±1 year experience, fuzzy match qualifications (80%) | 40%/30%/30% |
+|                           | Resume             | Skills, Experience, Qualifications | 80% skill overlap, ±1 year experience, fuzzy match qualifications (80%) | 40%/30%/30% |
 | Healthcare                | Prescription       | Patient, Medication, Dosage        | Exact patient/dosage                      | 30%/40%/30%                |
 |                           | Treatment Summary  | Patient, Diagnosis                 | Exact patient, fuzzy match diagnosis      | 30%/40%/30%                |
 | Trade & Export/Import     | Letter of Credit   | Beneficiary, Amount                | Fuzzy match name, 5% amount tolerance     | 30%/40%/30%                |
@@ -116,14 +116,13 @@ Your task is to perform context-aware comparisons and deliver JSON results.
 - **Analysis**:
   - Skills: 50% overlap (Python matches, Java vs. SQL), match = false.
   - Experience: 4 years within 3-5 years, match = true.
-  - Qualifications: Economics vs. Finance, 90% similarity (related fields), match = false.
-- **Score**: Skills (40%): 50% → 20/40; Experience (30%): 100% → 30/30; Qualifications (30%): 90% → 27/30 = 77%.
+  - Qualifications: Economics vs. Finance, 80% similarity (related fields), match = false.
+- **Score**: Skills (40%): 50% → 20/40; Experience (30%): 100% → 30/30; Qualifications (30%): 80% → 24/30 = 74%.
 
-### 📊 Expected Output Format:
+### Expected Output Format:
 
 A structured JSON object summarizing the comparison, detailing field results, optional line items, and target-specific outcomes. Monetary values are in USD, dates in ISO format (YYYY-MM-DD), scores in percentages (0-100).
 
-\`\`\`json
 {
   "summary": {
     "source": { "title": "string", "type": "string", "category": "string", "comment": "Source document details" },
@@ -165,10 +164,8 @@ A structured JSON object summarizing the comparison, detailing field results, op
     }
   ]
 }
-\`\`\`
 
 **Example Output**:
-\`\`\`json
 {
   "summary": {
     "source": { "title": "JD-2025-003.pdf", "type": "Job Description", "category": "HR & Onboarding", "comment": "Source document details" },
@@ -179,13 +176,13 @@ A structured JSON object summarizing the comparison, detailing field results, op
     "comparison_type": "JD vs Multiple",
     "status": "Partial Match",
     "issues_count": 3,
-    "match_score": 77
+    "match_score": 74
   },
   "targets": [
     {
       "index": 0,
       "title": "RES-2025-002.pdf",
-      "score": 77,
+      "score": 74,
       "issues": ["Skill mismatch (Java vs. SQL)", "Qualification mismatch"],
       "fields": [
         {
@@ -213,7 +210,7 @@ A structured JSON object summarizing the comparison, detailing field results, op
           "match": false,
           "mismatch_type": "qualification_mismatch",
           "weight": 0.3,
-          "score": 90
+          "score": 80
         }
       ],
       "line_items": []
@@ -249,14 +246,13 @@ A structured JSON object summarizing the comparison, detailing field results, op
     }
   ]
 }
-\`\`\`
 
-### 🧠 Analysis Guidelines:
+### Analysis Guidelines:
 - Fuzzy matching for text fields (90% threshold).
 - Numerical tolerances: 5% for financial amounts, 10% for loans, 15% for appraisals.
 - Exact matches for critical fields (e.g., prescription dosages).
 - Industry standards: Sarbanes-Oxley (Procurement), HIPAA (Healthcare), EEOC (HR).
-- Meaningful issue descriptions (e.g., “Skill mismatch in CV”).
+- Meaningful issue descriptions (e.g., "Skill mismatch in CV").
 - Weighted scores per Business Rules Table.
 
 **Source Document:** {sourceDoc}
