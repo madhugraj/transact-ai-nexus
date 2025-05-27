@@ -35,6 +35,7 @@ export interface DetailedComparisonResult {
   targetDocuments: any[];
   comparisonSummary: any;
 }
+
 const COMPARISON_PROMPT: string = `
 You are an intelligent document comparison agent that analyzes and compares documents across the following categories and subtypes:
 1. Procurement & Finance: Purchase Order (PO), Invoice, Payment Advice
@@ -57,8 +58,8 @@ Your task is to perform context-aware comparisons and deliver JSON results.
 
 **Example (HR & Onboarding)**:
 - **Input**:
-  - Source: "JD-2025-003.pdf" (Role: Compliance Analyst, Skills: Python, SQL, Experience: 3-5 years, Qualifications: Bachelor’s in Finance).
-  - Target: "RES-2025-002.pdf" (Name: Alice Brown, Skills: Python, Java, Experience: 4 years, Qualifications: Bachelor’s in Economics).
+  - Source: "JD-2025-003.pdf" (Role: Compliance Analyst, Skills: Python, SQL, Experience: 3-5 years, Qualifications: Bachelor's in Finance).
+  - Target: "RES-2025-002.pdf" (Name: Alice Brown, Skills: Python, Java, Experience: 4 years, Qualifications: Bachelor's in Economics).
 - **Classification**:
   - Source: Job Description, Context: Recruitment, Logic: Compare skills, experience, qualifications.
   - Target: Resume, Context: Candidate evaluation, Logic: Match JD requirements.
@@ -111,8 +112,8 @@ Your task is to perform context-aware comparisons and deliver JSON results.
 
 **Example (HR - JD vs. CV)**:
 - **Input**:
-  - JD: Role: Compliance Analyst, Skills: Python, SQL, Experience: 3-5 years, Qualifications: Bachelor’s in Finance.
-  - CV: Name: Alice Brown, Skills: Python, Java, Experience: 4 years, Qualifications: Bachelor’s in Economics.
+  - JD: Role: Compliance Analyst, Skills: Python, SQL, Experience: 3-5 years, Qualifications: Bachelor's in Finance.
+  - CV: Name: Alice Brown, Skills: Python, Java, Experience: 4 years, Qualifications: Bachelor's in Economics.
 - **Analysis**:
   - Skills: 50% overlap (Python matches, Java vs. SQL), match = false.
   - Experience: 4 years within 3-5 years, match = true.
@@ -205,8 +206,8 @@ A structured JSON object summarizing the comparison, detailing field results, op
         },
         {
           "field": "qualifications",
-          "source_value": "Bachelor’s in Finance",
-          "target_value": "Bachelor’s in Economics",
+          "source_value": "Bachelor's in Finance",
+          "target_value": "Bachelor's in Economics",
           "match": false,
           "mismatch_type": "qualification_mismatch",
           "weight": 0.3,
@@ -483,31 +484,47 @@ const DocumentComparison = () => {
       const comparisonData = parseGeminiResponse(responseText);
       console.log("Parsed enhanced comparison data:", comparisonData);
 
-      if (comparisonData && comparisonData.comparison_summary && comparisonData.detailed_comparison) {
-        // Convert detailed comparison to our format
-        const uiResults: ComparisonResult[] = comparisonData.detailed_comparison.map((item: any) => ({
-          field: item.field || "Unknown Field",
-          poValue: item.source_value || "N/A",
-          invoiceValue: item.target_value || "N/A", 
-          sourceValue: item.source_value || "N/A",
-          targetValue: item.target_value || "N/A",
-          match: item.match || false
-        }));
+      if (comparisonData && comparisonData.summary && comparisonData.targets) {
+        // Convert to our format using the new structure
+        const uiResults: ComparisonResult[] = [];
+        
+        // Process each target's field comparisons
+        comparisonData.targets.forEach((target: any, targetIndex: number) => {
+          if (target.fields && Array.isArray(target.fields)) {
+            target.fields.forEach((field: any) => {
+              uiResults.push({
+                field: `${field.field} (Target ${targetIndex + 1})`,
+                poValue: field.source_value || "N/A",
+                invoiceValue: field.target_value || "N/A",
+                sourceValue: field.source_value || "N/A",
+                targetValue: field.target_value || "N/A",
+                match: field.match || false
+              });
+            });
+          }
+        });
 
-        const percentage = Math.round(comparisonData.comparison_summary.match_score || 0);
+        const percentage = Math.round(comparisonData.summary.match_score || 0);
         
         // Create enhanced detailed results object
         const detailedComparisonResult: DetailedComparisonResult = {
           overallMatch: percentage,
           headerResults: uiResults,
-          lineItems: comparisonData.line_items || [],
+          lineItems: [],
           sourceDocument: existingSource,
           targetDocuments: targetDocsArray,
           comparisonSummary: {
-            ...comparisonData.comparison_summary,
-            target_specific_results: comparisonData.target_specific_results || []
+            ...comparisonData.summary,
+            targets: comparisonData.targets || []
           }
         };
+
+        // Process line items if available
+        comparisonData.targets.forEach((target: any) => {
+          if (target.line_items && Array.isArray(target.line_items)) {
+            detailedComparisonResult.lineItems.push(...target.line_items);
+          }
+        });
         
         console.log("Enhanced comparison results formatted:", {
           resultsCount: uiResults.length,
@@ -526,10 +543,8 @@ const DocumentComparison = () => {
             doc_type_target: targetDocsArray.map(doc => doc.type).join(', '),
             doc_compare_count_targets: targetDocsArray.length,
             doc_compare_results: {
-              comparison_summary: comparisonData.comparison_summary,
-              detailed_comparison: comparisonData.detailed_comparison,
-              line_items: comparisonData.line_items || [],
-              target_specific_results: comparisonData.target_specific_results || [],
+              summary: comparisonData.summary,
+              targets: comparisonData.targets,
               match_percentage: percentage,
               processed_at: new Date().toISOString(),
               source_document: existingSource,
