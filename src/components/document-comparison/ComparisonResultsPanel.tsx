@@ -2,8 +2,9 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Download, AlertCircle, CheckCircle } from "lucide-react";
+import { Download, AlertCircle, CheckCircle, Replace } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   BarChart, 
   Bar, 
@@ -40,164 +41,228 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
   matchPercentage,
   detailedResults
 }) => {
-  // Use dynamic data from detailedResults instead of mock data
-  const lineItems = detailedResults.lineItems || [];
+  console.log("ComparisonResultsPanel received detailedResults:", detailedResults);
+  console.log("Target documents:", detailedResults?.targetDocuments);
   
-  // Prepare data for visualization based on actual results
-  const matchStatusData = [
-    { 
-      name: "Matches", 
-      value: lineItems.filter(item => 
-        item.quantityMatch && item.priceMatch && item.totalMatch
-      ).length 
-    },
-    { 
-      name: "Quantity Mismatch", 
-      value: lineItems.filter(item => 
-        !item.quantityMatch && item.priceMatch
-      ).length 
-    },
-    { 
-      name: "Price Mismatch", 
-      value: lineItems.filter(item => 
-        item.quantityMatch && !item.priceMatch
-      ).length 
-    },
-    { 
-      name: "Multiple Issues", 
-      value: lineItems.filter(item => 
-        !item.quantityMatch && !item.priceMatch
-      ).length 
+  // Get all target documents from detailed results
+  const targetDocuments = detailedResults?.targetDocuments || [];
+  const sourceDocument = detailedResults?.sourceDocument;
+  
+  // Calculate consolidated match data across all targets
+  const consolidatedMatchData = targetDocuments.length > 0 ? (() => {
+    const totalComparisons = targetDocuments.length;
+    const highMatches = targetDocuments.filter(doc => {
+      // Calculate match percentage for each document
+      const comparison = detailedResults.comparisonSummary;
+      return comparison?.match_score >= 80;
+    }).length;
+    
+    const mediumMatches = targetDocuments.filter(doc => {
+      const comparison = detailedResults.comparisonSummary;
+      const score = comparison?.match_score || 0;
+      return score >= 60 && score < 80;
+    }).length;
+    
+    const lowMatches = totalComparisons - highMatches - mediumMatches;
+    
+    return [
+      { name: "High Match (≥80%)", value: highMatches, color: "#00C49F" },
+      { name: "Medium Match (60-79%)", value: mediumMatches, color: "#FFBB28" },
+      { name: "Low Match (<60%)", value: lowMatches, color: "#FF8042" }
+    ].filter(item => item.value > 0);
+  })() : [];
+
+  // Prepare comparison type data for charts
+  const comparisonTypeData = (() => {
+    const summary = detailedResults?.comparisonSummary;
+    if (!summary) return [];
+    
+    const category = summary.category || "Unknown";
+    const comparisonType = summary.comparison_type || "Document Comparison";
+    const matchScore = summary.match_score || matchPercentage || 0;
+    
+    return [{
+      category,
+      comparison_type: comparisonType,
+      match_score: matchScore,
+      issues_found: summary.issues_found || 0,
+      target_count: targetDocuments.length
+    }];
+  })();
+
+  // Get line items for the active document or consolidated view
+  const getLineItemsForTarget = (targetIndex?: number) => {
+    if (targetIndex !== undefined && targetDocuments[targetIndex]) {
+      // Return line items for specific target document
+      return detailedResults?.lineItems?.filter(item => 
+        item.targetIndex === targetIndex || !item.targetIndex
+      ) || [];
     }
-  ].filter(item => item.value > 0); // Only show categories with data
+    // Return all line items (consolidated view)
+    return detailedResults?.lineItems || [];
+  };
 
-  const quantityComparisonData = lineItems.length > 0 ? lineItems.map(item => ({
-    name: item.itemName ? item.itemName.split(' ').slice(0, 2).join(' ') : 'Item',
-    poQuantity: item.poQuantity || 0,
-    invoiceQuantity: item.invoiceQuantity || 0,
-    match: item.quantityMatch ? "Yes" : "No"
-  })) : [];
+  const activeLineItems = getLineItemsForTarget(activeInvoiceIndex);
 
-  // Calculate totals from actual line items
-  const poTotal = lineItems.reduce((sum, item) => sum + (item.poTotal || 0), 0);
-  const invoiceTotal = lineItems.reduce((sum, item) => sum + (item.invoiceTotal || 0), 0);
-  const totalDifference = Math.abs(poTotal - invoiceTotal);
-  const percentageDifference = poTotal > 0 ? (totalDifference / poTotal) * 100 : 0;
+  // Calculate totals for active view
+  const calculateTotals = (lineItems: any[]) => {
+    const sourceTotal = lineItems.reduce((sum, item) => sum + (item.poTotal || item.sourceTotal || 0), 0);
+    const targetTotal = lineItems.reduce((sum, item) => sum + (item.invoiceTotal || item.targetTotal || 0), 0);
+    const totalDifference = Math.abs(sourceTotal - targetTotal);
+    const percentageDifference = sourceTotal > 0 ? (totalDifference / sourceTotal) * 100 : 0;
+    
+    return { sourceTotal, targetTotal, totalDifference, percentageDifference };
+  };
 
-  // Get comparison summary from actual results
-  const comparisonSummary = detailedResults.comparisonSummary || {};
-  const sourceDocType = detailedResults.sourceDocument?.doc_type || "Unknown";
-  const targetDocTypes = detailedResults.targetDocuments?.map(doc => doc.type).join(', ') || "Unknown";
+  const { sourceTotal, targetTotal, totalDifference, percentageDifference } = calculateTotals(activeLineItems);
+
+  // Handle replace functionality
+  const handleReplace = () => {
+    console.log("Replace button clicked - starting new comparison");
+    window.location.reload(); // Simple approach to reset the comparison
+  };
+
+  // Get document type and category from results
+  const sourceDocType = sourceDocument?.doc_type || detailedResults?.comparisonSummary?.source_doc || "Source Document";
+  const category = detailedResults?.comparisonSummary?.category || "Document Comparison";
+  const comparisonType = detailedResults?.comparisonSummary?.comparison_type || "Document Analysis";
   
   return (
     <div className="space-y-6">
-      {/* Invoice selector if multiple invoices */}
-      {invoiceFiles.length > 1 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          {invoiceFiles.map((file, index) => (
-            <Button
-              key={index}
-              variant={activeInvoiceIndex === index ? "default" : "outline"}
-              className="text-xs"
-              onClick={() => setActiveInvoiceIndex(index)}
-            >
-              {file.name}
-            </Button>
-          ))}
-        </div>
-      )}
-      
-      {/* Summary Card */}
+      {/* Summary Card with Dynamic Content */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg flex justify-between items-center">
-            <span>
-              Document Comparison Summary
-            </span>
-            <span className={`${matchPercentage > 80 ? 'text-green-600' : 'text-red-600'} text-2xl font-bold`}>
-              {matchPercentage}% Match
-            </span>
+            <span>Document Comparison Results</span>
+            <div className="flex items-center gap-3">
+              <span className={`${matchPercentage > 80 ? 'text-green-600' : matchPercentage > 60 ? 'text-blue-600' : 'text-red-600'} text-2xl font-bold`}>
+                {matchPercentage}% Match
+              </span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleReplace}
+                className="flex items-center gap-2"
+              >
+                <Replace className="h-4 w-4" />
+                New Comparison
+              </Button>
+            </div>
           </CardTitle>
           <CardDescription>
-            {poFile?.name} vs {invoiceFiles.map(f => f.name).join(', ')}
+            {sourceDocType} vs {targetDocuments.length} target document(s)
           </CardDescription>
           <CardDescription className="text-sm text-muted-foreground">
-            Comparison Type: {sourceDocType} vs {targetDocTypes}
+            Category: {category} | Type: {comparisonType}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Only show charts if we have line items data */}
-          {lineItems.length > 0 ? (
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* First chart - Match status pie chart */}
-              {matchStatusData.length > 0 && (
-                <div>
-                  <h3 className="text-md font-semibold mb-2 text-center">Line Items Match Status</h3>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={matchStatusData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                        >
-                          {matchStatusData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              )}
-              
-              {/* Second chart - Quantity comparison */}
-              {quantityComparisonData.length > 0 && (
-                <div>
-                  <h3 className="text-md font-semibold mb-2 text-center">Quantity Comparison</h3>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={quantityComparisonData}
-                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+          {/* Consolidated Overview Charts */}
+          {consolidatedMatchData.length > 0 && (
+            <div className="grid md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <h3 className="text-md font-semibold mb-2 text-center">Overall Match Distribution</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={consolidatedMatchData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                       >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <Tooltip />
-                        <Legend />
-                        <Bar dataKey="poQuantity" name="Source Quantity" fill="#8884d8" />
-                        <Bar dataKey="invoiceQuantity" name="Target Quantity" fill="#82ca9d" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                        {consolidatedMatchData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-              )}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>No line item data available for visualization.</p>
-              <p className="text-sm">This comparison focuses on header field matching.</p>
+              </div>
+              
+              <div>
+                <h3 className="text-md font-semibold mb-2 text-center">Comparison Analysis</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={comparisonTypeData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="category" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="match_score" name="Match Score %" fill="#8884d8" />
+                      <Bar dataKey="issues_found" name="Issues Found" fill="#FF8042" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
           )}
-          
+
+          {/* Target Document Tabs for Detailed View */}
+          {targetDocuments.length > 1 ? (
+            <Tabs value={activeInvoiceIndex.toString()} onValueChange={(value) => setActiveInvoiceIndex(parseInt(value))}>
+              <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${Math.min(targetDocuments.length + 1, 5)}, 1fr)` }}>
+                <TabsTrigger value="-1">All Targets</TabsTrigger>
+                {targetDocuments.slice(0, 4).map((doc, index) => (
+                  <TabsTrigger key={index} value={index.toString()}>
+                    {doc.title?.split('.')[0].substring(0, 10) || `Target ${index + 1}`}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              
+              <TabsContent value="-1" className="mt-4">
+                <div className="text-center py-4 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                  <p className="text-sm font-medium">Consolidated view of all {targetDocuments.length} target documents</p>
+                  <p className="text-xs text-muted-foreground">Select individual tabs for detailed comparison</p>
+                </div>
+              </TabsContent>
+              
+              {targetDocuments.map((doc, index) => (
+                <TabsContent key={index} value={index.toString()} className="mt-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-md">
+                        {sourceDocType} vs {doc.title || `Target ${index + 1}`}
+                      </CardTitle>
+                      <CardDescription>
+                        Document Type: {doc.type || 'Unknown'} | 
+                        Match Score: {detailedResults?.comparisonSummary?.match_score || 0}%
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {/* Individual document comparison details would go here */}
+                      <div className="text-center py-8 text-muted-foreground">
+                        <p>Detailed comparison for {doc.title}</p>
+                        <p className="text-sm">Line items and field-by-field analysis</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              ))}
+            </Tabs>
+          ) : (
+            <div className="text-center py-4 bg-gray-50 dark:bg-gray-900/20 rounded-md">
+              <p className="text-sm">Single target document comparison</p>
+            </div>
+          )}
+
           {/* Financial summary - only show if we have totals */}
-          {(poTotal > 0 || invoiceTotal > 0) && (
+          {(sourceTotal > 0 || targetTotal > 0) && (
             <div className="mt-6 grid md:grid-cols-3 gap-4">
               <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-md">
                 <div className="text-sm font-medium text-blue-600 dark:text-blue-300">Source Total</div>
-                <div className="text-2xl font-bold">${poTotal.toFixed(2)}</div>
+                <div className="text-2xl font-bold">${sourceTotal.toFixed(2)}</div>
               </div>
               <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-md">
                 <div className="text-sm font-medium text-amber-600 dark:text-amber-300">Target Total</div>
-                <div className="text-2xl font-bold">${invoiceTotal.toFixed(2)}</div>
+                <div className="text-2xl font-bold">${targetTotal.toFixed(2)}</div>
               </div>
               <div className={`${percentageDifference > 5 ? 'bg-red-50 dark:bg-red-900/20' : 'bg-green-50 dark:bg-green-900/20'} p-4 rounded-md`}>
                 <div className={`text-sm font-medium ${percentageDifference > 5 ? 'text-red-600 dark:text-red-300' : 'text-green-600 dark:text-green-300'}`}>
@@ -207,35 +272,11 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
               </div>
             </div>
           )}
-
-          {/* Show comparison summary if available */}
-          {comparisonSummary.status && (
-            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-900/20 rounded-md">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <div className="font-medium text-gray-600 dark:text-gray-300">Status</div>
-                  <div className="font-semibold">{comparisonSummary.status}</div>
-                </div>
-                <div>
-                  <div className="font-medium text-gray-600 dark:text-gray-300">Category</div>
-                  <div className="font-semibold">{comparisonSummary.category || 'Unknown'}</div>
-                </div>
-                <div>
-                  <div className="font-medium text-gray-600 dark:text-gray-300">Comparison Type</div>
-                  <div className="font-semibold">{comparisonSummary.comparison_type || 'Unknown'}</div>
-                </div>
-                <div>
-                  <div className="font-medium text-gray-600 dark:text-gray-300">Issues Found</div>
-                  <div className="font-semibold">{comparisonSummary.issues_found || 0}</div>
-                </div>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
       
       {/* Line Item Comparison Table - only show if we have line items */}
-      {lineItems.length > 0 && (
+      {activeLineItems.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Line Item Comparison</CardTitle>
@@ -256,29 +297,29 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {lineItems.map((item, index) => (
-                    <TableRow key={item.id || index} className={!item.totalMatch ? "bg-red-50 dark:bg-red-900/10" : ""}>
-                      <TableCell className="font-medium">{item.itemName || `Item ${index + 1}`}</TableCell>
+                  {activeLineItems.map((item, index) => (
+                    <TableRow key={item.id || index} className={!item.totalMatch && !item.match ? "bg-red-50 dark:bg-red-900/10" : ""}>
+                      <TableCell className="font-medium">{item.itemName || item.item || `Item ${index + 1}`}</TableCell>
                       <TableCell className={`text-right ${!item.quantityMatch ? "text-red-600 font-medium" : ""}`}>
-                        {item.poQuantity || 0}
+                        {item.poQuantity || item.sourceQuantity || 0}
                       </TableCell>
                       <TableCell className={`text-right ${!item.quantityMatch ? "text-red-600 font-medium" : ""}`}>
-                        {item.invoiceQuantity || 0}
+                        {item.invoiceQuantity || item.targetQuantity || 0}
                       </TableCell>
                       <TableCell className={`text-right ${!item.priceMatch ? "text-red-600 font-medium" : ""}`}>
-                        ${(item.poUnitPrice || 0).toFixed(2)}
+                        ${(item.poUnitPrice || item.sourceUnitPrice || 0).toFixed(2)}
                       </TableCell>
                       <TableCell className={`text-right ${!item.priceMatch ? "text-red-600 font-medium" : ""}`}>
-                        ${(item.invoiceUnitPrice || 0).toFixed(2)}
+                        ${(item.invoiceUnitPrice || item.targetUnitPrice || 0).toFixed(2)}
                       </TableCell>
-                      <TableCell className={`text-right ${!item.totalMatch ? "text-red-600 font-medium" : ""}`}>
-                        ${(item.poTotal || 0).toFixed(2)}
+                      <TableCell className={`text-right ${!item.totalMatch && !item.match ? "text-red-600 font-medium" : ""}`}>
+                        ${(item.poTotal || item.sourceTotal || 0).toFixed(2)}
                       </TableCell>
-                      <TableCell className={`text-right ${!item.totalMatch ? "text-red-600 font-medium" : ""}`}>
-                        ${(item.invoiceTotal || 0).toFixed(2)}
+                      <TableCell className={`text-right ${!item.totalMatch && !item.match ? "text-red-600 font-medium" : ""}`}>
+                        ${(item.invoiceTotal || item.targetTotal || 0).toFixed(2)}
                       </TableCell>
                       <TableCell>
-                        {item.totalMatch ? (
+                        {item.totalMatch || item.match ? (
                           <div className="flex items-center">
                             <CheckCircle className="h-4 w-4 text-green-500 mr-1" />
                             <span className="text-green-600">Match</span>
@@ -319,8 +360,8 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
                 {comparisonResults.map((result, index) => (
                   <TableRow key={index} className={result.match ? "" : "bg-red-50 dark:bg-red-900/10"}>
                     <TableCell className="font-medium">{result.field}</TableCell>
-                    <TableCell>{result.poValue}</TableCell>
-                    <TableCell>{result.invoiceValue}</TableCell>
+                    <TableCell>{result.poValue || result.sourceValue}</TableCell>
+                    <TableCell>{result.invoiceValue || result.targetValue}</TableCell>
                     <TableCell>
                       {result.match ? (
                         <div className="flex items-center">

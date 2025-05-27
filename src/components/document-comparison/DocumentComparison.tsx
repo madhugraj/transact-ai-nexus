@@ -1,11 +1,11 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileSearch } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DocumentUploadPanel } from "./DocumentUploadPanel";
 import { ComparisonResultsPanel } from "./ComparisonResultsPanel";
+import ComparisonDashboard from "./ComparisonDashboard";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 
 // Types for document comparison
@@ -22,6 +22,8 @@ export interface ComparisonResult {
   poValue: string | number;
   invoiceValue: string | number;
   match: boolean;
+  sourceValue?: string | number;
+  targetValue?: string | number;
 }
 
 export interface DetailedComparisonResult {
@@ -94,8 +96,8 @@ Dynamically apply business logic for comparison based on the pair of documents.
 * Match submitted ID proof with offer letter information
 
 #### B. JD vs Resume
-* Validate JD with resume on qulaification, experience, skillset, others
-* Flag discrepancies in qulalification, or degree 
+* Validate JD with resume on qualification, experience, skillset, others
+* Flag discrepancies in qualification, or degree 
 
 ---
 
@@ -133,7 +135,17 @@ Return a JSON result for the dashboard:
       "invoiceTotal": 200.00,
       "quantityMatch": true,
       "priceMatch": true,
-      "totalMatch": true
+      "totalMatch": true,
+      "targetIndex": 0
+    }
+  ],
+  "target_specific_results": [
+    {
+      "target_index": 0,
+      "target_title": "Invoice_1.pdf",
+      "match_score": 85,
+      "issues": ["Price mismatch on item 2"],
+      "line_items": [...]
     }
   ]
 }
@@ -142,7 +154,8 @@ Return a JSON result for the dashboard:
 
 ### 🧠 Guidelines
 * Use fuzzy logic for text mismatches (e.g., "ABC Corp" vs "ABC Corporation")
-* Return match_score for each document pair
+* Return match_score for each document pair and overall
+* Provide target_specific_results for individual document analysis
 * If document type is not known, classify based on layout and keywords
 
 Source Document JSON: {sourceDoc}
@@ -231,7 +244,7 @@ const DocumentComparison = () => {
 
   // Compare documents using AI and database data (TEXT-ONLY)
   const compareDocuments = async () => {
-    console.log("=== STARTING DOCUMENT COMPARISON ===");
+    console.log("=== STARTING ENHANCED DOCUMENT COMPARISON ===");
     
     if (!poFile || invoiceFiles.length === 0) {
       console.error("Missing files - PO file:", !!poFile, "Invoice files:", invoiceFiles.length);
@@ -246,13 +259,13 @@ const DocumentComparison = () => {
     setIsComparing(true);
     
     try {
-      console.log("Starting comparison process...");
+      console.log("Starting enhanced comparison process...");
       console.log("Source file:", poFile.name);
       console.log("Target files:", invoiceFiles.map(f => f.name));
       
-      // Get the latest source document from database
-      console.log("Fetching source document from database...");
-      const { data: sourceDoc, error: sourceError } = await supabase
+      // Check for existing source document to avoid duplicates
+      console.log("Checking for existing source document...");
+      const { data: existingSource, error: sourceCheckError } = await supabase
         .from('compare_source_document')
         .select('*')
         .eq('doc_title', poFile.name)
@@ -260,44 +273,50 @@ const DocumentComparison = () => {
         .limit(1)
         .maybeSingle();
 
-      console.log("Source document query result:", { sourceDoc, sourceError });
+      console.log("Existing source check result:", { existingSource, sourceCheckError });
 
-      if (sourceError || !sourceDoc) {
-        console.error("Source document error:", sourceError);
-        throw new Error("Source document not found in database. Please upload and process it first.");
+      let sourceDoc = existingSource;
+      
+      if (!sourceDoc) {
+        console.log("Source document not found, need to process it first");
+        toast({
+          title: "Processing Required",
+          description: "Source document needs to be processed first. Please upload and process it in the table extraction tab.",
+          variant: "destructive",
+        });
+        return;
       }
 
-      console.log("Found source document:", {
-        id: sourceDoc.id,
-        title: sourceDoc.doc_title,
-        type: sourceDoc.doc_type,
-        hasJsonData: !!sourceDoc.doc_json_extract
-      });
-
-      // Get target documents from database using the source document ID
-      console.log("Fetching target documents for source ID:", sourceDoc.id);
-      const { data: targetDocs, error: targetError } = await supabase
+      // Check for existing target documents
+      console.log("Checking for existing target documents...");
+      const { data: existingTargets, error: targetCheckError } = await supabase
         .from('compare_target_docs')
         .select('*')
         .eq('id', sourceDoc.id)
         .maybeSingle();
 
-      console.log("Target documents query result:", { targetDocs, targetError });
+      console.log("Target documents query result:", { existingTargets, targetCheckError });
 
-      if (targetError || !targetDocs) {
-        console.error("Target documents error:", targetError);
-        throw new Error("Target documents not found. Please upload and process target documents first.");
+      if (targetCheckError || !existingTargets) {
+        console.log("Target documents not found, need to process them first");
+        toast({
+          title: "Processing Required", 
+          description: "Target documents need to be processed first. Please upload and process them in the table extraction tab.",
+          variant: "destructive",
+        });
+        return;
       }
 
       // Prepare target documents array with ALL target documents
-      console.log("Preparing target documents array...");
+      console.log("Preparing target documents array for enhanced comparison...");
       const targetDocsArray = [];
       for (let i = 1; i <= 5; i++) {
-        if (targetDocs[`doc_json_${i}`]) {
+        if (existingTargets[`doc_json_${i}`]) {
           const targetDoc = {
-            title: targetDocs[`doc_title_${i}`],
-            type: targetDocs[`doc_type_${i}`],
-            json: targetDocs[`doc_json_${i}`]
+            index: i - 1,
+            title: existingTargets[`doc_title_${i}`],
+            type: existingTargets[`doc_type_${i}`],
+            json: existingTargets[`doc_json_${i}`]
           };
           targetDocsArray.push(targetDoc);
           console.log(`Target document ${i}:`, {
@@ -309,21 +328,20 @@ const DocumentComparison = () => {
       }
 
       if (targetDocsArray.length === 0) {
-        console.error("No target documents found for comparison");
+        console.error("No target documents found for enhanced comparison");
         throw new Error("No target documents found for comparison.");
       }
 
-      console.log("Total target documents prepared:", targetDocsArray.length);
+      console.log("Total target documents prepared for enhanced comparison:", targetDocsArray.length);
 
-      // Create comparison prompt with actual data - COMPARE ALL TARGET DOCUMENTS
+      // Create enhanced comparison prompt with actual data
       const comparisonPrompt = COMPARISON_PROMPT
         .replace('{sourceDoc}', JSON.stringify(sourceDoc.doc_json_extract))
         .replace('{targetDocs}', JSON.stringify(targetDocsArray));
 
-      console.log("Comparison prompt prepared, length:", comparisonPrompt.length);
-      console.log("Sending comparison request to Gemini API...");
+      console.log("Enhanced comparison prompt prepared, sending to Gemini API...");
       
-      // Use Gemini to perform the comparison - TEXT ONLY, NO IMAGES
+      // Use Gemini for enhanced comparison
       const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent', {
         method: 'POST',
         headers: {
@@ -345,65 +363,56 @@ const DocumentComparison = () => {
         })
       });
 
-      console.log("Gemini API response status:", response.status);
-
       if (!response.ok) {
         const errorData = await response.text();
-        console.error("Gemini API error details:", {
-          status: response.status,
-          statusText: response.statusText,
-          errorData: errorData
-        });
+        console.error("Gemini API error:", errorData);
         throw new Error(`Gemini API error: ${response.status} - ${errorData}`);
       }
 
       const responseData = await response.json();
-      console.log("Gemini API response data:", responseData);
-
-      if (!responseData.candidates || !responseData.candidates[0] || !responseData.candidates[0].content) {
-        console.error("Invalid Gemini response structure:", responseData);
-        throw new Error("Invalid response structure from Gemini API");
-      }
-
       const responseText = responseData.candidates[0].content.parts[0].text;
-      console.log("Raw Gemini response text:", responseText);
+      console.log("Enhanced Gemini response received");
       
-      // Parse the comparison results
-      console.log("Parsing comparison results...");
+      // Parse the enhanced comparison results
       const comparisonData = parseGeminiResponse(responseText);
-      console.log("Parsed comparison data:", comparisonData);
+      console.log("Parsed enhanced comparison data:", comparisonData);
 
       if (comparisonData && comparisonData.comparison_summary && comparisonData.detailed_comparison) {
-        // Convert detailed comparison to our format
+        // Convert detailed comparison to our format with enhanced support
         const uiResults: ComparisonResult[] = comparisonData.detailed_comparison.map((item: any) => ({
           field: item.field || "Unknown Field",
           poValue: item.source_value || "N/A",
-          invoiceValue: item.target_value || "N/A",
+          invoiceValue: item.target_value || "N/A", 
+          sourceValue: item.source_value || "N/A",
+          targetValue: item.target_value || "N/A",
           match: item.match || false
         }));
 
         const percentage = comparisonData.comparison_summary.match_score || 0;
         
-        // Create detailed results object with dynamic data
+        // Create enhanced detailed results object
         const detailedComparisonResult: DetailedComparisonResult = {
           overallMatch: percentage,
           headerResults: uiResults,
           lineItems: comparisonData.line_items || [],
           sourceDocument: sourceDoc,
           targetDocuments: targetDocsArray,
-          comparisonSummary: comparisonData.comparison_summary
+          comparisonSummary: {
+            ...comparisonData.comparison_summary,
+            target_specific_results: comparisonData.target_specific_results || []
+          }
         };
         
-        console.log("Formatted comparison results:", {
+        console.log("Enhanced comparison results formatted:", {
           resultsCount: uiResults.length,
           matchPercentage: percentage,
-          summary: comparisonData.comparison_summary,
+          targetDocuments: targetDocsArray.length,
           lineItemsCount: detailedComparisonResult.lineItems.length
         });
 
-        // Store results in Supabase doc_compare_results table
-        console.log("Storing comparison results in database...");
-        const { data: insertedResult, error: insertError } = await supabase
+        // Store enhanced results in database
+        console.log("Storing enhanced comparison results in database...");
+        const { error: insertError } = await supabase
           .from('Doc_Compare_results')
           .insert({
             doc_id_compare: sourceDoc.id,
@@ -414,46 +423,34 @@ const DocumentComparison = () => {
               comparison_summary: comparisonData.comparison_summary,
               detailed_comparison: comparisonData.detailed_comparison,
               line_items: comparisonData.line_items || [],
+              target_specific_results: comparisonData.target_specific_results || [],
               match_percentage: percentage,
               processed_at: new Date().toISOString(),
               source_document: sourceDoc,
               target_documents: targetDocsArray
             }
-          })
-          .select()
-          .single();
+          });
 
         if (insertError) {
-          console.error("Error storing comparison results:", insertError);
-          toast({
-            title: "Warning",
-            description: "Comparison successful but failed to save results to database",
-            variant: "destructive",
-          });
+          console.error("Error storing enhanced comparison results:", insertError);
         } else {
-          console.log("Successfully stored comparison results:", insertedResult);
+          console.log("Successfully stored enhanced comparison results");
         }
         
-        // Update UI state to show results
-        console.log("Setting UI state with results...");
+        // Update UI state with enhanced results
         setComparisonResults(uiResults);
         setDetailedResults(detailedComparisonResult);
         setMatchPercentage(percentage);
         setActiveTab("results");
         
-        console.log("=== COMPARISON COMPLETED SUCCESSFULLY ===");
-        console.log("Final results set in state:", {
-          resultsCount: uiResults.length,
-          matchPercentage: percentage,
-          hasDetailedResults: !!detailedComparisonResult
-        });
+        console.log("=== ENHANCED COMPARISON COMPLETED SUCCESSFULLY ===");
         
         toast({
           title: "Comparison Complete",
-          description: `Documents compared with ${percentage}% match`,
+          description: `Documents compared with ${percentage}% overall match across ${targetDocsArray.length} targets`,
         });
 
-        // Dispatch custom event to notify dashboard to refresh
+        // Dispatch enhanced event for dashboard refresh
         window.dispatchEvent(new CustomEvent('comparisonComplete', {
           detail: {
             sourceDoc: sourceDoc,
@@ -464,17 +461,12 @@ const DocumentComparison = () => {
         }));
         
       } else {
-        console.error("Invalid comparison response format:", comparisonData);
+        console.error("Invalid enhanced comparison response format:", comparisonData);
         throw new Error("Invalid comparison response format");
       }
 
     } catch (error) {
-      console.error("=== COMPARISON ERROR ===");
-      console.error("Error details:", {
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        timestamp: new Date().toISOString()
-      });
+      console.error("=== ENHANCED COMPARISON ERROR ===", error);
       toast({
         title: "Comparison Failed",
         description: error instanceof Error ? error.message : "Failed to compare documents",
@@ -482,17 +474,19 @@ const DocumentComparison = () => {
       });
     } finally {
       setIsComparing(false);
-      console.log("=== COMPARISON PROCESS ENDED ===");
     }
   };
 
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-2 w-full max-w-md">
+        <TabsList className="grid grid-cols-3 w-full max-w-lg">
           <TabsTrigger value="upload">Upload Documents</TabsTrigger>
           <TabsTrigger value="results" disabled={comparisonResults.length === 0}>
             Comparison Results
+          </TabsTrigger>
+          <TabsTrigger value="dashboard">
+            Analysis Dashboard
           </TabsTrigger>
         </TabsList>
         
@@ -524,6 +518,17 @@ const DocumentComparison = () => {
               No comparison results available. Please run a comparison first.
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="dashboard" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Comparison Analytics Dashboard</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ComparisonDashboard />
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

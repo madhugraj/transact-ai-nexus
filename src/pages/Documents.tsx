@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card } from "@/components/ui/card";
@@ -7,27 +8,24 @@ import { Download, Bot } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DocumentComparison from "@/components/document-comparison/DocumentComparison";
-import ComparisonDashboard from "@/components/document-comparison/ComparisonDashboard";
 import AIAssistant from "@/components/assistant/AIAssistant";
 import { InventoryMappingPanel } from "@/components/inventory/InventoryMappingPanel";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
 const Documents = () => {
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<string>("tableExtraction");
   const [showAssistant, setShowAssistant] = useState(false);
+
   const handleDownload = () => {
-    // Placeholder for download functionality
     toast({
       title: "Download initiated",
       description: "Your document is being prepared for download"
     });
-
-    // In a real implementation, this would trigger an actual download
-    // For demonstration purposes, we're just showing a toast
   };
-  return <AppLayout>
+
+  return (
+    <AppLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -50,10 +48,9 @@ const Documents = () => {
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-4 w-full max-w-lg">
+          <TabsList className="grid grid-cols-3 w-full max-w-lg">
             <TabsTrigger value="tableExtraction" className="text-xs">Table Extraction</TabsTrigger>
-            <TabsTrigger value="documentComparison" className="text-xs">Process</TabsTrigger>
-            <TabsTrigger value="comparisonDashboard" className="text-xs">Dashboard</TabsTrigger>
+            <TabsTrigger value="documentComparison" className="text-xs">Document Comparison</TabsTrigger>
             <TabsTrigger value="inventoryMapping" className="text-xs">Inventory Mapping</TabsTrigger>
           </TabsList>
           
@@ -66,12 +63,6 @@ const Documents = () => {
           <TabsContent value="documentComparison" className="mt-4">
             <Card className="overflow-hidden border-muted/40 shadow-sm hover:shadow-md transition-all duration-200 p-6">
               <DocumentComparison />
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="comparisonDashboard" className="mt-4">
-            <Card className="overflow-hidden border-muted/40 shadow-sm hover:shadow-md transition-all duration-200 p-6">
-              <ComparisonDashboard />
             </Card>
           </TabsContent>
           
@@ -97,6 +88,8 @@ const Documents = () => {
           </div>
         </DialogContent>
       </Dialog>
-    </AppLayout>;
+    </AppLayout>
+  );
 };
+
 export default Documents;
