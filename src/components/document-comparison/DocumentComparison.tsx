@@ -124,7 +124,7 @@ Your task is to perform context-aware comparisons and deliver JSON results.
 
 A structured JSON object summarizing the comparison, detailing field results, optional line items, and target-specific outcomes. Monetary values are in USD, dates in ISO format (YYYY-MM-DD), scores in percentages (0-100).
 
-```json
+json
 {
   "summary": {
     "source": { "title": "string", "type": "string", "category": "string" }, // Source details
