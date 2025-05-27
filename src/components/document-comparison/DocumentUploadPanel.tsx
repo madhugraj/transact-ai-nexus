@@ -78,60 +78,16 @@ Based on your classification, extract the content into an appropriate **JSON** u
 
 Return ONLY a valid JSON object with the classification and extracted data. Do not include any additional text or markdown formatting.`;
 
-const TARGET_DOCUMENT_CLASSIFICATION_PROMPT = `You are an intelligent document processor. Your job is to **extract structured data** from one or more uploaded documents (up to 5) and store them in **schema-aware JSON format**, **ready for later comparison** with another document (source/reference).
-
----
-
-### 🎯 OBJECTIVE
-
-1. Classify each uploaded document by its domain and subtype.
-2. Extract structured content into JSON using the appropriate format for that subtype.
-3. Prepare the results for downstream comparison (e.g., PO vs. Invoices, Claim vs. Evidence, etc.).
-
----
-
-### 📚 SUPPORTED DOCUMENT TYPES:
-
-Refer to the following domains and supported subtypes:
-
-1. **Procurement & Finance** — Invoice, Purchase Order (PO), Payment Advice  
-2. **Insurance & Claims** — Claim Form, Accident Report  
-3. **Banking & Loan Origination** — Loan Application, Property Appraisal  
-4. **Legal & Compliance** — Contract, Company Filings  
-5. **HR & Onboarding** — JD or Job Description, Resume  
-6. **Healthcare** — Prescription, Treatment Summary  
-7. **Trade & Export/Import** — Letter of Credit, Customs Declaration  
-8. **Education & Certification** — Student Application, Certificates 
-
----
-
-### 🧩 EXTRACTION FORMAT:
-
-For each uploaded document:
-
-- Identify its \`document_type\` as:  
-  \`"Domain - Subtype"\` (e.g., \`"Procurement & Finance - Invoice"\`).
-  
-- Extract key fields into **standardized JSON** based on subtype.
-- Do not hallucinate values if not found. Use null or omit the field.
-- Preserve all numeric and date formatting accurately.
-
-Based on your classification, extract the content into an appropriate **JSON** using **ONLY the schema relevant to the identified subtype**. Don't include irrelevant fields. Do not hallucinate missing data.
-
-Return ONLY a valid JSON object with the classification and extracted data. Do not include any additional text or markdown formatting.`;
-
 // Enhanced JSON parsing function
 const parseGeminiResponse = (responseText: string): any => {
   console.log("Raw Gemini response:", responseText);
   
-  // Strategy 1: Try to parse as direct JSON
   try {
     return JSON.parse(responseText.trim());
   } catch (error) {
     console.log("Direct JSON parsing failed, trying extraction methods...");
   }
   
-  // Strategy 2: Extract JSON from markdown code blocks
   const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/i;
   const codeBlockMatch = responseText.match(codeBlockRegex);
   
@@ -145,7 +101,6 @@ const parseGeminiResponse = (responseText: string): any => {
     }
   }
   
-  // Strategy 3: Find JSON object in the text (look for { to })
   const jsonRegex = /\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}/;
   const jsonMatch = responseText.match(jsonRegex);
   
@@ -159,35 +114,19 @@ const parseGeminiResponse = (responseText: string): any => {
     }
   }
   
-  // Strategy 4: Try to clean and parse common formatting issues
-  let cleanedText = responseText
-    .replace(/^[^{]*/, '') // Remove text before first {
-    .replace(/[^}]*$/, '') // Remove text after last }
-    .replace(/,\s*}/g, '}') // Remove trailing commas
-    .replace(/,\s*]/g, ']'); // Remove trailing commas in arrays
-  
-  if (cleanedText.startsWith('{') && cleanedText.endsWith('}')) {
-    try {
-      const cleanedJson = JSON.parse(cleanedText);
-      console.log("Successfully parsed cleaned JSON");
-      return cleanedJson;
-    } catch (error) {
-      console.error("Failed to parse cleaned JSON:", error);
-    }
-  }
-  
   throw new Error(`Unable to extract valid JSON from response. Raw response: ${responseText.substring(0, 200)}...`);
 };
 
 // Global variable to store the current source document ID
 let currentSourceDocumentId: number | null = null;
 
-// Function to check if source document already exists in database
-const checkSourceDocumentExists = async (fileName: string): Promise<{ exists: boolean; id?: number }> => {
+// Function to check if source document already exists in Supabase database
+const checkSourceDocumentInDatabase = async (fileName: string): Promise<{ exists: boolean; id?: number; data?: any }> => {
   try {
+    console.log("Checking if source document exists in database:", fileName);
     const { data, error } = await supabase
       .from('compare_source_document')
-      .select('id')
+      .select('id, doc_json_extract')
       .eq('doc_title', fileName)
       .maybeSingle();
 
@@ -197,19 +136,22 @@ const checkSourceDocumentExists = async (fileName: string): Promise<{ exists: bo
     }
 
     if (data) {
-      return { exists: true, id: data.id };
+      console.log("Source document found in database:", data);
+      return { exists: true, id: data.id, data: data.doc_json_extract };
     }
 
+    console.log("Source document not found in database");
     return { exists: false };
   } catch (error) {
-    console.error("Error in checkSourceDocumentExists:", error);
+    console.error("Error in checkSourceDocumentInDatabase:", error);
     return { exists: false };
   }
 };
 
-// Function to check if target documents already exist for a source document
-const checkTargetDocumentsExist = async (sourceDocId: number, fileNames: string[]): Promise<{ exists: boolean; existingFiles: string[] }> => {
+// Function to check if target documents already exist for a source document in database
+const checkTargetDocumentsInDatabase = async (sourceDocId: number, fileNames: string[]): Promise<{ exists: boolean; existingFiles: string[]; targetData?: any }> => {
   try {
+    console.log("Checking if target documents exist for source ID:", sourceDocId, "files:", fileNames);
     const { data, error } = await supabase
       .from('compare_target_docs')
       .select('*')
@@ -222,6 +164,7 @@ const checkTargetDocumentsExist = async (sourceDocId: number, fileNames: string[
     }
 
     if (!data) {
+      console.log("No target documents found for source ID:", sourceDocId);
       return { exists: false, existingFiles: [] };
     }
 
@@ -234,12 +177,14 @@ const checkTargetDocumentsExist = async (sourceDocId: number, fileNames: string[
       }
     }
 
+    console.log("Found existing target documents:", existingFiles);
     return { 
       exists: existingFiles.length > 0, 
-      existingFiles 
+      existingFiles,
+      targetData: data
     };
   } catch (error) {
-    console.error("Error in checkTargetDocumentsExist:", error);
+    console.error("Error in checkTargetDocumentsInDatabase:", error);
     return { exists: false, existingFiles: [] };
   }
 };
@@ -259,12 +204,13 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
     try {
       console.log("Starting source document processing for:", file.name, "Size:", file.size, "Type:", file.type);
       
-      // Check if document already exists
-      const existsResult = await checkSourceDocumentExists(file.name);
+      // Check if document already exists in database
+      const existsResult = await checkSourceDocumentInDatabase(file.name);
       if (existsResult.exists) {
         currentSourceDocumentId = existsResult.id!;
+        console.log("Source document already exists in database with ID:", currentSourceDocumentId);
         toast({
-          title: "Document Already Exists",
+          title: "Document Already Processed",
           description: "This source document has already been processed. Using existing data.",
         });
         return;
@@ -301,7 +247,6 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
         console.log("Attempting to parse Gemini response...");
         extractedData = parseGeminiResponse(response.data);
         
-        // Validate that we have the basic structure we expect
         if (!extractedData || typeof extractedData !== 'object') {
           throw new Error("Parsed data is not a valid object");
         }
@@ -342,13 +287,6 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
 
     } catch (error) {
       console.error("Error processing source document:", error);
-      console.error("Error details:", {
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type
-      });
       toast({
         title: "Processing Failed",
         description: error instanceof Error ? error.message : "Failed to process document",
@@ -361,21 +299,20 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
     try {
       console.log("Starting target documents processing for:", files.length, "files");
       
-      // Validate file count (1-5 files)
       if (files.length < 1 || files.length > 5) {
         throw new Error("Please upload between 1 and 5 target documents");
       }
 
-      // Check if we have a source document ID to link to
       if (!currentSourceDocumentId) {
         throw new Error("Please upload and process a source document first");
       }
 
-      // Check for duplicate target documents
+      // Check for duplicate target documents in database
       const fileNames = files.map(f => f.name);
-      const duplicateCheck = await checkTargetDocumentsExist(currentSourceDocumentId, fileNames);
+      const duplicateCheck = await checkTargetDocumentsInDatabase(currentSourceDocumentId, fileNames);
       
       if (duplicateCheck.exists) {
+        console.log("Found duplicates in database:", duplicateCheck.existingFiles);
         toast({
           title: "Duplicate Documents Found",
           description: `The following documents have already been processed: ${duplicateCheck.existingFiles.join(', ')}. Skipping duplicate processing.`,
@@ -391,7 +328,6 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
           return;
         }
         
-        // Continue with only new files
         files = newFiles;
       }
 
@@ -421,9 +357,9 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
         // Convert file to base64
         const base64Image = await fileToBase64(file);
         
-        // Process with Gemini using target document prompt
+        // Process with Gemini
         const response = await processImageWithGemini(
-          TARGET_DOCUMENT_CLASSIFICATION_PROMPT,
+          DOCUMENT_CLASSIFICATION_PROMPT,
           base64Image,
           file.type
         );
@@ -445,12 +381,11 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
         console.log(`Target document ${i + 1} processed successfully:`, extractedData);
       }
 
-      // Prepare data for insertion/update into compare_target_docs
+      // Prepare data for insertion/update
       let targetDocData: any = {
-        id: currentSourceDocumentId // Link to source document
+        id: currentSourceDocumentId
       };
 
-      // If there's existing data, start with that
       if (existingData) {
         targetDocData = { ...existingData };
       }
@@ -458,14 +393,12 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
       // Find the next available slot and add new documents
       let nextSlot = 1;
       if (existingData) {
-        // Find the first empty slot
         for (let i = 1; i <= 5; i++) {
           if (!existingData[`doc_title_${i}`]) {
             nextSlot = i;
             break;
           }
         }
-        // If no empty slots found, find the last used slot + 1
         if (nextSlot === 1) {
           for (let i = 5; i >= 1; i--) {
             if (existingData[`doc_title_${i}`]) {
@@ -518,10 +451,7 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       console.log("New source file selected:", file.name);
-      // Call the original handler first
       handlePoFileChange(e);
-      
-      // Then process and store the document
       await processAndStoreSourceDocument(file);
     }
   };
@@ -532,7 +462,6 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
       const fileArray = Array.from(files);
       console.log("New target files selected:", fileArray.length, "files");
       
-      // Validate file count before processing
       if (fileArray.length > 5) {
         toast({
           title: "Too Many Files",
@@ -542,10 +471,7 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
         return;
       }
 
-      // Call the original handler first
       handleInvoiceFileChange(e);
-      
-      // Then process and store the target documents
       await processAndStoreTargetDocuments(fileArray);
     }
   };
@@ -554,7 +480,7 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
     console.log("Replace button clicked");
     const input = document.getElementById('po-upload') as HTMLInputElement;
     if (input) {
-      input.value = ''; // Clear the input to allow selecting the same file again
+      input.value = '';
       input.click();
     }
   };

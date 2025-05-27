@@ -24,6 +24,15 @@ export interface ComparisonResult {
   match: boolean;
 }
 
+export interface DetailedComparisonResult {
+  overallMatch: number;
+  headerResults: ComparisonResult[];
+  lineItems: any[];
+  sourceDocument: any;
+  targetDocuments: any[];
+  comparisonSummary: any;
+}
+
 const COMPARISON_PROMPT = `You are an intelligent agent designed to compare a source document against one or more target documents. The comparison logic dynamically adjusts based on the document category and type (e.g., Invoice, PO, Claim Form, Offer Letter).
 
 ---
@@ -111,6 +120,21 @@ Return a JSON result for the dashboard:
       "match": true,
       "mismatch_type": null
     }
+  ],
+  "line_items": [
+    {
+      "id": "1",
+      "itemName": "Item Name",
+      "poQuantity": 2,
+      "invoiceQuantity": 2,
+      "poUnitPrice": 100.00,
+      "invoiceUnitPrice": 100.00,
+      "poTotal": 200.00,
+      "invoiceTotal": 200.00,
+      "quantityMatch": true,
+      "priceMatch": true,
+      "totalMatch": true
+    }
   ]
 }
 
@@ -131,6 +155,7 @@ const DocumentComparison = () => {
   const [activeInvoiceIndex, setActiveInvoiceIndex] = useState<number>(0);
   const [isComparing, setIsComparing] = useState(false);
   const [comparisonResults, setComparisonResults] = useState<ComparisonResult[]>([]);
+  const [detailedResults, setDetailedResults] = useState<DetailedComparisonResult | null>(null);
   const [matchPercentage, setMatchPercentage] = useState<number>(0);
   const [activeTab, setActiveTab] = useState("upload");
 
@@ -264,7 +289,7 @@ const DocumentComparison = () => {
         throw new Error("Target documents not found. Please upload and process target documents first.");
       }
 
-      // Prepare target documents array
+      // Prepare target documents array with ALL target documents
       console.log("Preparing target documents array...");
       const targetDocsArray = [];
       for (let i = 1; i <= 5; i++) {
@@ -290,7 +315,7 @@ const DocumentComparison = () => {
 
       console.log("Total target documents prepared:", targetDocsArray.length);
 
-      // Create comparison prompt with actual data
+      // Create comparison prompt with actual data - COMPARE ALL TARGET DOCUMENTS
       const comparisonPrompt = COMPARISON_PROMPT
         .replace('{sourceDoc}', JSON.stringify(sourceDoc.doc_json_extract))
         .replace('{targetDocs}', JSON.stringify(targetDocsArray));
@@ -315,7 +340,7 @@ const DocumentComparison = () => {
             temperature: 0.1,
             topK: 32,
             topP: 1,
-            maxOutputTokens: 2048,
+            maxOutputTokens: 4096,
           }
         })
       });
@@ -359,10 +384,21 @@ const DocumentComparison = () => {
 
         const percentage = comparisonData.comparison_summary.match_score || 0;
         
+        // Create detailed results object with dynamic data
+        const detailedComparisonResult: DetailedComparisonResult = {
+          overallMatch: percentage,
+          headerResults: uiResults,
+          lineItems: comparisonData.line_items || [],
+          sourceDocument: sourceDoc,
+          targetDocuments: targetDocsArray,
+          comparisonSummary: comparisonData.comparison_summary
+        };
+        
         console.log("Formatted comparison results:", {
           resultsCount: uiResults.length,
           matchPercentage: percentage,
-          summary: comparisonData.comparison_summary
+          summary: comparisonData.comparison_summary,
+          lineItemsCount: detailedComparisonResult.lineItems.length
         });
 
         // Store results in Supabase doc_compare_results table
@@ -377,8 +413,11 @@ const DocumentComparison = () => {
             doc_compare_results: {
               comparison_summary: comparisonData.comparison_summary,
               detailed_comparison: comparisonData.detailed_comparison,
+              line_items: comparisonData.line_items || [],
               match_percentage: percentage,
-              processed_at: new Date().toISOString()
+              processed_at: new Date().toISOString(),
+              source_document: sourceDoc,
+              target_documents: targetDocsArray
             }
           })
           .select()
@@ -398,13 +437,15 @@ const DocumentComparison = () => {
         // Update UI state to show results
         console.log("Setting UI state with results...");
         setComparisonResults(uiResults);
+        setDetailedResults(detailedComparisonResult);
         setMatchPercentage(percentage);
         setActiveTab("results");
         
         console.log("=== COMPARISON COMPLETED SUCCESSFULLY ===");
         console.log("Final results set in state:", {
           resultsCount: uiResults.length,
-          matchPercentage: percentage
+          matchPercentage: percentage,
+          hasDetailedResults: !!detailedComparisonResult
         });
         
         toast({
@@ -468,7 +509,7 @@ const DocumentComparison = () => {
         </TabsContent>
         
         <TabsContent value="results" className="mt-4 space-y-4">
-          {comparisonResults.length > 0 ? (
+          {comparisonResults.length > 0 && detailedResults ? (
             <ComparisonResultsPanel
               poFile={poFile}
               invoiceFiles={invoiceFiles}
@@ -476,6 +517,7 @@ const DocumentComparison = () => {
               setActiveInvoiceIndex={setActiveInvoiceIndex}
               comparisonResults={comparisonResults}
               matchPercentage={matchPercentage}
+              detailedResults={detailedResults}
             />
           ) : (
             <div className="text-center py-8 text-muted-foreground">
