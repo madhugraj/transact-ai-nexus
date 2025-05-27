@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -35,84 +36,38 @@ export interface DetailedComparisonResult {
   comparisonSummary: any;
 }
 
-const COMPARISON_PROMPT = `You are an intelligent agent designed to compare a source document against one or more target documents. The comparison logic dynamically adjusts based on the document category and type (e.g., Invoice, PO, Claim Form, Offer Letter).
+const COMPARISON_PROMPT = `You are an intelligent document comparison agent that analyzes and compares documents across multiple categories. Your task is to perform detailed, context-aware comparisons and provide comprehensive analysis.
 
----
+### 🔍 **Core Functions:**
 
-### 🔍 **Your Tasks:**
+#### 1. Document Classification & Context Understanding
+- Automatically detect document types: PO, Invoice, Delivery Note, Claim Form, Resume, Offer Letter, etc.
+- Identify the business context and comparison scenario
+- Adapt comparison logic based on document pairs
 
-#### 1. Classify Documents
-Identify the document type (e.g., PO, Invoice, Delivery Note, Payment Advice)
-* **Procurement & Finance**: PO, Invoice, Delivery Note, Payment Advice
-* **Insurance & Claims**: Claim Form, Medical Bills, Accident Report
-* **HR & Onboarding**: Offer Letter, Resume, Submitted Documents
+#### 2. Multi-Target Comparison Logic
+- Compare 1 source document against multiple target documents
+- Generate individual comparison scores for each target
+- Provide consolidated analysis across all targets
+- Highlight patterns and anomalies across the document set
 
-#### 2. Parse and Normalize
-Extract relevant fields from each document into structured JSON.
+#### 3. Dynamic Field Analysis
+- Extract and compare relevant fields based on document type
+- Apply business rules specific to the document category
+- Generate detailed field-by-field comparison results
+- Calculate match scores using weighted importance
 
-#### 3. Perform Comparison Logic
-Dynamically apply business logic for comparison based on the pair of documents.
-
----
-
-### 🧾 **Procurement & Finance Use Cases**
-
-#### A. PO vs Invoices
-* Match PO number, vendor name
-* Compare line_items: check for quantity, rate, tax mismatches
-* Calculate % deviation in unit rate or total
-
-#### B. Invoice vs Delivery Note / GRN
-* Ensure line-item quantities and items match what was actually delivered
-* Highlight missing items or excess billing
-
-#### C. Payment Advice vs Invoices
-* Match invoice numbers
-* Check if each invoice is fully paid, partially paid, or unpaid
-* Return payment summary with status per invoice
-
----
-
-### 🛡️ **Insurance & Claims Use Cases**
-
-#### A. Claim Form vs Medical Bills
-* Match treatment details, patient info, and claimed amount vs submitted bills
-* Flag over-claims or missing bills
-
-#### B. Claim Form vs Policy Terms
-* Ensure coverage for the claimed condition exists
-* Flag policy exclusions or claim rejection criteria
-
-#### C. Accident Report vs Photographic Evidence
-* Extract stated damage from report
-* Cross-check with image metadata and description
-
----
-
-### 👨‍💼 **HR & Onboarding Use Cases**
-
-#### A. Offer Letter vs Submitted Documents
-* Compare salary (CTC), date of joining, personal details
-* Match submitted ID proof with offer letter information
-
-#### B. JD vs Resume
-* Validate JD with resume on qualification, experience, skillset, others
-* Flag discrepancies in qualification, or degree 
-
----
-
-### 📊 **Output Format**
-Return a JSON result for the dashboard:
+### 📊 **Expected Output Format:**
 
 {
   "comparison_summary": {
     "source_doc": "source_document_title",
-    "target_docs": ["target_doc_1", "target_doc_2"],
+    "target_docs": ["target_doc_1", "target_doc_2", "target_doc_3"],
     "category": "Procurement & Finance",
     "comparison_type": "PO vs Invoices",
     "status": "Partial Match",
-    "issues_found": 2,
-    "match_score": 85
+    "issues_found": 3,
+    "match_score": 78
   },
   "detailed_comparison": [
     {
@@ -121,51 +76,66 @@ Return a JSON result for the dashboard:
       "target_value": "ABC Corporation",
       "match": true,
       "mismatch_type": null
+    },
+    {
+      "field": "total_amount",
+      "source_value": 1500.00,
+      "target_value": 1600.00,
+      "match": false,
+      "mismatch_type": "amount_variance"
     }
   ],
   "line_items": [
     {
       "id": "1",
-      "itemName": "Item Name",
-      "poQuantity": 2,
-      "invoiceQuantity": 2,
-      "poUnitPrice": 100.00,
-      "invoiceUnitPrice": 100.00,
-      "poTotal": 200.00,
-      "invoiceTotal": 200.00,
+      "itemName": "Office Supplies",
+      "sourceQuantity": 10,
+      "targetQuantity": 10,
+      "sourceUnitPrice": 15.00,
+      "targetUnitPrice": 16.00,
+      "sourceTotal": 150.00,
+      "targetTotal": 160.00,
       "quantityMatch": true,
-      "priceMatch": true,
-      "totalMatch": true,
+      "priceMatch": false,
+      "totalMatch": false,
       "targetIndex": 0
     }
   ],
   "target_specific_results": [
     {
       "target_index": 0,
-      "target_title": "Invoice_1.pdf",
+      "target_title": "Invoice_001.pdf",
       "match_score": 85,
-      "issues": ["Price mismatch on item 2"],
-      "line_items": [...]
+      "issues": ["Price variance on item 2"],
+      "detailed_comparison": [
+        {
+          "field": "invoice_number",
+          "source_value": "PO-2024-001",
+          "target_value": "INV-2024-001",
+          "match": false
+        }
+      ]
     }
   ]
 }
 
----
+### 🧠 **Analysis Guidelines:**
+- Use fuzzy matching for text fields (vendor names, addresses)
+- Apply tolerance levels for numerical comparisons
+- Consider industry-standard variance thresholds
+- Provide meaningful issue descriptions
+- Calculate weighted match scores based on field importance
 
-### 🧠 Guidelines
-* Use fuzzy logic for text mismatches (e.g., "ABC Corp" vs "ABC Corporation")
-* Return match_score for each document pair and overall
-* Provide target_specific_results for individual document analysis
-* If document type is not known, classify based on layout and keywords
+**Source Document:** {sourceDoc}
+**Target Documents:** {targetDocs}
 
-Source Document JSON: {sourceDoc}
-Target Documents JSON: {targetDocs}`;
+Perform a comprehensive comparison and return detailed JSON results.`;
 
 const DocumentComparison = () => {
   const { toast } = useToast();
   const [poFile, setPoFile] = useState<File | null>(null);
   const [invoiceFiles, setInvoiceFiles] = useState<File[]>([]);
-  const [activeInvoiceIndex, setActiveInvoiceIndex] = useState<number>(0);
+  const [activeInvoiceIndex, setActiveInvoiceIndex] = useState<number>(-1);
   const [isComparing, setIsComparing] = useState(false);
   const [comparisonResults, setComparisonResults] = useState<ComparisonResult[]>([]);
   const [detailedResults, setDetailedResults] = useState<DetailedComparisonResult | null>(null);
@@ -199,20 +169,23 @@ const DocumentComparison = () => {
   const removeInvoiceFile = (index: number) => {
     setInvoiceFiles(invoiceFiles.filter((_, i) => i !== index));
     if (activeInvoiceIndex === index) {
-      setActiveInvoiceIndex(0);
+      setActiveInvoiceIndex(-1);
     }
   };
 
-  // Enhanced JSON parsing function
+  // Enhanced JSON parsing function with better error handling
   const parseGeminiResponse = (responseText: string): any => {
     console.log("Raw Gemini response:", responseText);
     
     try {
-      return JSON.parse(responseText.trim());
+      const parsed = JSON.parse(responseText.trim());
+      console.log("Successfully parsed JSON directly");
+      return parsed;
     } catch (error) {
       console.log("Direct JSON parsing failed, trying extraction methods...");
     }
     
+    // Try to extract from code blocks
     const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/i;
     const codeBlockMatch = responseText.match(codeBlockRegex);
     
@@ -226,23 +199,26 @@ const DocumentComparison = () => {
       }
     }
     
-    const jsonRegex = /\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}/;
-    const jsonMatch = responseText.match(jsonRegex);
+    // Try to find JSON object in the text
+    const jsonStartIndex = responseText.indexOf('{');
+    const jsonEndIndex = responseText.lastIndexOf('}');
     
-    if (jsonMatch) {
+    if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
       try {
-        const extractedJson = JSON.parse(jsonMatch[0]);
-        console.log("Successfully extracted JSON using regex");
-        return extractedJson;
+        const extractedJson = responseText.substring(jsonStartIndex, jsonEndIndex + 1);
+        const parsed = JSON.parse(extractedJson);
+        console.log("Successfully extracted JSON using substring method");
+        return parsed;
       } catch (error) {
-        console.error("Failed to parse extracted JSON:", error);
+        console.error("Failed to parse extracted JSON using substring:", error);
       }
     }
     
+    console.error("All parsing methods failed");
     throw new Error(`Unable to extract valid JSON from response. Raw response: ${responseText.substring(0, 200)}...`);
   };
 
-  // Compare documents using AI and database data (TEXT-ONLY)
+  // Enhanced comparison function with better error handling and duplicate checking
   const compareDocuments = async () => {
     console.log("=== STARTING ENHANCED DOCUMENT COMPARISON ===");
     
@@ -263,7 +239,7 @@ const DocumentComparison = () => {
       console.log("Source file:", poFile.name);
       console.log("Target files:", invoiceFiles.map(f => f.name));
       
-      // Check for existing source document to avoid duplicates
+      // Check for existing source document
       console.log("Checking for existing source document...");
       const { data: existingSource, error: sourceCheckError } = await supabase
         .from('compare_source_document')
@@ -273,12 +249,10 @@ const DocumentComparison = () => {
         .limit(1)
         .maybeSingle();
 
-      console.log("Existing source check result:", { existingSource, sourceCheckError });
+      console.log("Source document check:", { existingSource, sourceCheckError });
 
-      let sourceDoc = existingSource;
-      
-      if (!sourceDoc) {
-        console.log("Source document not found, need to process it first");
+      if (!existingSource) {
+        console.log("Source document not found in database");
         toast({
           title: "Processing Required",
           description: "Source document needs to be processed first. Please upload and process it in the table extraction tab.",
@@ -292,13 +266,13 @@ const DocumentComparison = () => {
       const { data: existingTargets, error: targetCheckError } = await supabase
         .from('compare_target_docs')
         .select('*')
-        .eq('id', sourceDoc.id)
+        .eq('id', existingSource.id)
         .maybeSingle();
 
-      console.log("Target documents query result:", { existingTargets, targetCheckError });
+      console.log("Target documents check:", { existingTargets, targetCheckError });
 
-      if (targetCheckError || !existingTargets) {
-        console.log("Target documents not found, need to process them first");
+      if (!existingTargets) {
+        console.log("Target documents not found in database");
         toast({
           title: "Processing Required", 
           description: "Target documents need to be processed first. Please upload and process them in the table extraction tab.",
@@ -307,15 +281,15 @@ const DocumentComparison = () => {
         return;
       }
 
-      // Prepare target documents array with ALL target documents
-      console.log("Preparing target documents array for enhanced comparison...");
+      // Prepare target documents array with validation
+      console.log("Preparing target documents array...");
       const targetDocsArray = [];
       for (let i = 1; i <= 5; i++) {
-        if (existingTargets[`doc_json_${i}`]) {
+        if (existingTargets[`doc_json_${i}`] && existingTargets[`doc_title_${i}`]) {
           const targetDoc = {
             index: i - 1,
             title: existingTargets[`doc_title_${i}`],
-            type: existingTargets[`doc_type_${i}`],
+            type: existingTargets[`doc_type_${i}`] || 'Unknown',
             json: existingTargets[`doc_json_${i}`]
           };
           targetDocsArray.push(targetDoc);
@@ -328,18 +302,18 @@ const DocumentComparison = () => {
       }
 
       if (targetDocsArray.length === 0) {
-        console.error("No target documents found for enhanced comparison");
+        console.error("No valid target documents found");
         throw new Error("No target documents found for comparison.");
       }
 
-      console.log("Total target documents prepared for enhanced comparison:", targetDocsArray.length);
+      console.log("Total target documents prepared:", targetDocsArray.length);
 
-      // Create enhanced comparison prompt with actual data
+      // Create enhanced comparison prompt
       const comparisonPrompt = COMPARISON_PROMPT
-        .replace('{sourceDoc}', JSON.stringify(sourceDoc.doc_json_extract))
+        .replace('{sourceDoc}', JSON.stringify(existingSource.doc_json_extract))
         .replace('{targetDocs}', JSON.stringify(targetDocsArray));
 
-      console.log("Enhanced comparison prompt prepared, sending to Gemini API...");
+      console.log("Sending comparison request to Gemini API...");
       
       // Use Gemini for enhanced comparison
       const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent', {
@@ -378,7 +352,7 @@ const DocumentComparison = () => {
       console.log("Parsed enhanced comparison data:", comparisonData);
 
       if (comparisonData && comparisonData.comparison_summary && comparisonData.detailed_comparison) {
-        // Convert detailed comparison to our format with enhanced support
+        // Convert detailed comparison to our format
         const uiResults: ComparisonResult[] = comparisonData.detailed_comparison.map((item: any) => ({
           field: item.field || "Unknown Field",
           poValue: item.source_value || "N/A",
@@ -388,14 +362,14 @@ const DocumentComparison = () => {
           match: item.match || false
         }));
 
-        const percentage = comparisonData.comparison_summary.match_score || 0;
+        const percentage = Math.round(comparisonData.comparison_summary.match_score || 0);
         
         // Create enhanced detailed results object
         const detailedComparisonResult: DetailedComparisonResult = {
           overallMatch: percentage,
           headerResults: uiResults,
           lineItems: comparisonData.line_items || [],
-          sourceDocument: sourceDoc,
+          sourceDocument: existingSource,
           targetDocuments: targetDocsArray,
           comparisonSummary: {
             ...comparisonData.comparison_summary,
@@ -415,8 +389,8 @@ const DocumentComparison = () => {
         const { error: insertError } = await supabase
           .from('Doc_Compare_results')
           .insert({
-            doc_id_compare: sourceDoc.id,
-            doc_type_source: sourceDoc.doc_type,
+            doc_id_compare: existingSource.id,
+            doc_type_source: existingSource.doc_type,
             doc_type_target: targetDocsArray.map(doc => doc.type).join(', '),
             doc_compare_count_targets: targetDocsArray.length,
             doc_compare_results: {
@@ -426,7 +400,7 @@ const DocumentComparison = () => {
               target_specific_results: comparisonData.target_specific_results || [],
               match_percentage: percentage,
               processed_at: new Date().toISOString(),
-              source_document: sourceDoc,
+              source_document: existingSource,
               target_documents: targetDocsArray
             }
           });
@@ -453,7 +427,7 @@ const DocumentComparison = () => {
         // Dispatch enhanced event for dashboard refresh
         window.dispatchEvent(new CustomEvent('comparisonComplete', {
           detail: {
-            sourceDoc: sourceDoc,
+            sourceDoc: existingSource,
             targetDocs: targetDocsArray,
             results: comparisonData,
             matchPercentage: percentage
@@ -480,13 +454,10 @@ const DocumentComparison = () => {
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-3 w-full max-w-lg">
+        <TabsList className="grid grid-cols-2 w-full max-w-md">
           <TabsTrigger value="upload">Upload Documents</TabsTrigger>
           <TabsTrigger value="results" disabled={comparisonResults.length === 0}>
             Comparison Results
-          </TabsTrigger>
-          <TabsTrigger value="dashboard">
-            Analysis Dashboard
           </TabsTrigger>
         </TabsList>
         
@@ -504,31 +475,32 @@ const DocumentComparison = () => {
         
         <TabsContent value="results" className="mt-4 space-y-4">
           {comparisonResults.length > 0 && detailedResults ? (
-            <ComparisonResultsPanel
-              poFile={poFile}
-              invoiceFiles={invoiceFiles}
-              activeInvoiceIndex={activeInvoiceIndex}
-              setActiveInvoiceIndex={setActiveInvoiceIndex}
-              comparisonResults={comparisonResults}
-              matchPercentage={matchPercentage}
-              detailedResults={detailedResults}
-            />
+            <>
+              <ComparisonResultsPanel
+                poFile={poFile}
+                invoiceFiles={invoiceFiles}
+                activeInvoiceIndex={activeInvoiceIndex}
+                setActiveInvoiceIndex={setActiveInvoiceIndex}
+                comparisonResults={comparisonResults}
+                matchPercentage={matchPercentage}
+                detailedResults={detailedResults}
+              />
+              
+              {/* Integrated Dashboard Section */}
+              <Card className="mt-8">
+                <CardHeader>
+                  <CardTitle>Comparison Analytics Dashboard</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ComparisonDashboard />
+                </CardContent>
+              </Card>
+            </>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               No comparison results available. Please run a comparison first.
             </div>
           )}
-        </TabsContent>
-
-        <TabsContent value="dashboard" className="mt-4 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Comparison Analytics Dashboard</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ComparisonDashboard />
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
     </div>

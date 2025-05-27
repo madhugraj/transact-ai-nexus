@@ -41,29 +41,31 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
   matchPercentage,
   detailedResults
 }) => {
-  console.log("ComparisonResultsPanel received detailedResults:", detailedResults);
-  console.log("Target documents:", detailedResults?.targetDocuments);
+  console.log("ComparisonResultsPanel rendered with:", {
+    detailedResults,
+    comparisonResults,
+    matchPercentage,
+    activeInvoiceIndex
+  });
   
-  // Get all target documents from detailed results
+  // Safely extract target documents
   const targetDocuments = detailedResults?.targetDocuments || [];
   const sourceDocument = detailedResults?.sourceDocument;
+  const comparisonSummary = detailedResults?.comparisonSummary || {};
+  
+  console.log("Extracted data:", { targetDocuments, sourceDocument, comparisonSummary });
+
+  // Calculate dynamic match percentage from comparison summary
+  const dynamicMatchPercentage = comparisonSummary?.match_score || matchPercentage || 0;
+  
+  // Get target-specific results
+  const targetSpecificResults = comparisonSummary?.target_specific_results || [];
   
   // Calculate consolidated match data across all targets
-  const consolidatedMatchData = targetDocuments.length > 0 ? (() => {
-    const totalComparisons = targetDocuments.length;
-    const highMatches = targetDocuments.filter(doc => {
-      // Calculate match percentage for each document
-      const comparison = detailedResults.comparisonSummary;
-      return comparison?.match_score >= 80;
-    }).length;
-    
-    const mediumMatches = targetDocuments.filter(doc => {
-      const comparison = detailedResults.comparisonSummary;
-      const score = comparison?.match_score || 0;
-      return score >= 60 && score < 80;
-    }).length;
-    
-    const lowMatches = totalComparisons - highMatches - mediumMatches;
+  const consolidatedMatchData = targetSpecificResults.length > 0 ? (() => {
+    const highMatches = targetSpecificResults.filter(result => result.match_score >= 80).length;
+    const mediumMatches = targetSpecificResults.filter(result => result.match_score >= 60 && result.match_score < 80).length;
+    const lowMatches = targetSpecificResults.filter(result => result.match_score < 60).length;
     
     return [
       { name: "High Match (≥80%)", value: highMatches, color: "#00C49F" },
@@ -72,36 +74,52 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
     ].filter(item => item.value > 0);
   })() : [];
 
-  // Prepare comparison type data for charts
-  const comparisonTypeData = (() => {
-    const summary = detailedResults?.comparisonSummary;
-    if (!summary) return [];
-    
-    const category = summary.category || "Unknown";
-    const comparisonType = summary.comparison_type || "Document Comparison";
-    const matchScore = summary.match_score || matchPercentage || 0;
-    
-    return [{
-      category,
-      comparison_type: comparisonType,
-      match_score: matchScore,
-      issues_found: summary.issues_found || 0,
-      target_count: targetDocuments.length
-    }];
-  })();
+  // Prepare comparison type data for charts with dynamic values
+  const comparisonTypeData = [{
+    category: comparisonSummary.category || "Document Comparison",
+    comparison_type: comparisonSummary.comparison_type || "General Comparison",
+    match_score: dynamicMatchPercentage,
+    issues_found: comparisonSummary.issues_found || 0,
+    target_count: targetDocuments.length
+  }];
 
-  // Get line items for the active document or consolidated view
-  const getLineItemsForTarget = (targetIndex?: number) => {
-    if (targetIndex !== undefined && targetDocuments[targetIndex]) {
-      // Return line items for specific target document
-      return detailedResults?.lineItems?.filter(item => 
-        item.targetIndex === targetIndex || !item.targetIndex
-      ) || [];
+  // Get detailed comparison results for active target
+  const getDetailedResultsForTarget = (targetIndex: number) => {
+    if (targetIndex === -1) {
+      // Return consolidated header results
+      return comparisonResults;
     }
-    // Return all line items (consolidated view)
-    return detailedResults?.lineItems || [];
+    
+    // Get target-specific detailed comparison
+    const targetResult = targetSpecificResults[targetIndex];
+    if (targetResult?.detailed_comparison) {
+      return targetResult.detailed_comparison.map((item: any) => ({
+        field: item.field || "Unknown Field",
+        poValue: item.source_value || "N/A",
+        invoiceValue: item.target_value || "N/A",
+        sourceValue: item.source_value || "N/A",
+        targetValue: item.target_value || "N/A",
+        match: item.match || false
+      }));
+    }
+    
+    return comparisonResults;
   };
 
+  // Get line items for the active target
+  const getLineItemsForTarget = (targetIndex: number) => {
+    if (targetIndex === -1) {
+      // Return all line items (consolidated view)
+      return detailedResults?.lineItems || [];
+    }
+    
+    // Return line items for specific target
+    return detailedResults?.lineItems?.filter(item => 
+      item.targetIndex === targetIndex
+    ) || [];
+  };
+
+  const activeDetailedResults = getDetailedResultsForTarget(activeInvoiceIndex);
   const activeLineItems = getLineItemsForTarget(activeInvoiceIndex);
 
   // Calculate totals for active view
@@ -118,14 +136,26 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
 
   // Handle replace functionality
   const handleReplace = () => {
-    console.log("Replace button clicked - starting new comparison");
-    window.location.reload(); // Simple approach to reset the comparison
+    console.log("Replace button clicked - reloading page");
+    window.location.reload();
   };
 
+  // Get match percentage for active target
+  const getActiveMatchPercentage = () => {
+    if (activeInvoiceIndex === -1) {
+      return dynamicMatchPercentage;
+    }
+    
+    const targetResult = targetSpecificResults[activeInvoiceIndex];
+    return targetResult?.match_score || dynamicMatchPercentage;
+  };
+
+  const activeMatchScore = getActiveMatchPercentage();
+
   // Get document type and category from results
-  const sourceDocType = sourceDocument?.doc_type || detailedResults?.comparisonSummary?.source_doc || "Source Document";
-  const category = detailedResults?.comparisonSummary?.category || "Document Comparison";
-  const comparisonType = detailedResults?.comparisonSummary?.comparison_type || "Document Analysis";
+  const sourceDocType = sourceDocument?.doc_type || comparisonSummary?.source_doc || "Source Document";
+  const category = comparisonSummary?.category || "Document Comparison";
+  const comparisonType = comparisonSummary?.comparison_type || "Document Analysis";
   
   return (
     <div className="space-y-6">
@@ -135,8 +165,8 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
           <CardTitle className="text-lg flex justify-between items-center">
             <span>Document Comparison Results</span>
             <div className="flex items-center gap-3">
-              <span className={`${matchPercentage > 80 ? 'text-green-600' : matchPercentage > 60 ? 'text-blue-600' : 'text-red-600'} text-2xl font-bold`}>
-                {matchPercentage}% Match
+              <span className={`${activeMatchScore > 80 ? 'text-green-600' : activeMatchScore > 60 ? 'text-blue-600' : 'text-red-600'} text-2xl font-bold`}>
+                {Math.round(activeMatchScore)}% Match
               </span>
               <Button 
                 variant="outline" 
@@ -158,7 +188,7 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
         </CardHeader>
         <CardContent>
           {/* Consolidated Overview Charts */}
-          {consolidatedMatchData.length > 0 && (
+          {consolidatedMatchData.length > 0 && activeInvoiceIndex === -1 && (
             <div className="grid md:grid-cols-2 gap-6 mb-6">
               <div>
                 <h3 className="text-md font-semibold mb-2 text-center">Overall Match Distribution</h3>
@@ -206,7 +236,7 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
           )}
 
           {/* Target Document Tabs for Detailed View */}
-          {targetDocuments.length > 1 ? (
+          {targetDocuments.length > 0 && (
             <Tabs value={activeInvoiceIndex.toString()} onValueChange={(value) => setActiveInvoiceIndex(parseInt(value))}>
               <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${Math.min(targetDocuments.length + 1, 5)}, 1fr)` }}>
                 <TabsTrigger value="-1">All Targets</TabsTrigger>
@@ -220,37 +250,36 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
               <TabsContent value="-1" className="mt-4">
                 <div className="text-center py-4 bg-blue-50 dark:bg-blue-900/20 rounded-md">
                   <p className="text-sm font-medium">Consolidated view of all {targetDocuments.length} target documents</p>
-                  <p className="text-xs text-muted-foreground">Select individual tabs for detailed comparison</p>
+                  <p className="text-xs text-muted-foreground">Overall Match Score: {Math.round(dynamicMatchPercentage)}%</p>
                 </div>
               </TabsContent>
               
-              {targetDocuments.map((doc, index) => (
-                <TabsContent key={index} value={index.toString()} className="mt-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-md">
-                        {sourceDocType} vs {doc.title || `Target ${index + 1}`}
-                      </CardTitle>
-                      <CardDescription>
-                        Document Type: {doc.type || 'Unknown'} | 
-                        Match Score: {detailedResults?.comparisonSummary?.match_score || 0}%
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {/* Individual document comparison details would go here */}
-                      <div className="text-center py-8 text-muted-foreground">
-                        <p>Detailed comparison for {doc.title}</p>
-                        <p className="text-sm">Line items and field-by-field analysis</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              ))}
+              {targetDocuments.map((doc, index) => {
+                const targetResult = targetSpecificResults[index] || {};
+                return (
+                  <TabsContent key={index} value={index.toString()} className="mt-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-md">
+                          {sourceDocType} vs {doc.title || `Target ${index + 1}`}
+                        </CardTitle>
+                        <CardDescription>
+                          Document Type: {doc.type || 'Unknown'} | 
+                          Match Score: {Math.round(targetResult.match_score || 0)}% |
+                          Issues: {targetResult.issues?.length || 0}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-sm text-muted-foreground">
+                          <p><strong>Target Document:</strong> {doc.title}</p>
+                          <p><strong>Issues Found:</strong> {targetResult.issues?.join(', ') || 'None'}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                );
+              })}
             </Tabs>
-          ) : (
-            <div className="text-center py-4 bg-gray-50 dark:bg-gray-900/20 rounded-md">
-              <p className="text-sm">Single target document comparison</p>
-            </div>
           )}
 
           {/* Financial summary - only show if we have totals */}
@@ -279,7 +308,9 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
       {activeLineItems.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Line Item Comparison</CardTitle>
+            <CardTitle className="text-lg">
+              Line Item Comparison {activeInvoiceIndex >= 0 ? `- ${targetDocuments[activeInvoiceIndex]?.title || `Target ${activeInvoiceIndex + 1}`}` : '- All Targets'}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -340,10 +371,12 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
         </Card>
       )}
       
-      {/* Header Fields Comparison */}
+      {/* Header Fields Comparison with Dynamic Data */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Header Fields Comparison</CardTitle>
+          <CardTitle className="text-lg">
+            Header Fields Comparison {activeInvoiceIndex >= 0 ? `- ${targetDocuments[activeInvoiceIndex]?.title || `Target ${activeInvoiceIndex + 1}`}` : '- All Targets'}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -357,7 +390,7 @@ export const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {comparisonResults.map((result, index) => (
+                {activeDetailedResults.map((result, index) => (
                   <TableRow key={index} className={result.match ? "" : "bg-red-50 dark:bg-red-900/10"}>
                     <TableCell className="font-medium">{result.field}</TableCell>
                     <TableCell>{result.poValue || result.sourceValue}</TableCell>
