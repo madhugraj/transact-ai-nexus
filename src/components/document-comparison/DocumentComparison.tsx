@@ -2,7 +2,7 @@
 import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DocumentUploadPanel } from "./DocumentUploadPanel";
-import { ComparisonResultsPanel } from "./ComparisonResultsPanel";
+import ComparisonResultsPanel from "./ComparisonResultsPanel";
 import ComparisonDashboard from "./ComparisonDashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDocumentComparison } from "./hooks/useDocumentComparison";
@@ -51,13 +51,10 @@ const DocumentComparison = () => {
           {comparisonResults.length > 0 && detailedResults ? (
             <>
               <ComparisonResultsPanel
-                poFile={poFile}
-                invoiceFiles={invoiceFiles}
-                activeInvoiceIndex={activeInvoiceIndex}
-                setActiveInvoiceIndex={setActiveInvoiceIndex}
-                comparisonResults={comparisonResults}
-                matchPercentage={matchPercentage}
+                results={comparisonResults}
                 detailedResults={detailedResults}
+                matchPercentage={matchPercentage}
+                onClose={() => setActiveTab("upload")}
               />
               
               {/* Integrated Dashboard Section */}
