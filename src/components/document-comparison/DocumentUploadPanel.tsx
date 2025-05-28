@@ -560,17 +560,19 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
     }
   };
 
-  const handleReplaceFile = () => {
-    console.log("Replace button clicked");
+  // Fixed Replace button functionality
+  const handleReplaceSourceFile = () => {
+    console.log("🔄 Replace source file button clicked");
     const input = document.getElementById('po-upload') as HTMLInputElement;
     if (input) {
-      input.value = '';
+      input.value = ''; // Clear the current value
       input.click();
     }
   };
 
+  // Fixed Add More Target Files functionality
   const handleAddMoreTargetFiles = () => {
-    console.log("Add more target files button clicked");
+    console.log("➕ Add more target files button clicked");
     const input = document.getElementById('invoice-upload') as HTMLInputElement;
     if (input) {
       input.click();
@@ -597,7 +599,7 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
               <Button 
                 variant="ghost" 
                 size="sm" 
-                onClick={() => document.getElementById('po-upload')?.click()}
+                onClick={handleReplaceSourceFile}
               >
                 Replace
               </Button>
@@ -650,7 +652,7 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
                 <Button 
                   variant="outline" 
                   className="w-full mt-2" 
-                  onClick={() => document.getElementById('invoice-upload')?.click()}
+                  onClick={handleAddMoreTargetFiles}
                 >
                   Add More Target Documents ({invoiceFiles.length}/5)
                 </Button>
@@ -662,7 +664,7 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
               <p className="text-sm text-muted-foreground mb-4">Upload 1-5 Target documents</p>
               <Button 
                 variant="outline" 
-                onClick={() => document.getElementById('invoice-upload')?.click()}
+                onClick={handleAddMoreTargetFiles}
               >
                 Reference Documents
               </Button>

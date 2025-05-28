@@ -3,8 +3,6 @@ import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DocumentUploadPanel } from "./DocumentUploadPanel";
 import ComparisonResultsPanel from "./ComparisonResultsPanel";
-import ComparisonDashboard from "./ComparisonDashboard";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDocumentComparison } from "./hooks/useDocumentComparison";
 
 const DocumentComparison = () => {
@@ -49,24 +47,12 @@ const DocumentComparison = () => {
         
         <TabsContent value="results" className="mt-4 space-y-4">
           {comparisonResults.length > 0 && detailedResults ? (
-            <>
-              <ComparisonResultsPanel
-                results={comparisonResults}
-                detailedResults={detailedResults}
-                matchPercentage={matchPercentage}
-                onClose={() => setActiveTab("upload")}
-              />
-              
-              {/* Integrated Dashboard Section */}
-              <Card className="mt-8">
-                <CardHeader>
-                  <CardTitle>Comparison Analytics Dashboard</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ComparisonDashboard />
-                </CardContent>
-              </Card>
-            </>
+            <ComparisonResultsPanel
+              results={comparisonResults}
+              detailedResults={detailedResults}
+              matchPercentage={matchPercentage}
+              onClose={() => setActiveTab("upload")}
+            />
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               No comparison results available. Please run a comparison first.
