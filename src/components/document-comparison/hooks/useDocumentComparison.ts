@@ -20,6 +20,7 @@ export const useDocumentComparison = () => {
   const handlePoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setPoFile(e.target.files[0]);
+      console.log("Source file selected:", e.target.files[0].name);
       toast({
         title: "Source Document Uploaded",
         description: `Successfully uploaded ${e.target.files[0].name}`,
@@ -31,19 +32,78 @@ export const useDocumentComparison = () => {
   const handleInvoiceFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const newFiles = Array.from(e.target.files);
-      setInvoiceFiles(prev => [...prev, ...newFiles]);
-      toast({
-        title: "Target Document(s) Uploaded",
-        description: `Successfully uploaded ${newFiles.length} target document(s)`,
-      });
+      
+      // Check for duplicates in current selection
+      const existingNames = invoiceFiles.map(f => f.name);
+      const duplicateFiles = newFiles.filter(f => existingNames.includes(f.name));
+      
+      if (duplicateFiles.length > 0) {
+        console.warn("Duplicate files detected:", duplicateFiles.map(f => f.name));
+        toast({
+          title: "Duplicate Files Detected",
+          description: `${duplicateFiles.length} duplicate file(s) were skipped: ${duplicateFiles.map(f => f.name).join(', ')}`,
+          variant: "destructive",
+        });
+      }
+      
+      // Only add non-duplicate files
+      const uniqueFiles = newFiles.filter(f => !existingNames.includes(f.name));
+      
+      if (uniqueFiles.length > 0) {
+        setInvoiceFiles(prev => [...prev, ...uniqueFiles]);
+        console.log("Target files added:", uniqueFiles.map(f => f.name));
+        toast({
+          title: "Target Document(s) Uploaded",
+          description: `Successfully uploaded ${uniqueFiles.length} unique target document(s)`,
+        });
+      }
     }
   };
 
   // Remove invoice file
   const removeInvoiceFile = (index: number) => {
+    const removedFile = invoiceFiles[index];
+    console.log("Removing target file:", removedFile?.name);
     setInvoiceFiles(invoiceFiles.filter((_, i) => i !== index));
     if (activeInvoiceIndex === index) {
       setActiveInvoiceIndex(-1);
+    }
+  };
+
+  // Check for existing comparison in database
+  const checkExistingComparison = async (sourceDocId: number, targetDocTitles: string[]) => {
+    console.log("🔍 Checking for existing comparison...");
+    console.log("Source Doc ID:", sourceDocId);
+    console.log("Target Doc Titles:", targetDocTitles);
+    
+    try {
+      // Sort target titles for consistent comparison
+      const sortedTargetTitles = [...targetDocTitles].sort().join(', ');
+      
+      const { data: existingComparison, error } = await supabase
+        .from('Doc_Compare_results')
+        .select('*')
+        .eq('doc_id_compare', sourceDocId)
+        .eq('doc_type_target', sortedTargetTitles)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error checking existing comparison:", error);
+        return null;
+      }
+
+      if (existingComparison) {
+        console.log("✅ Found existing comparison:", existingComparison.id);
+        return existingComparison;
+      } else {
+        console.log("❌ No existing comparison found");
+        return null;
+      }
+    } catch (error) {
+      console.error("Exception while checking existing comparison:", error);
+      return null;
     }
   };
 
@@ -51,12 +111,16 @@ export const useDocumentComparison = () => {
   const parseGeminiResponse = (responseText: string): any => {
     console.log("=== PARSING GEMINI RESPONSE ===");
     console.log("Raw response length:", responseText.length);
-    console.log("Raw response preview:", responseText.substring(0, 500));
+    console.log("Raw response preview:", responseText.substring(0, 1000));
     
     try {
       const parsed = JSON.parse(responseText.trim());
       console.log("✅ Successfully parsed JSON directly");
-      console.log("Parsed object keys:", Object.keys(parsed));
+      console.log("Parsed object structure:", {
+        hasSummary: !!parsed.summary,
+        hasTargets: !!parsed.targets,
+        targetsCount: parsed.targets?.length || 0
+      });
       return parsed;
     } catch (error) {
       console.log("❌ Direct JSON parsing failed:", error);
@@ -70,7 +134,10 @@ export const useDocumentComparison = () => {
       try {
         const extractedJson = JSON.parse(codeBlockMatch[1].trim());
         console.log("✅ Successfully extracted JSON from code block");
-        console.log("Extracted object keys:", Object.keys(extractedJson));
+        console.log("Extracted object structure:", {
+          hasSummary: !!extractedJson.summary,
+          hasTargets: !!extractedJson.targets
+        });
         return extractedJson;
       } catch (error) {
         console.error("❌ Failed to parse JSON from code block:", error);
@@ -86,7 +153,6 @@ export const useDocumentComparison = () => {
         const extractedJson = responseText.substring(jsonStartIndex, jsonEndIndex + 1);
         const parsed = JSON.parse(extractedJson);
         console.log("✅ Successfully extracted JSON using substring method");
-        console.log("Substring extracted object keys:", Object.keys(parsed));
         return parsed;
       } catch (error) {
         console.error("❌ Failed to parse extracted JSON using substring:", error);
@@ -94,8 +160,8 @@ export const useDocumentComparison = () => {
     }
     
     console.error("❌ All parsing methods failed");
-    console.error("Response that failed to parse:", responseText.substring(0, 1000));
-    throw new Error(`Unable to extract valid JSON from response. Raw response: ${responseText.substring(0, 200)}...`);
+    console.error("Full response for debugging:", responseText);
+    throw new Error(`Unable to extract valid JSON from response. Response length: ${responseText.length}`);
   };
 
   // Enhanced comparison function with better error handling and duplicate checking
@@ -119,7 +185,7 @@ export const useDocumentComparison = () => {
       console.log("Source file:", poFile.name);
       console.log("Target files:", invoiceFiles.map(f => f.name));
       
-      // Check for existing source document with better duplicate handling
+      // Check for existing source document
       console.log("🔍 Checking for existing source document...");
       const { data: existingSource, error: sourceCheckError } = await supabase
         .from('compare_source_document')
@@ -129,11 +195,10 @@ export const useDocumentComparison = () => {
         .limit(1)
         .maybeSingle();
 
-      console.log("Source document check result:", { 
-        found: !!existingSource, 
-        error: sourceCheckError,
-        docId: existingSource?.id 
-      });
+      if (sourceCheckError) {
+        console.error("❌ Error checking source document:", sourceCheckError);
+        throw new Error(`Source document check failed: ${sourceCheckError.message}`);
+      }
 
       if (!existingSource) {
         console.log("❌ Source document not found in database");
@@ -147,11 +212,12 @@ export const useDocumentComparison = () => {
 
       console.log("✅ Source document found:", {
         id: existingSource.id,
+        title: existingSource.doc_title,
         type: existingSource.doc_type,
         hasJsonData: !!existingSource.doc_json_extract
       });
 
-      // Check for existing target documents with better validation
+      // Check for existing target documents
       console.log("🔍 Checking for existing target documents...");
       const { data: existingTargets, error: targetCheckError } = await supabase
         .from('compare_target_docs')
@@ -159,10 +225,10 @@ export const useDocumentComparison = () => {
         .eq('id', existingSource.id)
         .maybeSingle();
 
-      console.log("Target documents check result:", { 
-        found: !!existingTargets, 
-        error: targetCheckError 
-      });
+      if (targetCheckError) {
+        console.error("❌ Error checking target documents:", targetCheckError);
+        throw new Error(`Target documents check failed: ${targetCheckError.message}`);
+      }
 
       if (!existingTargets) {
         console.log("❌ Target documents not found in database");
@@ -177,6 +243,8 @@ export const useDocumentComparison = () => {
       // Prepare target documents array with better validation
       console.log("📋 Preparing target documents array...");
       const targetDocsArray = [];
+      const targetTitles = [];
+      
       for (let i = 1; i <= 5; i++) {
         const titleKey = `doc_title_${i}` as keyof typeof existingTargets;
         const typeKey = `doc_type_${i}` as keyof typeof existingTargets;
@@ -190,6 +258,7 @@ export const useDocumentComparison = () => {
             json: existingTargets[jsonKey]
           };
           targetDocsArray.push(targetDoc);
+          targetTitles.push(targetDoc.title);
           console.log(`✅ Target document ${i} prepared:`, {
             title: targetDoc.title,
             type: targetDoc.type,
@@ -205,10 +274,92 @@ export const useDocumentComparison = () => {
 
       console.log(`📋 Total target documents prepared: ${targetDocsArray.length}`);
 
-      // Create enhanced comparison prompt with better structure
-      console.log("📝 Creating comparison prompt...");
+      // Check for existing comparison results
+      const existingComparison = await checkExistingComparison(existingSource.id, targetTitles);
+      
+      if (existingComparison && existingComparison.doc_compare_results) {
+        console.log("🔄 Using existing comparison results from database");
+        
+        const storedResults = existingComparison.doc_compare_results;
+        console.log("Stored results structure:", {
+          hasSummary: !!storedResults.summary,
+          hasTargets: !!storedResults.targets,
+          matchPercentage: storedResults.match_percentage
+        });
+        
+        // Process existing results
+        if (storedResults.summary && storedResults.targets) {
+          const uiResults: ComparisonResult[] = [];
+          
+          storedResults.targets.forEach((target: any, targetIndex: number) => {
+            console.log(`Processing stored target ${targetIndex + 1}:`, {
+              title: target.title,
+              score: target.score,
+              fieldsCount: target.fields?.length || 0
+            });
+            
+            if (target.fields && Array.isArray(target.fields)) {
+              target.fields.forEach((field: any) => {
+                uiResults.push({
+                  field: `${field.field} (Target ${targetIndex + 1})`,
+                  poValue: field.source_value || "N/A",
+                  invoiceValue: field.target_value || "N/A",
+                  sourceValue: field.source_value || "N/A",
+                  targetValue: field.target_value || "N/A",
+                  match: field.match || false
+                });
+              });
+            }
+          });
+
+          const percentage = Math.round(storedResults.match_percentage || storedResults.summary?.match_score || 0);
+          
+          const detailedComparisonResult: DetailedComparisonResult = {
+            overallMatch: percentage,
+            headerResults: uiResults,
+            lineItems: [],
+            sourceDocument: existingSource,
+            targetDocuments: targetDocsArray,
+            comparisonSummary: {
+              ...storedResults.summary,
+              target_specific_results: storedResults.targets || []
+            }
+          };
+
+          // Process line items
+          storedResults.targets.forEach((target: any, targetIndex: number) => {
+            if (target.line_items && Array.isArray(target.line_items)) {
+              target.line_items.forEach((item: any) => {
+                detailedComparisonResult.lineItems.push({
+                  ...item,
+                  targetIndex: targetIndex
+                });
+              });
+            }
+          });
+          
+          setComparisonResults(uiResults);
+          setDetailedResults(detailedComparisonResult);
+          setMatchPercentage(percentage);
+          setActiveTab("results");
+          
+          console.log("✅ Successfully loaded existing comparison results");
+          toast({
+            title: "Existing Comparison Loaded",
+            description: `Previously computed comparison with ${percentage}% match loaded from database`,
+          });
+          
+          return;
+        }
+      }
+
+      // Create enhanced comparison prompt
+      console.log("📝 Creating comparison prompt for new comparison...");
       const sourceDocString = JSON.stringify(existingSource.doc_json_extract, null, 2);
       const targetDocsString = JSON.stringify(targetDocsArray, null, 2);
+      
+      console.log("Source document type:", existingSource.doc_type);
+      console.log("Target document types:", targetDocsArray.map(d => d.type));
       
       const comparisonPrompt = COMPARISON_PROMPT
         .replace('{sourceDoc}', sourceDocString)
@@ -220,7 +371,7 @@ export const useDocumentComparison = () => {
         targetDocsLength: targetDocsString.length
       });
       
-      // Use Gemini for enhanced comparison with better error handling
+      // Use Gemini for enhanced comparison
       console.log("🤖 Sending request to Gemini API...");
       const geminiApiKey = localStorage.getItem('Gemini_key') || 'AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk';
       
@@ -273,8 +424,9 @@ export const useDocumentComparison = () => {
       
       const responseText = responseData.candidates[0].content.parts[0].text;
       console.log("📄 Gemini response text received, length:", responseText.length);
+      console.log("Response preview:", responseText.substring(0, 1000));
       
-      // Parse the enhanced comparison results with better error handling
+      // Parse the enhanced comparison results
       console.log("🔍 Parsing comparison results...");
       const comparisonData = parseGeminiResponse(responseText);
       console.log("✅ Comparison data parsed successfully");
@@ -286,15 +438,16 @@ export const useDocumentComparison = () => {
       });
 
       if (comparisonData && comparisonData.summary && comparisonData.targets) {
-        // Convert to our format using the new structure with better validation
+        // Convert to our format
         const uiResults: ComparisonResult[] = [];
         
-        // Process each target's field comparisons with enhanced logging
+        // Process each target's field comparisons
         comparisonData.targets.forEach((target: any, targetIndex: number) => {
           console.log(`Processing target ${targetIndex + 1}:`, {
             title: target.title,
             score: target.score,
-            fieldsCount: target.fields?.length || 0
+            fieldsCount: target.fields?.length || 0,
+            issues: target.issues?.length || 0
           });
           
           if (target.fields && Array.isArray(target.fields)) {
@@ -314,7 +467,7 @@ export const useDocumentComparison = () => {
         const percentage = Math.round(comparisonData.summary.match_score || 0);
         console.log("📊 Final match percentage calculated:", percentage);
         
-        // Create enhanced detailed results object
+        // Create detailed results object
         const detailedComparisonResult: DetailedComparisonResult = {
           overallMatch: percentage,
           headerResults: uiResults,
@@ -327,7 +480,7 @@ export const useDocumentComparison = () => {
           }
         };
 
-        // Process line items if available with better validation
+        // Process line items
         console.log("📋 Processing line items...");
         comparisonData.targets.forEach((target: any, targetIndex: number) => {
           if (target.line_items && Array.isArray(target.line_items)) {
@@ -348,14 +501,16 @@ export const useDocumentComparison = () => {
           lineItemsCount: detailedComparisonResult.lineItems.length
         });
 
-        // Store enhanced results in database with better error handling
+        // Store results in database with sorted target titles for consistency
         console.log("💾 Storing comparison results in database...");
+        const sortedTargetTitles = [...targetTitles].sort().join(', ');
+        
         const { error: insertError } = await supabase
           .from('Doc_Compare_results')
           .insert({
             doc_id_compare: existingSource.id,
             doc_type_source: existingSource.doc_type,
-            doc_type_target: targetDocsArray.map(doc => doc.type).join(', '),
+            doc_type_target: sortedTargetTitles,
             doc_compare_count_targets: targetDocsArray.length,
             doc_compare_results: {
               summary: comparisonData.summary,
@@ -364,7 +519,7 @@ export const useDocumentComparison = () => {
               processed_at: new Date().toISOString(),
               source_document: existingSource,
               target_documents: targetDocsArray,
-              raw_response: responseText.substring(0, 2000)
+              raw_response_preview: responseText.substring(0, 2000)
             }
           });
 
@@ -374,7 +529,7 @@ export const useDocumentComparison = () => {
           console.log("✅ Successfully stored comparison results");
         }
         
-        // Update UI state with enhanced results
+        // Update UI state
         setComparisonResults(uiResults);
         setDetailedResults(detailedComparisonResult);
         setMatchPercentage(percentage);
@@ -387,7 +542,7 @@ export const useDocumentComparison = () => {
           description: `Documents compared with ${percentage}% overall match across ${targetDocsArray.length} targets`,
         });
 
-        // Dispatch enhanced event for dashboard refresh
+        // Dispatch event for dashboard refresh
         window.dispatchEvent(new CustomEvent('comparisonComplete', {
           detail: {
             sourceDoc: existingSource,
@@ -404,7 +559,8 @@ export const useDocumentComparison = () => {
           hasTargets: !!comparisonData?.targets,
           actualStructure: comparisonData ? Object.keys(comparisonData) : 'null'
         });
-        throw new Error("Invalid comparison response format");
+        console.error("Full response data:", comparisonData);
+        throw new Error("Invalid comparison response format from Gemini API");
       }
 
     } catch (error) {
