@@ -28,7 +28,34 @@ const getMatchBadge = (match: boolean) => {
   );
 };
 
+const formatValue = (value: any): string => {
+  if (value === null || value === undefined) return "N/A";
+  if (typeof value === 'object') {
+    // Handle arrays
+    if (Array.isArray(value)) {
+      return value.map(item => 
+        typeof item === 'object' ? JSON.stringify(item) : String(item)
+      ).join(', ');
+    }
+    // Handle objects - extract meaningful data
+    if (value.description || value.partDescription) {
+      return value.description || value.partDescription;
+    }
+    if (value.amount || value.total) {
+      return String(value.amount || value.total);
+    }
+    if (value.quantity) {
+      return String(value.quantity);
+    }
+    // Fallback to string representation
+    return JSON.stringify(value);
+  }
+  return String(value);
+};
+
 export const FieldComparisonTable: React.FC<FieldComparisonTableProps> = ({ fields }) => {
+  console.log("🔍 FieldComparisonTable rendering with fields:", fields);
+
   if (!fields || fields.length === 0) {
     return <p className="text-muted-foreground">No field comparisons available</p>;
   }
@@ -48,12 +75,12 @@ export const FieldComparisonTable: React.FC<FieldComparisonTableProps> = ({ fiel
       <TableBody>
         {fields.map((field: any, fieldIndex: number) => (
           <TableRow key={fieldIndex}>
-            <TableCell className="font-medium">{field.field}</TableCell>
-            <TableCell className="max-w-[150px] truncate" title={field.source_value}>
-              {field.source_value || "N/A"}
+            <TableCell className="font-medium">{field.field || 'Unknown Field'}</TableCell>
+            <TableCell className="max-w-[150px] truncate" title={formatValue(field.source_value)}>
+              {formatValue(field.source_value)}
             </TableCell>
-            <TableCell className="max-w-[150px] truncate" title={field.target_value}>
-              {field.target_value || "N/A"}
+            <TableCell className="max-w-[150px] truncate" title={formatValue(field.target_value)}>
+              {formatValue(field.target_value)}
             </TableCell>
             <TableCell>
               <span className={getMatchColor(field.match_percentage || 0)}>

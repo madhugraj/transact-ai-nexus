@@ -33,7 +33,15 @@ const getMatchBadge = (match: boolean, score?: number) => {
   );
 };
 
+const safeString = (value: any): string => {
+  if (value === null || value === undefined) return 'N/A';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+};
+
 export const LineItemsTable: React.FC<LineItemsTableProps> = ({ lineItems }) => {
+  console.log("🔍 LineItemsTable rendering with items:", lineItems);
+
   if (!lineItems || lineItems.length === 0) {
     return <p className="text-muted-foreground">No line items to display</p>;
   }
@@ -62,11 +70,11 @@ export const LineItemsTable: React.FC<LineItemsTableProps> = ({ lineItems }) => 
                 <TableCell className="max-w-[200px]">
                   {sourceItem ? (
                     <div className="space-y-1 text-xs">
-                      <div><strong>Desc:</strong> {sourceItem.partDescription || sourceItem.description || 'N/A'}</div>
-                      <div><strong>Qty:</strong> {sourceItem.quantity || 'N/A'}</div>
-                      <div><strong>Rate:</strong> {sourceItem.rate || sourceItem.unit_price || 'N/A'}</div>
-                      <div><strong>Amount:</strong> {sourceItem.amount || sourceItem.total || 'N/A'}</div>
-                      {sourceItem.hsnSac && <div><strong>HSN:</strong> {sourceItem.hsnSac}</div>}
+                      <div><strong>Desc:</strong> {safeString(sourceItem.partDescription || sourceItem.description)}</div>
+                      <div><strong>Qty:</strong> {safeString(sourceItem.quantity)}</div>
+                      <div><strong>Rate:</strong> {safeString(sourceItem.rate || sourceItem.unit_price)}</div>
+                      <div><strong>Amount:</strong> {safeString(sourceItem.amount || sourceItem.total)}</div>
+                      {sourceItem.hsnSac && <div><strong>HSN:</strong> {safeString(sourceItem.hsnSac)}</div>}
                     </div>
                   ) : (
                     <span className="text-muted-foreground">No source data</span>
@@ -75,11 +83,11 @@ export const LineItemsTable: React.FC<LineItemsTableProps> = ({ lineItems }) => 
                 <TableCell className="max-w-[200px]">
                   {targetItem ? (
                     <div className="space-y-1 text-xs">
-                      <div><strong>Desc:</strong> {targetItem.description || 'N/A'}</div>
-                      <div><strong>Qty:</strong> {targetItem.quantity || 'N/A'}</div>
-                      <div><strong>Price:</strong> {targetItem.unit_price || 'N/A'}</div>
-                      <div><strong>Total:</strong> {targetItem.total || 'N/A'}</div>
-                      {targetItem.hsn_sac && <div><strong>HSN:</strong> {targetItem.hsn_sac}</div>}
+                      <div><strong>Desc:</strong> {safeString(targetItem.description)}</div>
+                      <div><strong>Qty:</strong> {safeString(targetItem.quantity)}</div>
+                      <div><strong>Price:</strong> {safeString(targetItem.unit_price)}</div>
+                      <div><strong>Total:</strong> {safeString(targetItem.total)}</div>
+                      {targetItem.hsn_sac && <div><strong>HSN:</strong> {safeString(targetItem.hsn_sac)}</div>}
                     </div>
                   ) : (
                     <span className="text-muted-foreground">No target data</span>
@@ -98,14 +106,14 @@ export const LineItemsTable: React.FC<LineItemsTableProps> = ({ lineItems }) => 
                 </TableCell>
                 <TableCell>
                   <div className="text-xs">
-                    <div>Source: {sourceItem?.hsnSac || 'N/A'}</div>
-                    <div>Target: {targetItem?.hsn_sac || 'N/A'}</div>
+                    <div>Source: {safeString(sourceItem?.hsnSac)}</div>
+                    <div>Target: {safeString(targetItem?.hsn_sac)}</div>
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="text-xs space-y-1">
                     {item.issues?.map((issue: string, i: number) => (
-                      <div key={i} className="text-red-600">{issue}</div>
+                      <div key={i} className="text-red-600">{safeString(issue)}</div>
                     )) || <span className="text-green-600">None</span>}
                   </div>
                 </TableCell>

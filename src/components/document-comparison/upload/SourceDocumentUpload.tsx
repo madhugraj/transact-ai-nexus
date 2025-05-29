@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, File, Upload } from "lucide-react";
@@ -13,19 +13,26 @@ export const SourceDocumentUpload: React.FC<SourceDocumentUploadProps> = ({
   poFile,
   onFileChange
 }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const handleReplaceClick = () => {
-    const input = document.getElementById('po-upload') as HTMLInputElement;
-    if (input) {
-      input.value = '';
-      input.click();
+    console.log("🔄 Replace button clicked");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
     }
   };
 
   const handleSelectClick = () => {
-    const input = document.getElementById('po-upload') as HTMLInputElement;
-    if (input) {
-      input.click();
+    console.log("📁 Select button clicked");
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("📁 File input changed");
+    onFileChange(e);
   };
 
   return (
@@ -41,7 +48,9 @@ export const SourceDocumentUpload: React.FC<SourceDocumentUploadProps> = ({
           <div className="flex items-center justify-between p-2 border rounded-md">
             <div className="flex items-center space-x-2">
               <FileText className="h-5 w-5 text-blue-500" />
-              <span className="truncate max-w-[200px]">{poFile.name}</span>
+              <span className="truncate max-w-[200px]" title={poFile.name}>
+                {poFile.name}
+              </span>
             </div>
             <Button 
               variant="ghost" 
@@ -64,11 +73,11 @@ export const SourceDocumentUpload: React.FC<SourceDocumentUploadProps> = ({
           </div>
         )}
         <input 
-          id="po-upload" 
+          ref={fileInputRef}
           type="file" 
           className="hidden" 
           accept=".pdf,.jpg,.jpeg,.png" 
-          onChange={onFileChange}
+          onChange={handleFileChange}
         />
       </CardContent>
     </Card>

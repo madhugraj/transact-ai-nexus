@@ -30,15 +30,27 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
   const documentProcessor = new DocumentProcessor(toast);
 
   const handleSourceFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("📁 Source file change triggered");
     const file = e.target.files?.[0];
     if (file) {
       console.log("📁 New source file selected:", file.name);
+      
+      // Clear any existing source document ID to force reprocessing
+      documentProcessor.setCurrentSourceDocumentId(null);
+      
+      // Update the parent state first
       handlePoFileChange(e);
+      
+      // Process the document
       await documentProcessor.processSourceDocument(file);
     }
+    
+    // Clear the input value to allow re-selecting the same file
+    e.target.value = '';
   };
 
   const handleTargetFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("📁 Target file change triggered");
     const files = e.target.files;
     if (files && files.length > 0) {
       const fileArray = Array.from(files);
@@ -50,12 +62,19 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
           description: "Please select a maximum of 5 target documents",
           variant: "destructive",
         });
+        e.target.value = '';
         return;
       }
 
+      // Update the parent state first
       handleInvoiceFileChange(e);
+      
+      // Process the documents
       await documentProcessor.processTargetDocuments(fileArray);
     }
+    
+    // Clear the input value to allow re-selecting files
+    e.target.value = '';
   };
 
   return (

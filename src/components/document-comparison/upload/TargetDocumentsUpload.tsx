@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, File, Upload } from "lucide-react";
@@ -15,18 +15,25 @@ export const TargetDocumentsUpload: React.FC<TargetDocumentsUploadProps> = ({
   onFileChange,
   onRemoveFile
 }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const handleAddMoreClick = () => {
-    const input = document.getElementById('invoice-upload') as HTMLInputElement;
-    if (input) {
-      input.click();
+    console.log("➕ Add more button clicked");
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
     }
   };
 
   const handleSelectClick = () => {
-    const input = document.getElementById('invoice-upload') as HTMLInputElement;
-    if (input) {
-      input.click();
+    console.log("📁 Select button clicked");
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("📁 Target files input changed");
+    onFileChange(e);
   };
 
   return (
@@ -44,7 +51,9 @@ export const TargetDocumentsUpload: React.FC<TargetDocumentsUploadProps> = ({
               <div key={index} className="flex items-center justify-between p-2 border rounded-md">
                 <div className="flex items-center space-x-2">
                   <FileText className="h-5 w-5 text-amber-500" />
-                  <span className="truncate max-w-[200px]">{file.name}</span>
+                  <span className="truncate max-w-[200px]" title={file.name}>
+                    {file.name}
+                  </span>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => onRemoveFile(index)}>
                   Remove
@@ -74,12 +83,12 @@ export const TargetDocumentsUpload: React.FC<TargetDocumentsUploadProps> = ({
           </div>
         )}
         <input 
-          id="invoice-upload" 
+          ref={fileInputRef}
           type="file" 
           multiple 
           className="hidden" 
           accept=".pdf,.jpg,.jpeg,.png" 
-          onChange={onFileChange} 
+          onChange={handleFileChange} 
         />
       </CardContent>
     </Card>
