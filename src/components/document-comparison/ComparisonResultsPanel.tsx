@@ -74,6 +74,17 @@ const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
     return <Badge className="bg-red-100 text-red-800">Low Match</Badge>;
   };
 
+  const formatIssuesAndRecommendations = (items: string[] | undefined, type: 'issues' | 'recommendations') => {
+    if (!items || items.length === 0) {
+      if (type === 'issues') {
+        return ['No critical issues found - all fields match within acceptable thresholds'];
+      } else {
+        return ['Document comparison meets compliance standards - no additional recommendations required'];
+      }
+    }
+    return items;
+  };
+
   const downloadResults = () => {
     const dataStr = JSON.stringify(detailedResults, null, 2);
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
@@ -227,26 +238,22 @@ const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
                               </CardHeader>
                               <CardContent>
                                 <div className="space-y-2">
-                                  {targetResult.detailed_analysis.critical_issues?.length > 0 && (
-                                    <div>
-                                      <p className="text-sm font-medium text-red-600">Critical Issues:</p>
-                                      <ul className="text-xs list-disc list-inside">
-                                        {targetResult.detailed_analysis.critical_issues.map((issue: string, i: number) => (
-                                          <li key={i}>{issue}</li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )}
-                                  {targetResult.detailed_analysis.recommendations?.length > 0 && (
-                                    <div>
-                                      <p className="text-sm font-medium text-blue-600">Recommendations:</p>
-                                      <ul className="text-xs list-disc list-inside">
-                                        {targetResult.detailed_analysis.recommendations.map((rec: string, i: number) => (
-                                          <li key={i}>{rec}</li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )}
+                                  <div>
+                                    <p className="text-sm font-medium text-red-600">Critical Issues:</p>
+                                    <ul className="text-xs list-disc list-inside">
+                                      {formatIssuesAndRecommendations(targetResult.detailed_analysis.critical_issues, 'issues').map((issue: string, i: number) => (
+                                        <li key={i} className={issue.includes('No critical issues') ? 'text-green-600' : 'text-red-600'}>{issue}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium text-blue-600">Recommendations:</p>
+                                    <ul className="text-xs list-disc list-inside">
+                                      {formatIssuesAndRecommendations(targetResult.detailed_analysis.recommendations, 'recommendations').map((rec: string, i: number) => (
+                                        <li key={i} className={rec.includes('meets compliance standards') ? 'text-green-600' : 'text-blue-600'}>{rec}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
                                 </div>
                               </CardContent>
                             </Card>

@@ -30,14 +30,22 @@ const getMatchBadge = (match: boolean) => {
 
 const formatValue = (value: any): string => {
   if (value === null || value === undefined) return "N/A";
-  if (typeof value === 'object') {
-    // Handle arrays
-    if (Array.isArray(value)) {
-      return value.map(item => 
-        typeof item === 'object' ? JSON.stringify(item) : String(item)
-      ).join(', ');
+  
+  // Don't display line_items in field comparisons - they belong in line items table
+  if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object') {
+    // Check if this looks like line items data
+    const firstItem = value[0];
+    if (firstItem.hasOwnProperty('description') || firstItem.hasOwnProperty('partDescription') || 
+        firstItem.hasOwnProperty('quantity') || firstItem.hasOwnProperty('amount')) {
+      return `[${value.length} line items - see Line Items table]`;
     }
-    // Handle objects - extract meaningful data
+    return value.map(item => 
+      typeof item === 'object' ? JSON.stringify(item) : String(item)
+    ).join(', ');
+  }
+  
+  if (typeof value === 'object') {
+    // Handle field mapping for descriptions
     if (value.description || value.partDescription) {
       return value.description || value.partDescription;
     }
@@ -47,7 +55,6 @@ const formatValue = (value: any): string => {
     if (value.quantity) {
       return String(value.quantity);
     }
-    // Fallback to string representation
     return JSON.stringify(value);
   }
   return String(value);
@@ -58,6 +65,17 @@ export const FieldComparisonTable: React.FC<FieldComparisonTableProps> = ({ fiel
 
   if (!fields || fields.length === 0) {
     return <p className="text-muted-foreground">No field comparisons available</p>;
+  }
+
+  // Filter out line_items from field comparisons as they should be in the separate table
+  const filteredFields = fields.filter(field => 
+    field.field !== 'line_items' && 
+    field.field !== 'lineItems' &&
+    !field.field?.toLowerCase().includes('line_item')
+  );
+
+  if (filteredFields.length === 0) {
+    return <p className="text-muted-foreground">No field comparisons available (line items are shown in separate table)</p>;
   }
 
   return (
@@ -73,7 +91,7 @@ export const FieldComparisonTable: React.FC<FieldComparisonTableProps> = ({ fiel
         </TableRow>
       </TableHeader>
       <TableBody>
-        {fields.map((field: any, fieldIndex: number) => (
+        {filteredFields.map((field: any, fieldIndex: number) => (
           <TableRow key={fieldIndex}>
             <TableCell className="font-medium">{field.field || 'Unknown Field'}</TableCell>
             <TableCell className="max-w-[150px] truncate" title={formatValue(field.source_value)}>

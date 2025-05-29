@@ -1,4 +1,3 @@
-
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { fileToBase64, processImageWithGemini } from "@/services/api/geminiService";
@@ -128,6 +127,7 @@ export class DocumentProcessor {
   async checkTargetDocumentsInDatabase(sourceDocId: number, fileNames: string[]): Promise<{ exists: boolean; existingFiles: string[]; targetData?: any }> {
     try {
       console.log("🔍 Checking target documents for source ID:", sourceDocId);
+      console.log("🔍 Looking for files:", fileNames);
       
       const { data, error } = await supabase
         .from('compare_target_docs')
@@ -147,9 +147,11 @@ export class DocumentProcessor {
         
         if (title && fileNames.includes(title)) {
           existingFiles.push(title);
+          console.log(`✅ Found existing file in slot ${i}:`, title);
         }
       }
 
+      console.log("📋 Existing files found:", existingFiles);
       return { 
         exists: existingFiles.length > 0, 
         existingFiles,
@@ -158,6 +160,25 @@ export class DocumentProcessor {
     } catch (error) {
       console.error("❌ Error checking target documents:", error);
       return { exists: false, existingFiles: [] };
+    }
+  }
+
+  async clearStaleTargetDocuments(sourceDocId: number): Promise<void> {
+    try {
+      console.log("🧹 Clearing stale target documents for source ID:", sourceDocId);
+      
+      const { error } = await supabase
+        .from('compare_target_docs')
+        .delete()
+        .eq('id', sourceDocId);
+
+      if (error) {
+        console.error("❌ Error clearing stale target documents:", error);
+      } else {
+        console.log("✅ Stale target documents cleared");
+      }
+    } catch (error) {
+      console.error("❌ Error in clearStaleTargetDocuments:", error);
     }
   }
 
@@ -170,9 +191,13 @@ export class DocumentProcessor {
       if (existsResult.exists) {
         this.currentSourceDocumentId = existsResult.id!;
         console.log("✅ Source document already exists with ID:", this.currentSourceDocumentId);
+        
+        // Clear any stale target documents for this source to prevent confusion
+        await this.clearStaleTargetDocuments(this.currentSourceDocumentId);
+        
         this.toast({
           title: "Document Already Processed",
-          description: "This source document has already been processed.",
+          description: "This source document has already been processed. Previous target documents have been cleared.",
         });
         return;
       }
@@ -255,36 +280,14 @@ export class DocumentProcessor {
       const fileNames = files.map(f => f.name);
       console.log("📋 Processing files:", fileNames);
       
-      const duplicateCheck = await this.checkTargetDocumentsInDatabase(this.currentSourceDocumentId, fileNames);
+      // First clear any existing target documents for this source to prevent stale data
+      await this.clearStaleTargetDocuments(this.currentSourceDocumentId);
+      console.log("🧹 Cleared any existing target documents for fresh start");
       
-      if (duplicateCheck.exists) {
-        console.log("⚠️ Duplicate files found:", duplicateCheck.existingFiles);
-        this.toast({
-          title: "Duplicate Documents Found",
-          description: `Some documents have already been processed: ${duplicateCheck.existingFiles.join(', ')}`,
-        });
-        
-        const newFiles = files.filter(f => !duplicateCheck.existingFiles.includes(f.name));
-        if (newFiles.length === 0) {
-          console.log("✅ All files already processed, skipping");
-          return;
-        }
-        files = newFiles;
-        console.log("📋 Processing new files only:", files.map(f => f.name));
-      }
-
       this.toast({
         title: "Processing Target Documents",
         description: `Analyzing ${files.length} document(s)...`,
       });
-
-      const { data: existingData } = await supabase
-        .from('compare_target_docs')
-        .select('*')
-        .eq('id', this.currentSourceDocumentId)
-        .maybeSingle();
-
-      console.log("📊 Existing target data:", existingData ? "Found" : "None");
 
       const processedDocs = [];
 
@@ -318,25 +321,10 @@ export class DocumentProcessor {
         id: this.currentSourceDocumentId
       };
 
-      if (existingData) {
-        targetDocData = { ...existingData };
-      }
-
-      let nextSlot = 1;
-      if (existingData) {
-        for (let i = 1; i <= 5; i++) {
-          const titleKey = `doc_title_${i}` as keyof typeof existingData;
-          if (!existingData[titleKey]) {
-            nextSlot = i;
-            break;
-          }
-        }
-      }
-
-      console.log("📝 Storing documents starting from slot:", nextSlot);
+      console.log("📝 Storing documents starting from slot 1 (fresh start)");
 
       processedDocs.forEach((doc, index) => {
-        const slotIndex = nextSlot + index;
+        const slotIndex = index + 1;
         if (slotIndex <= 5) {
           targetDocData[`doc_title_${slotIndex}`] = doc.title;
           targetDocData[`doc_type_${slotIndex}`] = doc.type;
