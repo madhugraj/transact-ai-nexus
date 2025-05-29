@@ -1,9 +1,9 @@
-
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card } from '@/components/ui/card';
+import GoogleDriveConnector from './GoogleDriveConnector';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -192,245 +192,36 @@ const CloudStorageConnector = ({ onFilesSelected }: CloudStorageConnectorProps) 
 
   return (
     <div className="space-y-4">
-      {!isConnected ? (
-        <div className="space-y-4">
-          <Tabs defaultValue="google_drive" onValueChange={(value) => setProvider(value as CloudStorageProvider)}>
-            <TabsList className="grid grid-cols-4">
-              <TabsTrigger value="google_drive">Google Drive</TabsTrigger>
-              <TabsTrigger value="onedrive">OneDrive</TabsTrigger>
-              <TabsTrigger value="sharepoint">SharePoint</TabsTrigger>
-              <TabsTrigger value="dropbox">Dropbox</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="google_drive" className="space-y-3 pt-3">
-              <div>
-                <Label htmlFor="client-id">Client ID</Label>
-                <Input 
-                  id="client-id" 
-                  placeholder="Google API Client ID" 
-                  value={authDetails.clientId}
-                  onChange={(e) => setAuthDetails({...authDetails, clientId: e.target.value})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="client-secret">Client Secret</Label>
-                <Input 
-                  id="client-secret" 
-                  type="password"
-                  placeholder="Google API Client Secret" 
-                  value={authDetails.clientSecret}
-                  onChange={(e) => setAuthDetails({...authDetails, clientSecret: e.target.value})}
-                />
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="onedrive" className="space-y-3 pt-3">
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input 
-                  id="email" 
-                  placeholder="Microsoft Account Email" 
-                  value={authDetails.email}
-                  onChange={(e) => setAuthDetails({...authDetails, email: e.target.value})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <Input 
-                  id="password" 
-                  type="password"
-                  placeholder="Microsoft Account Password" 
-                  value={authDetails.password}
-                  onChange={(e) => setAuthDetails({...authDetails, password: e.target.value})}
-                />
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="sharepoint" className="space-y-3 pt-3">
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input 
-                  id="email" 
-                  placeholder="SharePoint Email" 
-                  value={authDetails.email}
-                  onChange={(e) => setAuthDetails({...authDetails, email: e.target.value})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <Input 
-                  id="password" 
-                  type="password"
-                  placeholder="SharePoint Password" 
-                  value={authDetails.password}
-                  onChange={(e) => setAuthDetails({...authDetails, password: e.target.value})}
-                />
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="dropbox" className="space-y-3 pt-3">
-              <div>
-                <Label htmlFor="client-id">Client ID</Label>
-                <Input 
-                  id="client-id" 
-                  placeholder="Dropbox API Key" 
-                  value={authDetails.clientId}
-                  onChange={(e) => setAuthDetails({...authDetails, clientId: e.target.value})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="client-secret">Client Secret</Label>
-                <Input 
-                  id="client-secret" 
-                  type="password"
-                  placeholder="Dropbox API Secret" 
-                  value={authDetails.clientSecret}
-                  onChange={(e) => setAuthDetails({...authDetails, clientSecret: e.target.value})}
-                />
-              </div>
-            </TabsContent>
-          </Tabs>
-          
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="auto-sync-cloud"
-              checked={autoSync}
-              onCheckedChange={setAutoSync}
-            />
-            <Label htmlFor="auto-sync-cloud">Enable Auto Sync</Label>
-          </div>
-          
-          <Button 
-            onClick={handleConnect} 
-            disabled={isConnecting}
-            className="w-full"
-          >
-            {isConnecting ? (
-              <>
-                <Loader className="h-4 w-4 animate-spin mr-2" />
-                Connecting...
-              </>
-            ) : (
-              `Connect to ${getProviderName(provider)}`
-            )}
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className="flex items-center">
-                <Check className="h-4 w-4 text-green-500 mr-1" />
-                <span className="text-sm">Connected to {getProviderName(provider)}</span>
-              </div>
-              
-              {currentFolder && (
-                <Button variant="ghost" size="sm" onClick={navigateToParent}>
-                  <FolderOpen className="h-4 w-4 mr-1" />
-                  Up
-                </Button>
-              )}
-            </div>
-            
-            <div className="flex space-x-2">
-              <Input 
-                placeholder="Search files..." 
-                className="h-8 w-40"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && loadFiles()}
-              />
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => loadFiles()}
-                disabled={isLoading}
-              >
-                <List className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          
-          {/* File list */}
-          <Card className="max-h-60 overflow-y-auto">
-            {isLoading ? (
-              <div className="p-4 space-y-2">
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-              </div>
-            ) : files.length === 0 ? (
-              <div className="p-4 text-center text-muted-foreground text-sm">
-                No files found
-              </div>
-            ) : (
-              <div className="divide-y">
-                {files.map((file) => (
-                  <div 
-                    key={file.id}
-                    className="p-2 flex items-center hover:bg-muted/40 cursor-pointer"
-                    onClick={() => file.isFolder ? navigateToFolder(file) : toggleFileSelection(file)}
-                  >
-                    {file.isFolder ? (
-                      <FolderOpen className="h-4 w-4 mr-2 text-blue-500" />
-                    ) : (
-                      <FileText className="h-4 w-4 mr-2 text-gray-500" />
-                    )}
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm truncate">{file.name}</div>
-                      {!file.isFolder && (
-                        <div className="text-xs text-muted-foreground">
-                          {(file.size / 1024).toFixed(1)} KB
-                        </div>
-                      )}
-                    </div>
-                    
-                    {!file.isFolder && (
-                      <div className="flex h-4 w-4 rounded border border-primary ml-2">
-                        {selectedFiles.some(f => f.id === file.id) && (
-                          <Check className="h-3 w-3 text-primary" />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+      <Tabs defaultValue="google_drive" className="w-full">
+        <TabsList className="grid grid-cols-4">
+          <TabsTrigger value="google_drive">Google Drive</TabsTrigger>
+          <TabsTrigger value="onedrive">OneDrive</TabsTrigger>
+          <TabsTrigger value="sharepoint">SharePoint</TabsTrigger>
+          <TabsTrigger value="dropbox">Dropbox</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="google_drive" className="mt-4">
+          <GoogleDriveConnector onFilesSelected={onFilesSelected} />
+        </TabsContent>
+        
+        <TabsContent value="onedrive" className="mt-4">
+          <Card className="p-6 text-center text-muted-foreground">
+            OneDrive integration coming soon...
           </Card>
-          
-          <div className="flex justify-between">
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setIsConnected(false);
-                setFiles([]);
-                setSelectedFiles([]);
-              }}
-              size="sm"
-            >
-              Disconnect
-            </Button>
-            
-            <Button 
-              onClick={handleDownload}
-              disabled={isLoading || selectedFiles.length === 0}
-              size="sm"
-            >
-              {isLoading ? (
-                <>
-                  <Loader className="h-4 w-4 mr-1 animate-spin" />
-                  Importing...
-                </>
-              ) : (
-                <>
-                  Import {selectedFiles.length} file(s)
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      )}
+        </TabsContent>
+        
+        <TabsContent value="sharepoint" className="mt-4">
+          <Card className="p-6 text-center text-muted-foreground">
+            SharePoint integration coming soon...
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="dropbox" className="mt-4">
+          <Card className="p-6 text-center text-muted-foreground">
+            Dropbox integration coming soon...
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

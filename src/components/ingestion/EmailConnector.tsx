@@ -1,11 +1,11 @@
-
 import React, { useState } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import GmailConnector from './GmailConnector';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { MailCheck, Loader2, RefreshCw, Database, Clock, Settings } from 'lucide-react';
@@ -135,11 +135,22 @@ const EmailConnector: React.FC = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="connection">Connection</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="gmail">Gmail</TabsTrigger>
+          <TabsTrigger value="connection">IMAP/POP3</TabsTrigger>
           <TabsTrigger value="sync">Sync Options</TabsTrigger>
           <TabsTrigger value="database">Database Integration</TabsTrigger>
         </TabsList>
+        
+        <TabsContent value="gmail">
+          <GmailConnector onEmailsImported={(emails) => {
+            console.log('Gmail emails imported:', emails);
+            toast({
+              title: "Gmail emails imported",
+              description: `Successfully imported ${emails.length} emails from Gmail`
+            });
+          }} />
+        </TabsContent>
         
         {/* Connection Tab */}
         <TabsContent value="connection">
