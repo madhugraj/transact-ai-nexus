@@ -5,10 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
-import { AlertCircle, X, Download } from 'lucide-react';
+import { AlertCircle, X, Download, FileText } from 'lucide-react';
 import { ComparisonResult, DetailedComparisonResult } from './types';
 import { LineItemsTable } from './results/LineItemsTable';
 import { FieldComparisonTable } from './results/FieldComparisonTable';
+import { exportToCSV } from './utils/csvExporter';
 
 interface ComparisonResultsPanelProps {
   results: ComparisonResult[];
@@ -62,6 +63,13 @@ const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
   const activeTargetResult = targetSpecificResults[activeTargetIndex];
   const activeTargetDoc = targetDocuments[activeTargetIndex];
 
+  // Calculate overall match percentage from target-specific results
+  const calculatedOverallMatch = targetSpecificResults.length > 0 
+    ? Math.round(targetSpecificResults.reduce((sum, target) => sum + (target.score || 0), 0) / targetSpecificResults.length)
+    : matchPercentage;
+
+  const finalMatchPercentage = calculatedOverallMatch > 0 ? calculatedOverallMatch : matchPercentage;
+
   const getMatchColor = (score: number) => {
     if (score >= 80) return 'text-green-600';
     if (score >= 60) return 'text-yellow-600';
@@ -77,9 +85,9 @@ const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
   const formatIssuesAndRecommendations = (items: string[] | undefined, type: 'issues' | 'recommendations') => {
     if (!items || items.length === 0) {
       if (type === 'issues') {
-        return ['No critical issues found - all fields match within acceptable thresholds'];
+        return ['All fields match within acceptable thresholds - no critical issues identified'];
       } else {
-        return ['Document comparison meets compliance standards - no additional recommendations required'];
+        return ['Document comparison meets compliance standards - maintain current quality levels'];
       }
     }
     return items;
@@ -97,14 +105,24 @@ const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
     linkElement.click();
   };
 
+  const downloadCSV = () => {
+    if (detailedResults) {
+      exportToCSV(detailedResults);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Comparison Results</h2>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={downloadCSV}>
+            <FileText className="h-4 w-4 mr-2" />
+            CSV
+          </Button>
           <Button variant="outline" size="sm" onClick={downloadResults}>
             <Download className="h-4 w-4 mr-2" />
-            Download
+            JSON
           </Button>
           <Button variant="ghost" size="sm" onClick={onClose}>
             <X className="h-4 w-4" />
@@ -117,8 +135,8 @@ const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Overall Comparison Summary</span>
-            <div className={`text-2xl font-bold ${getMatchColor(matchPercentage)}`}>
-              {matchPercentage}%
+            <div className={`text-2xl font-bold ${getMatchColor(finalMatchPercentage)}`}>
+              {finalMatchPercentage}%
             </div>
           </CardTitle>
         </CardHeader>
@@ -137,7 +155,7 @@ const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
               <p className="font-medium">{targetDocuments.length} documents</p>
             </div>
           </div>
-          <Progress value={matchPercentage} className="w-full" />
+          <Progress value={finalMatchPercentage} className="w-full" />
         </CardContent>
       </Card>
 
@@ -242,7 +260,7 @@ const ComparisonResultsPanel: React.FC<ComparisonResultsPanelProps> = ({
                                     <p className="text-sm font-medium text-red-600">Critical Issues:</p>
                                     <ul className="text-xs list-disc list-inside">
                                       {formatIssuesAndRecommendations(targetResult.detailed_analysis.critical_issues, 'issues').map((issue: string, i: number) => (
-                                        <li key={i} className={issue.includes('No critical issues') ? 'text-green-600' : 'text-red-600'}>{issue}</li>
+                                        <li key={i} className={issue.includes('All fields match') ? 'text-green-600' : 'text-red-600'}>{issue}</li>
                                       ))}
                                     </ul>
                                   </div>

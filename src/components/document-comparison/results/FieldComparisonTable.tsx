@@ -31,16 +31,22 @@ const getMatchBadge = (match: boolean) => {
 const formatValue = (value: any): string => {
   if (value === null || value === undefined) return "N/A";
   
-  // Don't display line_items in field comparisons - they belong in line items table
-  if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object') {
+  // Handle arrays by joining them with commas for better readability
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "[]";
+    
     // Check if this looks like line items data
-    const firstItem = value[0];
-    if (firstItem.hasOwnProperty('description') || firstItem.hasOwnProperty('partDescription') || 
-        firstItem.hasOwnProperty('quantity') || firstItem.hasOwnProperty('amount')) {
-      return `[${value.length} line items - see Line Items table]`;
+    if (value.length > 0 && typeof value[0] === 'object') {
+      const firstItem = value[0];
+      if (firstItem.hasOwnProperty('description') || firstItem.hasOwnProperty('partDescription') || 
+          firstItem.hasOwnProperty('quantity') || firstItem.hasOwnProperty('amount')) {
+        return `[${value.length} line items - see Line Items table]`;
+      }
     }
+    
+    // For skill arrays or other string arrays, join with commas
     return value.map(item => 
-      typeof item === 'object' ? JSON.stringify(item) : String(item)
+      typeof item === 'string' ? item : (typeof item === 'object' ? JSON.stringify(item) : String(item))
     ).join(', ');
   }
   
@@ -94,10 +100,10 @@ export const FieldComparisonTable: React.FC<FieldComparisonTableProps> = ({ fiel
         {filteredFields.map((field: any, fieldIndex: number) => (
           <TableRow key={fieldIndex}>
             <TableCell className="font-medium">{field.field || 'Unknown Field'}</TableCell>
-            <TableCell className="max-w-[150px] truncate" title={formatValue(field.source_value)}>
+            <TableCell className="max-w-[200px] break-words" title={formatValue(field.source_value)}>
               {formatValue(field.source_value)}
             </TableCell>
-            <TableCell className="max-w-[150px] truncate" title={formatValue(field.target_value)}>
+            <TableCell className="max-w-[200px] break-words" title={formatValue(field.target_value)}>
               {formatValue(field.target_value)}
             </TableCell>
             <TableCell>
