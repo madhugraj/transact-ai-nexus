@@ -93,6 +93,7 @@ export class DocumentProcessor {
 
   constructor(toast: any) {
     this.toast = toast;
+    console.log("🔧 DocumentProcessor initialized");
   }
 
   async checkSourceDocumentInDatabase(fileName: string): Promise<{ exists: boolean; id?: number; data?: any }> {
@@ -163,6 +164,7 @@ export class DocumentProcessor {
   async processSourceDocument(file: File): Promise<void> {
     try {
       console.log("=== PROCESSING SOURCE DOCUMENT ===");
+      console.log("📁 File:", file.name, "Size:", file.size, "Type:", file.type);
       
       const existsResult = await this.checkSourceDocumentInDatabase(file.name);
       if (existsResult.exists) {
@@ -181,7 +183,7 @@ export class DocumentProcessor {
       });
 
       const base64Image = await fileToBase64(file);
-      console.log("📄 File converted to base64");
+      console.log("📄 File converted to base64, length:", base64Image.length);
       
       const response = await processImageWithGemini(
         DOCUMENT_CLASSIFICATION_PROMPT,
@@ -190,10 +192,13 @@ export class DocumentProcessor {
       );
 
       if (!response.success || !response.data) {
+        console.error("❌ Gemini processing failed:", response.error);
         throw new Error(response.error || "Failed to process document");
       }
 
+      console.log("✅ Gemini response received, parsing...");
       const extractedData = parseGeminiResponse(response.data);
+      console.log("✅ Data extracted:", extractedData);
       
       const { data: insertedData, error } = await supabase
         .from('compare_source_document')
@@ -206,6 +211,7 @@ export class DocumentProcessor {
         .single();
 
       if (error) {
+        console.error("❌ Database insert error:", error);
         throw error;
       }
 
@@ -219,26 +225,40 @@ export class DocumentProcessor {
 
     } catch (error) {
       console.error("❌ Source document processing error:", error);
+      this.currentSourceDocumentId = null;
       this.toast({
         title: "Processing Failed",
         description: error instanceof Error ? error.message : "Failed to process document",
         variant: "destructive",
       });
+      throw error;
     }
   }
 
   async processTargetDocuments(files: File[]): Promise<void> {
     try {
       console.log("=== PROCESSING TARGET DOCUMENTS ===");
+      console.log("📁 Files to process:", files.length);
+      console.log("🔍 Current source document ID:", this.currentSourceDocumentId);
       
       if (!this.currentSourceDocumentId) {
-        throw new Error("Please upload and process a source document first");
+        const errorMsg = "Please upload and process a source document first";
+        console.error("❌", errorMsg);
+        this.toast({
+          title: "Source Document Required",
+          description: errorMsg,
+          variant: "destructive",
+        });
+        throw new Error(errorMsg);
       }
 
       const fileNames = files.map(f => f.name);
+      console.log("📋 Processing files:", fileNames);
+      
       const duplicateCheck = await this.checkTargetDocumentsInDatabase(this.currentSourceDocumentId, fileNames);
       
       if (duplicateCheck.exists) {
+        console.log("⚠️ Duplicate files found:", duplicateCheck.existingFiles);
         this.toast({
           title: "Duplicate Documents Found",
           description: `Some documents have already been processed: ${duplicateCheck.existingFiles.join(', ')}`,
@@ -246,9 +266,11 @@ export class DocumentProcessor {
         
         const newFiles = files.filter(f => !duplicateCheck.existingFiles.includes(f.name));
         if (newFiles.length === 0) {
+          console.log("✅ All files already processed, skipping");
           return;
         }
         files = newFiles;
+        console.log("📋 Processing new files only:", files.map(f => f.name));
       }
 
       this.toast({
@@ -262,9 +284,13 @@ export class DocumentProcessor {
         .eq('id', this.currentSourceDocumentId)
         .maybeSingle();
 
+      console.log("📊 Existing target data:", existingData ? "Found" : "None");
+
       const processedDocs = [];
 
-      for (const file of files) {
+      for (const [index, file] of files.entries()) {
+        console.log(`📄 Processing file ${index + 1}/${files.length}:`, file.name);
+        
         const base64Image = await fileToBase64(file);
         const response = await processImageWithGemini(
           DOCUMENT_CLASSIFICATION_PROMPT,
@@ -273,10 +299,13 @@ export class DocumentProcessor {
         );
 
         if (!response.success || !response.data) {
-          throw new Error(`Failed to process ${file.name}`);
+          const errorMsg = `Failed to process ${file.name}`;
+          console.error("❌", errorMsg, response.error);
+          throw new Error(errorMsg);
         }
 
         const extractedData = parseGeminiResponse(response.data);
+        console.log(`✅ File ${index + 1} processed:`, file.name);
         
         processedDocs.push({
           title: file.name,
@@ -304,12 +333,15 @@ export class DocumentProcessor {
         }
       }
 
+      console.log("📝 Storing documents starting from slot:", nextSlot);
+
       processedDocs.forEach((doc, index) => {
         const slotIndex = nextSlot + index;
         if (slotIndex <= 5) {
           targetDocData[`doc_title_${slotIndex}`] = doc.title;
           targetDocData[`doc_type_${slotIndex}`] = doc.type;
           targetDocData[`doc_json_${slotIndex}`] = doc.json;
+          console.log(`📊 Assigned slot ${slotIndex} to:`, doc.title);
         }
       });
 
@@ -318,6 +350,7 @@ export class DocumentProcessor {
         .upsert(targetDocData);
 
       if (error) {
+        console.error("❌ Database upsert error:", error);
         throw error;
       }
 
@@ -334,14 +367,17 @@ export class DocumentProcessor {
         description: error instanceof Error ? error.message : "Failed to process target documents",
         variant: "destructive",
       });
+      throw error;
     }
   }
 
   getCurrentSourceDocumentId(): number | null {
+    console.log("🔍 Getting current source document ID:", this.currentSourceDocumentId);
     return this.currentSourceDocumentId;
   }
 
   setCurrentSourceDocumentId(id: number | null): void {
+    console.log("🔧 Setting source document ID:", id);
     this.currentSourceDocumentId = id;
   }
 }

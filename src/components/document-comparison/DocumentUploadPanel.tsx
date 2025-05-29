@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { FileSearch } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -27,22 +27,29 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
   isComparing
 }) => {
   const { toast } = useToast();
-  const documentProcessor = new DocumentProcessor(toast);
+  const documentProcessorRef = useRef<DocumentProcessor | null>(null);
+
+  // Initialize processor once
+  if (!documentProcessorRef.current) {
+    documentProcessorRef.current = new DocumentProcessor(toast);
+  }
 
   const handleSourceFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     console.log("📁 Source file change triggered");
     const file = e.target.files?.[0];
-    if (file) {
+    if (file && documentProcessorRef.current) {
       console.log("📁 New source file selected:", file.name);
       
       // Clear any existing source document ID to force reprocessing
-      documentProcessor.setCurrentSourceDocumentId(null);
+      documentProcessorRef.current.setCurrentSourceDocumentId(null);
       
       // Update the parent state first
       handlePoFileChange(e);
       
       // Process the document
-      await documentProcessor.processSourceDocument(file);
+      await documentProcessorRef.current.processSourceDocument(file);
+      
+      console.log("✅ Source document processed, ID:", documentProcessorRef.current.getCurrentSourceDocumentId());
     }
     
     // Clear the input value to allow re-selecting the same file
@@ -52,9 +59,23 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
   const handleTargetFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     console.log("📁 Target file change triggered");
     const files = e.target.files;
-    if (files && files.length > 0) {
+    if (files && files.length > 0 && documentProcessorRef.current) {
       const fileArray = Array.from(files);
       console.log("📁 New target files selected:", fileArray.length, "files");
+      
+      // Check if we have a source document first
+      const sourceDocId = documentProcessorRef.current.getCurrentSourceDocumentId();
+      console.log("🔍 Current source document ID:", sourceDocId);
+      
+      if (!sourceDocId) {
+        toast({
+          title: "Source Document Required",
+          description: "Please upload and process a source document first",
+          variant: "destructive",
+        });
+        e.target.value = '';
+        return;
+      }
       
       if (fileArray.length > 5) {
         toast({
@@ -70,7 +91,7 @@ export const DocumentUploadPanel: React.FC<DocumentUploadPanelProps> = ({
       handleInvoiceFileChange(e);
       
       // Process the documents
-      await documentProcessor.processTargetDocuments(fileArray);
+      await documentProcessorRef.current.processTargetDocuments(fileArray);
     }
     
     // Clear the input value to allow re-selecting files
