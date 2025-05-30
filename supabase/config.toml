@@ -1,0 +1,11 @@
+
+project_id = "ezwoozlwsokkkbkeolmu"
+
+[functions.google-auth]
+verify_jwt = false
+
+[functions.google-drive]
+verify_jwt = false
+
+[functions.gmail]
+verify_jwt = false

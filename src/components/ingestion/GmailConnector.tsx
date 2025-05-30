@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Loader, Check, Mail, Paperclip, Download } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface GmailMessage {
   id: string;
@@ -102,18 +103,24 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
 
   const exchangeCodeForToken = async (authCode: string) => {
     try {
-      // In a real implementation, this should be done through your backend
-      // For now, we'll use a mock token
-      const mockToken = 'mock-gmail-token-' + Date.now();
-      setAccessToken(mockToken);
-      setIsConnected(true);
-      
-      await loadGmailMessages(mockToken);
-      
-      toast({
-        title: "Connected to Gmail",
-        description: "Successfully authenticated with your Gmail account"
+      const { data, error } = await supabase.functions.invoke('google-auth', {
+        body: { authCode, scope: SCOPE }
       });
+
+      if (error) throw error;
+
+      if (data.success) {
+        setAccessToken(data.accessToken);
+        setIsConnected(true);
+        await loadGmailMessages(data.accessToken);
+        
+        toast({
+          title: "Connected to Gmail",
+          description: "Successfully authenticated with your Gmail account"
+        });
+      } else {
+        throw new Error(data.error);
+      }
     } catch (error) {
       toast({
         title: "Token exchange failed",
@@ -126,50 +133,22 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
   const loadGmailMessages = async (token: string) => {
     setIsLoading(true);
     try {
-      // In a real implementation, you would call Gmail API here
-      // For now, using mock data
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      const mockEmails: GmailMessage[] = [
-        {
-          id: '1',
-          subject: 'Invoice #12345 - Payment Due',
-          from: 'billing@company.com',
-          date: '2024-01-20T10:30:00Z',
-          snippet: 'Please find attached your invoice for services rendered...',
-          hasAttachments: true,
-          labels: ['INBOX', 'IMPORTANT']
-        },
-        {
-          id: '2',
-          subject: 'Monthly Financial Report',
-          from: 'finance@organization.com',
-          date: '2024-01-19T15:45:00Z',
-          snippet: 'Attached is the monthly financial report for review...',
-          hasAttachments: true,
-          labels: ['INBOX']
-        },
-        {
-          id: '3',
-          subject: 'Contract Renewal Notice',
-          from: 'legal@partner.com',
-          date: '2024-01-18T09:15:00Z',
-          snippet: 'Your contract is due for renewal. Please review the attached documents...',
-          hasAttachments: true,
-          labels: ['INBOX', 'CATEGORY_UPDATES']
-        },
-        {
-          id: '4',
-          subject: 'Receipt for Purchase Order #67890',
-          from: 'orders@supplier.com',
-          date: '2024-01-17T14:20:00Z',
-          snippet: 'Thank you for your purchase. Receipt attached...',
-          hasAttachments: true,
-          labels: ['INBOX']
+      const { data, error } = await supabase.functions.invoke('gmail', {
+        body: {
+          accessToken: token,
+          action: 'list',
+          query: searchQuery,
+          maxResults: parseInt(maxResults)
         }
-      ];
-      
-      setEmails(mockEmails);
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        setEmails(data.data);
+      } else {
+        throw new Error(data.error);
+      }
     } catch (error) {
       toast({
         title: "Error loading emails",
@@ -203,9 +182,7 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
 
     setIsLoading(true);
     try {
-      // Simulate email import process
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      // Import email data and attachments
       if (onEmailsImported) {
         onEmailsImported(selectedEmails);
       }
@@ -226,36 +203,8 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
   };
 
   const searchEmails = async () => {
-    if (!searchQuery.trim()) {
+    if (accessToken) {
       await loadGmailMessages(accessToken);
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      // Simulate search
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const filteredEmails = emails.filter(email =>
-        email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.snippet.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      
-      setEmails(filteredEmails);
-      
-      toast({
-        title: "Search completed",
-        description: `Found ${filteredEmails.length} emails matching "${searchQuery}"`
-      });
-    } catch (error) {
-      toast({
-        title: "Search failed",
-        description: "Failed to search emails",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
     }
   };
 

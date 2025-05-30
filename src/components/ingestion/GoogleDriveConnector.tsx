@@ -1,8 +1,10 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader, Check, FolderOpen, FileText } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface GoogleDriveFile {
   id: string;
@@ -11,6 +13,7 @@ interface GoogleDriveFile {
   size?: string;
   modifiedTime: string;
   webViewLink: string;
+  parents?: string[];
 }
 
 interface GoogleDriveConnectorProps {
@@ -97,18 +100,24 @@ const GoogleDriveConnector = ({ onFilesSelected }: GoogleDriveConnectorProps) =>
 
   const exchangeCodeForToken = async (authCode: string) => {
     try {
-      // In a real implementation, this should be done through your backend
-      // For now, we'll use a mock token
-      const mockToken = 'mock-google-drive-token-' + Date.now();
-      setAccessToken(mockToken);
-      setIsConnected(true);
-      
-      await loadGoogleDriveFiles(mockToken);
-      
-      toast({
-        title: "Connected to Google Drive",
-        description: "Successfully authenticated with your Google Drive account"
+      const { data, error } = await supabase.functions.invoke('google-auth', {
+        body: { authCode, scope: SCOPE }
       });
+
+      if (error) throw error;
+
+      if (data.success) {
+        setAccessToken(data.accessToken);
+        setIsConnected(true);
+        await loadGoogleDriveFiles(data.accessToken);
+        
+        toast({
+          title: "Connected to Google Drive",
+          description: "Successfully authenticated with your Google Drive account"
+        });
+      } else {
+        throw new Error(data.error);
+      }
     } catch (error) {
       toast({
         title: "Token exchange failed",
@@ -118,40 +127,24 @@ const GoogleDriveConnector = ({ onFilesSelected }: GoogleDriveConnectorProps) =>
     }
   };
 
-  const loadGoogleDriveFiles = async (token: string) => {
+  const loadGoogleDriveFiles = async (token: string, folderId?: string) => {
     setIsLoading(true);
     try {
-      // In a real implementation, you would call Google Drive API here
-      // For now, using mock data
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      const mockFiles: GoogleDriveFile[] = [
-        {
-          id: '1',
-          name: 'Financial Report Q3.pdf',
-          mimeType: 'application/pdf',
-          size: '2.5 MB',
-          modifiedTime: '2024-01-15T10:30:00Z',
-          webViewLink: 'https://drive.google.com/file/d/1/view'
-        },
-        {
-          id: '2',
-          name: 'Invoices Folder',
-          mimeType: 'application/vnd.google-apps.folder',
-          modifiedTime: '2024-01-20T15:45:00Z',
-          webViewLink: 'https://drive.google.com/drive/folders/2'
-        },
-        {
-          id: '3',
-          name: 'Contract Agreement.docx',
-          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          size: '1.2 MB',
-          modifiedTime: '2024-01-18T09:15:00Z',
-          webViewLink: 'https://drive.google.com/file/d/3/view'
+      const { data, error } = await supabase.functions.invoke('google-drive', {
+        body: {
+          accessToken: token,
+          action: 'list',
+          folderId
         }
-      ];
-      
-      setFiles(mockFiles);
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        setFiles(data.data);
+      } else {
+        throw new Error(data.error);
+      }
     } catch (error) {
       toast({
         title: "Error loading files",
@@ -190,24 +183,37 @@ const GoogleDriveConnector = ({ onFilesSelected }: GoogleDriveConnectorProps) =>
       const downloadedFiles: File[] = [];
       
       for (const file of selectedFiles) {
-        // Simulate file download from Google Drive
-        const response = await new Promise<File>((resolve) => {
-          setTimeout(() => {
-            const content = `Mock content for ${file.name}`;
-            const mockFile = new File([content], file.name, { type: file.mimeType });
-            resolve(mockFile);
-          }, 1000);
-        });
-        
-        downloadedFiles.push(response);
+        try {
+          const { data, error } = await supabase.functions.invoke('google-drive', {
+            body: {
+              accessToken,
+              action: file.mimeType.includes('google-apps') ? 'export' : 'download',
+              fileId: file.id
+            }
+          });
+
+          if (error) throw error;
+
+          // Convert response to File
+          const blob = new Blob([data]);
+          const downloadedFile = new File([blob], file.name, { 
+            type: file.mimeType.includes('google-apps') ? 'application/pdf' : file.mimeType 
+          });
+          
+          downloadedFiles.push(downloadedFile);
+        } catch (fileError) {
+          console.error(`Error downloading ${file.name}:`, fileError);
+        }
       }
       
-      onFilesSelected(downloadedFiles);
-      
-      toast({
-        title: "Files downloaded",
-        description: `Successfully downloaded ${downloadedFiles.length} files from Google Drive`
-      });
+      if (downloadedFiles.length > 0) {
+        onFilesSelected(downloadedFiles);
+        
+        toast({
+          title: "Files downloaded",
+          description: `Successfully downloaded ${downloadedFiles.length} files from Google Drive`
+        });
+      }
     } catch (error) {
       toast({
         title: "Download failed",
