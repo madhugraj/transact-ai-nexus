@@ -1,9 +1,7 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Loader, Check, Mail, Paperclip, Download } from 'lucide-react';
@@ -30,16 +28,87 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [maxResults, setMaxResults] = useState('50');
+  const [accessToken, setAccessToken] = useState<string>('');
   const { toast } = useToast();
+
+  const CLIENT_ID = '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com';
+  const REDIRECT_URI = window.location.origin;
+  const SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
 
   const handleGmailAuth = async () => {
     setIsConnecting(true);
     try {
-      // This would normally use Google OAuth2 flow for Gmail API
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      // Create OAuth URL for Gmail
+      const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      authUrl.searchParams.set('client_id', CLIENT_ID);
+      authUrl.searchParams.set('redirect_uri', REDIRECT_URI);
+      authUrl.searchParams.set('response_type', 'code');
+      authUrl.searchParams.set('scope', SCOPE);
+      authUrl.searchParams.set('access_type', 'offline');
+      authUrl.searchParams.set('prompt', 'consent');
+
+      // Open popup for authentication
+      const popup = window.open(
+        authUrl.toString(),
+        'gmail-auth',
+        'width=500,height=600,scrollbars=yes,resizable=yes'
+      );
+
+      // Listen for the popup to close or receive auth code
+      const checkClosed = setInterval(async () => {
+        if (popup?.closed) {
+          clearInterval(checkClosed);
+          setIsConnecting(false);
+          
+          // Check URL parameters for auth code
+          const urlParams = new URLSearchParams(window.location.search);
+          const authCode = urlParams.get('code');
+          
+          if (authCode) {
+            await exchangeCodeForToken(authCode);
+          } else {
+            toast({
+              title: "Authentication cancelled",
+              description: "Gmail authentication was cancelled",
+              variant: "destructive"
+            });
+          }
+        }
+      }, 1000);
+
+      // Timeout after 5 minutes
+      setTimeout(() => {
+        if (popup && !popup.closed) {
+          popup.close();
+          clearInterval(checkClosed);
+          setIsConnecting(false);
+          toast({
+            title: "Authentication timeout",
+            description: "Gmail authentication timed out",
+            variant: "destructive"
+          });
+        }
+      }, 300000);
+
+    } catch (error) {
+      setIsConnecting(false);
+      toast({
+        title: "Connection failed",
+        description: "Failed to connect to Gmail. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const exchangeCodeForToken = async (authCode: string) => {
+    try {
+      // In a real implementation, this should be done through your backend
+      // For now, we'll use a mock token
+      const mockToken = 'mock-gmail-token-' + Date.now();
+      setAccessToken(mockToken);
       setIsConnected(true);
-      await loadGmailMessages();
+      
+      await loadGmailMessages(mockToken);
       
       toast({
         title: "Connected to Gmail",
@@ -47,19 +116,18 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
       });
     } catch (error) {
       toast({
-        title: "Connection failed",
-        description: "Failed to connect to Gmail. Please try again.",
+        title: "Token exchange failed",
+        description: "Failed to complete Gmail authentication",
         variant: "destructive"
       });
-    } finally {
-      setIsConnecting(false);
     }
   };
 
-  const loadGmailMessages = async () => {
+  const loadGmailMessages = async (token: string) => {
     setIsLoading(true);
     try {
-      // Simulate Gmail API call
+      // In a real implementation, you would call Gmail API here
+      // For now, using mock data
       await new Promise(resolve => setTimeout(resolve, 1500));
       
       const mockEmails: GmailMessage[] = [
@@ -159,7 +227,7 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
 
   const searchEmails = async () => {
     if (!searchQuery.trim()) {
-      await loadGmailMessages();
+      await loadGmailMessages(accessToken);
       return;
     }
 
@@ -200,6 +268,9 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
             <p className="text-sm text-muted-foreground">
               Authenticate with your Google account to access your Gmail
             </p>
+            <p className="text-xs text-muted-foreground">
+              Client ID: {CLIENT_ID.substring(0, 20)}...
+            </p>
           </div>
           
           <Button
@@ -239,6 +310,7 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
             setIsConnected(false);
             setEmails([]);
             setSelectedEmails([]);
+            setAccessToken('');
           }}
         >
           Disconnect
@@ -331,7 +403,7 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
       <div className="flex justify-between">
         <Button
           variant="outline"
-          onClick={loadGmailMessages}
+          onClick={() => loadGmailMessages(accessToken)}
           disabled={isLoading}
           size="sm"
         >

@@ -1,9 +1,6 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader, Check, FolderOpen, FileText } from 'lucide-react';
 
@@ -26,17 +23,87 @@ const GoogleDriveConnector = ({ onFilesSelected }: GoogleDriveConnectorProps) =>
   const [files, setFiles] = useState<GoogleDriveFile[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<GoogleDriveFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [accessToken, setAccessToken] = useState<string>('');
   const { toast } = useToast();
+
+  const CLIENT_ID = '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com';
+  const REDIRECT_URI = window.location.origin;
+  const SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
 
   const handleGoogleAuth = async () => {
     setIsConnecting(true);
     try {
-      // This would normally use Google OAuth2 flow
-      // For now, we'll simulate the authentication
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      // Create OAuth URL
+      const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      authUrl.searchParams.set('client_id', CLIENT_ID);
+      authUrl.searchParams.set('redirect_uri', REDIRECT_URI);
+      authUrl.searchParams.set('response_type', 'code');
+      authUrl.searchParams.set('scope', SCOPE);
+      authUrl.searchParams.set('access_type', 'offline');
+      authUrl.searchParams.set('prompt', 'consent');
+
+      // Open popup for authentication
+      const popup = window.open(
+        authUrl.toString(),
+        'google-auth',
+        'width=500,height=600,scrollbars=yes,resizable=yes'
+      );
+
+      // Listen for the popup to close or receive auth code
+      const checkClosed = setInterval(async () => {
+        if (popup?.closed) {
+          clearInterval(checkClosed);
+          setIsConnecting(false);
+          
+          // Check URL parameters for auth code
+          const urlParams = new URLSearchParams(window.location.search);
+          const authCode = urlParams.get('code');
+          
+          if (authCode) {
+            await exchangeCodeForToken(authCode);
+          } else {
+            toast({
+              title: "Authentication cancelled",
+              description: "Google Drive authentication was cancelled",
+              variant: "destructive"
+            });
+          }
+        }
+      }, 1000);
+
+      // Timeout after 5 minutes
+      setTimeout(() => {
+        if (popup && !popup.closed) {
+          popup.close();
+          clearInterval(checkClosed);
+          setIsConnecting(false);
+          toast({
+            title: "Authentication timeout",
+            description: "Google Drive authentication timed out",
+            variant: "destructive"
+          });
+        }
+      }, 300000);
+
+    } catch (error) {
+      setIsConnecting(false);
+      toast({
+        title: "Connection failed",
+        description: "Failed to connect to Google Drive. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const exchangeCodeForToken = async (authCode: string) => {
+    try {
+      // In a real implementation, this should be done through your backend
+      // For now, we'll use a mock token
+      const mockToken = 'mock-google-drive-token-' + Date.now();
+      setAccessToken(mockToken);
       setIsConnected(true);
-      await loadGoogleDriveFiles();
+      
+      await loadGoogleDriveFiles(mockToken);
       
       toast({
         title: "Connected to Google Drive",
@@ -44,19 +111,18 @@ const GoogleDriveConnector = ({ onFilesSelected }: GoogleDriveConnectorProps) =>
       });
     } catch (error) {
       toast({
-        title: "Connection failed",
-        description: "Failed to connect to Google Drive. Please try again.",
+        title: "Token exchange failed",
+        description: "Failed to complete Google Drive authentication",
         variant: "destructive"
       });
-    } finally {
-      setIsConnecting(false);
     }
   };
 
-  const loadGoogleDriveFiles = async () => {
+  const loadGoogleDriveFiles = async (token: string) => {
     setIsLoading(true);
     try {
-      // Simulate Google Drive API call
+      // In a real implementation, you would call Google Drive API here
+      // For now, using mock data
       await new Promise(resolve => setTimeout(resolve, 1500));
       
       const mockFiles: GoogleDriveFile[] = [
@@ -162,6 +228,9 @@ const GoogleDriveConnector = ({ onFilesSelected }: GoogleDriveConnectorProps) =>
             <p className="text-sm text-muted-foreground">
               Authenticate with your Google account to access your Drive files
             </p>
+            <p className="text-xs text-muted-foreground">
+              Client ID: {CLIENT_ID.substring(0, 20)}...
+            </p>
           </div>
           
           <Button
@@ -201,6 +270,7 @@ const GoogleDriveConnector = ({ onFilesSelected }: GoogleDriveConnectorProps) =>
             setIsConnected(false);
             setFiles([]);
             setSelectedFiles([]);
+            setAccessToken('');
           }}
         >
           Disconnect
@@ -255,7 +325,7 @@ const GoogleDriveConnector = ({ onFilesSelected }: GoogleDriveConnectorProps) =>
       <div className="flex justify-between">
         <Button
           variant="outline"
-          onClick={loadGoogleDriveFiles}
+          onClick={() => loadGoogleDriveFiles(accessToken)}
           disabled={isLoading}
           size="sm"
         >
