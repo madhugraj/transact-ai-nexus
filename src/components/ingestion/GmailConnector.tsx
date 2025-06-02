@@ -33,7 +33,7 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
   const { toast } = useToast();
 
   const CLIENT_ID = '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com';
-  const REDIRECT_URI = window.location.origin + '/oauth/callback';
+  const REDIRECT_URI = `${window.location.protocol}//${window.location.host}/oauth/callback`;
   const SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
 
   const handleGmailAuth = async () => {
@@ -50,6 +50,7 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
       authUrl.searchParams.set('state', 'gmail_auth');
 
       console.log('Opening Gmail auth popup with URL:', authUrl.toString());
+      console.log('Redirect URI being used:', REDIRECT_URI);
 
       // Open popup for authentication
       const popup = window.open(

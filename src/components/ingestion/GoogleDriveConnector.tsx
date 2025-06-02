@@ -29,7 +29,7 @@ const GoogleDriveConnector = ({ onFilesSelected }: GoogleDriveConnectorProps) =>
   const { toast } = useToast();
 
   const CLIENT_ID = '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com';
-  const REDIRECT_URI = window.location.origin + '/oauth/callback';
+  const REDIRECT_URI = `${window.location.protocol}//${window.location.host}/oauth/callback`;
   const SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
 
   const handleGoogleAuth = async () => {
@@ -46,6 +46,7 @@ const GoogleDriveConnector = ({ onFilesSelected }: GoogleDriveConnectorProps) =>
       authUrl.searchParams.set('state', 'drive_auth');
 
       console.log('Opening Google Drive auth popup with URL:', authUrl.toString());
+      console.log('Redirect URI being used:', REDIRECT_URI);
 
       // Open popup for authentication
       const popup = window.open(

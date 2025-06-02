@@ -22,13 +22,17 @@ serve(async (req) => {
 
     const CLIENT_ID = '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com';
     const CLIENT_SECRET = Deno.env.get('Client_secret');
-    const REDIRECT_URI = req.headers.get('origin') || 'http://localhost:3000';
+    
+    // Construct redirect URI based on request origin
+    const origin = req.headers.get('origin') || 'https://transact-ai-nexus.lovable.app';
+    const REDIRECT_URI = `${origin}/oauth/callback`;
 
     if (!CLIENT_SECRET) {
       throw new Error('Google client secret not configured');
     }
 
     console.log('Exchanging auth code for tokens...');
+    console.log('Using redirect URI:', REDIRECT_URI);
 
     // Exchange authorization code for access token
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
