@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
-import { UserAuthProvider } from "@/components/auth/UserAuthContext";
+import { AuthProvider } from "@/components/auth/UserAuthContext";
 import Index from "./pages/Index";
 import Upload from "./pages/Upload";
 import Actions from "./pages/Actions";
@@ -29,7 +29,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <TooltipProvider>
-          <UserAuthProvider>
+          <AuthProvider>
             <Toaster />
             <BrowserRouter>
               <Routes>
@@ -51,7 +51,7 @@ function App() {
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
-          </UserAuthProvider>
+          </AuthProvider>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
