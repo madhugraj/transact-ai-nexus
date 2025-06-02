@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -30,7 +29,7 @@ const GoogleDriveConnector = ({ onFilesSelected }: GoogleDriveConnectorProps) =>
   const { toast } = useToast();
 
   const CLIENT_ID = '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com';
-  const REDIRECT_URI = window.location.origin;
+  const REDIRECT_URI = window.location.origin + '/oauth/callback';
   const SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
 
   const handleGoogleAuth = async () => {
@@ -44,6 +43,9 @@ const GoogleDriveConnector = ({ onFilesSelected }: GoogleDriveConnectorProps) =>
       authUrl.searchParams.set('scope', SCOPE);
       authUrl.searchParams.set('access_type', 'offline');
       authUrl.searchParams.set('prompt', 'consent');
+      authUrl.searchParams.set('state', 'drive_auth');
+
+      console.log('Opening Google Drive auth popup with URL:', authUrl.toString());
 
       // Open popup for authentication
       const popup = window.open(
@@ -52,25 +54,50 @@ const GoogleDriveConnector = ({ onFilesSelected }: GoogleDriveConnectorProps) =>
         'width=500,height=600,scrollbars=yes,resizable=yes'
       );
 
-      // Listen for the popup to close or receive auth code
-      const checkClosed = setInterval(async () => {
-        if (popup?.closed) {
+      if (!popup) {
+        throw new Error('Popup was blocked. Please allow popups for this site.');
+      }
+
+      // Listen for messages from the popup
+      const messageListener = async (event: MessageEvent) => {
+        console.log('Received message from popup:', event);
+        
+        if (event.origin !== window.location.origin) {
+          return;
+        }
+
+        if (event.data?.type === 'OAUTH_SUCCESS' && event.data?.code) {
+          console.log('Received auth code from popup:', event.data.code);
+          window.removeEventListener('message', messageListener);
+          popup.close();
+          await exchangeCodeForToken(event.data.code);
+        } else if (event.data?.type === 'OAUTH_ERROR') {
+          console.error('OAuth error from popup:', event.data.error);
+          window.removeEventListener('message', messageListener);
+          popup.close();
+          setIsConnecting(false);
+          toast({
+            title: "Authentication failed",
+            description: event.data.error || "Google Drive authentication failed",
+            variant: "destructive"
+          });
+        }
+      };
+
+      window.addEventListener('message', messageListener);
+
+      // Check if popup was closed manually
+      const checkClosed = setInterval(() => {
+        if (popup.closed) {
           clearInterval(checkClosed);
+          window.removeEventListener('message', messageListener);
           setIsConnecting(false);
           
-          // Check URL parameters for auth code
-          const urlParams = new URLSearchParams(window.location.search);
-          const authCode = urlParams.get('code');
-          
-          if (authCode) {
-            await exchangeCodeForToken(authCode);
-          } else {
-            toast({
-              title: "Authentication cancelled",
-              description: "Google Drive authentication was cancelled",
-              variant: "destructive"
-            });
-          }
+          toast({
+            title: "Authentication cancelled",
+            description: "Google Drive authentication was cancelled",
+            variant: "destructive"
+          });
         }
       }, 1000);
 
@@ -79,6 +106,7 @@ const GoogleDriveConnector = ({ onFilesSelected }: GoogleDriveConnectorProps) =>
         if (popup && !popup.closed) {
           popup.close();
           clearInterval(checkClosed);
+          window.removeEventListener('message', messageListener);
           setIsConnecting(false);
           toast({
             title: "Authentication timeout",
@@ -90,9 +118,10 @@ const GoogleDriveConnector = ({ onFilesSelected }: GoogleDriveConnectorProps) =>
 
     } catch (error) {
       setIsConnecting(false);
+      console.error('Google Drive auth error:', error);
       toast({
         title: "Connection failed",
-        description: "Failed to connect to Google Drive. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to connect to Google Drive. Please try again.",
         variant: "destructive"
       });
     }
@@ -100,11 +129,17 @@ const GoogleDriveConnector = ({ onFilesSelected }: GoogleDriveConnectorProps) =>
 
   const exchangeCodeForToken = async (authCode: string) => {
     try {
+      console.log('Exchanging auth code for token...');
       const { data, error } = await supabase.functions.invoke('google-auth', {
         body: { authCode, scope: SCOPE }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
+
+      console.log('Token exchange response:', data);
 
       if (data.success) {
         setAccessToken(data.accessToken);
@@ -119,6 +154,8 @@ const GoogleDriveConnector = ({ onFilesSelected }: GoogleDriveConnectorProps) =>
         throw new Error(data.error);
       }
     } catch (error) {
+      console.error('Token exchange error:', error);
+      setIsConnecting(false);
       toast({
         title: "Token exchange failed",
         description: "Failed to complete Google Drive authentication",
@@ -235,7 +272,7 @@ const GoogleDriveConnector = ({ onFilesSelected }: GoogleDriveConnectorProps) =>
               Authenticate with your Google account to access your Drive files
             </p>
             <p className="text-xs text-muted-foreground">
-              Client ID: {CLIENT_ID.substring(0, 20)}...
+              Note: You may see a warning that the app is unverified. Click "Advanced" → "Go to {window.location.hostname} (unsafe)" to continue.
             </p>
           </div>
           
