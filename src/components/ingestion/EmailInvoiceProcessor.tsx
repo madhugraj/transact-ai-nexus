@@ -1,14 +1,14 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
-import { CheckCircle, XCircle, FileText, Mail, Download, Database } from 'lucide-react';
+import { CheckCircle, XCircle, FileText, Mail, Download, Database, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { InvoiceDetectionAgent } from '@/services/agents/InvoiceDetectionAgent';
 import { InvoiceDataExtractionAgent } from '@/services/agents/InvoiceDataExtractionAgent';
+import { GmailAttachmentProcessor } from '@/services/gmail/attachmentProcessor';
 
 interface GmailMessage {
   id: string;
@@ -22,7 +22,8 @@ interface GmailMessage {
 
 interface ProcessingResult {
   email: GmailMessage;
-  attachments: File[];
+  emailContext: any;
+  attachments: any[];
   invoiceValidation: any[];
   extractedData: any[];
   status: 'processing' | 'completed' | 'error';
@@ -62,6 +63,7 @@ const EmailInvoiceProcessor: React.FC<EmailInvoiceProcessorProps> = ({
 
     try {
       const processingResults: ProcessingResult[] = [];
+      const attachmentProcessor = new GmailAttachmentProcessor(accessToken);
 
       for (let i = 0; i < selectedEmails.length; i++) {
         const email = selectedEmails[i];
@@ -71,6 +73,7 @@ const EmailInvoiceProcessor: React.FC<EmailInvoiceProcessorProps> = ({
 
         const result: ProcessingResult = {
           email,
+          emailContext: null,
           attachments: [],
           invoiceValidation: [],
           extractedData: [],
@@ -78,35 +81,71 @@ const EmailInvoiceProcessor: React.FC<EmailInvoiceProcessorProps> = ({
         };
 
         try {
-          // Step 1: Get email attachments
-          console.log('Step 1: Extracting attachments...');
-          const attachments = await extractEmailAttachments(email.id);
+          // Step 1: Analyze email context for invoice indicators
+          console.log('Step 1: Analyzing email context...');
+          const emailContext = await attachmentProcessor.analyzeEmailForInvoiceContext(email.id);
+          result.emailContext = emailContext;
+
+          if (!emailContext.isLikelyInvoice) {
+            console.log('Email does not appear to contain invoice-related content');
+            result.status = 'completed';
+            result.error = 'Email does not appear invoice-related';
+            processingResults.push(result);
+            setResults([...processingResults]);
+            continue;
+          }
+
+          // Step 2: Extract real email attachments
+          console.log('Step 2: Extracting real attachments...');
+          const attachments = await attachmentProcessor.extractEmailAttachments(email.id);
           result.attachments = attachments;
 
           if (attachments.length === 0) {
             result.status = 'completed';
-            result.error = 'No attachments found';
+            result.error = 'No supported attachments found (PDF/Image files)';
             processingResults.push(result);
+            setResults([...processingResults]);
             continue;
           }
 
-          // Step 2: Validate each attachment as invoice
-          console.log('Step 2: Validating invoices...');
+          console.log(`Found ${attachments.length} attachments to process`);
+
+          // Step 3: Validate each attachment as invoice using AI
+          console.log('Step 3: Validating invoices with AI...');
           for (const attachment of attachments) {
-            const validation = await invoiceDetectionAgent.process(attachment);
-            result.invoiceValidation.push(validation);
+            console.log(`Processing attachment: ${attachment.filename}`);
+            
+            const validation = await invoiceDetectionAgent.process(attachment.file);
+            result.invoiceValidation.push({
+              ...validation,
+              filename: attachment.filename,
+              fileSize: attachment.size
+            });
 
-            // Step 3: If it's an invoice, extract data
+            // Step 4: If it's an invoice, extract structured data
             if (validation.success && validation.data?.is_invoice) {
-              console.log('Step 3: Extracting invoice data...');
-              const extraction = await invoiceDataExtractionAgent.process(attachment);
-              result.extractedData.push(extraction);
+              console.log(`✅ Invoice detected: ${attachment.filename}`);
+              console.log('Step 4: Extracting invoice data with AI...');
+              
+              const extraction = await invoiceDataExtractionAgent.process(attachment.file);
+              result.extractedData.push({
+                ...extraction,
+                filename: attachment.filename,
+                fileSize: attachment.size
+              });
 
-              // Step 4: Store in database
-              if (extraction.success) {
-                console.log('Step 4: Storing in database...');
-                await storeInvoiceInDatabase(extraction.data, email, attachment.name);
+              // Step 5: Store in database
+              if (extraction.success && extraction.data) {
+                console.log('Step 5: Storing in database...');
+                await storeInvoiceInDatabase(
+                  extraction.data, 
+                  email, 
+                  attachment.filename,
+                  emailContext.context
+                );
               }
+            } else {
+              console.log(`❌ Not an invoice: ${attachment.filename}`);
             }
           }
 
@@ -138,51 +177,12 @@ const EmailInvoiceProcessor: React.FC<EmailInvoiceProcessorProps> = ({
     }
   };
 
-  const extractEmailAttachments = async (messageId: string): Promise<File[]> => {
-    try {
-      // Get full message details including attachments
-      const { data, error } = await supabase.functions.invoke('gmail', {
-        body: {
-          accessToken,
-          action: 'get',
-          messageId
-        }
-      });
-
-      if (error) throw error;
-
-      if (!data.success) throw new Error(data.error);
-
-      const message = data.data;
-      const attachments: File[] = [];
-
-      // Extract attachments from message parts
-      const extractAttachments = (parts: any[]) => {
-        for (const part of parts) {
-          if (part.filename && part.filename.length > 0 && part.body?.attachmentId) {
-            // Note: In a real implementation, you'd fetch the attachment data
-            // For now, we'll create a placeholder file
-            const file = new File([''], part.filename, { type: part.mimeType });
-            attachments.push(file);
-          }
-          if (part.parts) {
-            extractAttachments(part.parts);
-          }
-        }
-      };
-
-      if (message.payload?.parts) {
-        extractAttachments(message.payload.parts);
-      }
-
-      return attachments;
-    } catch (error) {
-      console.error('Error extracting attachments:', error);
-      return [];
-    }
-  };
-
-  const storeInvoiceInDatabase = async (invoiceData: any, email: GmailMessage, fileName: string) => {
+  const storeInvoiceInDatabase = async (
+    invoiceData: any, 
+    email: GmailMessage, 
+    fileName: string,
+    emailContext: any
+  ) => {
     try {
       // Store each line item as a separate row in invoice_table
       for (const lineItem of invoiceData.line_items || []) {
@@ -202,7 +202,8 @@ const EmailInvoiceProcessor: React.FC<EmailInvoiceProcessorProps> = ({
               email_date: email.date,
               file_name: fileName,
               line_item: lineItem,
-              extraction_confidence: invoiceData.extraction_confidence
+              extraction_confidence: invoiceData.extraction_confidence,
+              email_context: emailContext
             }
           });
 
@@ -221,6 +222,10 @@ const EmailInvoiceProcessor: React.FC<EmailInvoiceProcessorProps> = ({
     return results.reduce((count, result) => {
       return count + result.extractedData.filter(ext => ext.success).length;
     }, 0);
+  };
+
+  const getTotalAttachments = () => {
+    return results.reduce((count, result) => count + result.attachments.length, 0);
   };
 
   return (
@@ -258,12 +263,16 @@ const EmailInvoiceProcessor: React.FC<EmailInvoiceProcessorProps> = ({
 
         {results.length > 0 && (
           <div className="space-y-3">
-            <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-4 text-sm flex-wrap">
               <Badge variant="outline" className="bg-green-50 text-green-700">
                 <CheckCircle className="h-3 w-3 mr-1" />
                 {getSuccessfulInvoices()} invoices processed
               </Badge>
               <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                <FileText className="h-3 w-3 mr-1" />
+                {getTotalAttachments()} attachments analyzed
+              </Badge>
+              <Badge variant="outline" className="bg-purple-50 text-purple-700">
                 <Database className="h-3 w-3 mr-1" />
                 Stored in database
               </Badge>
@@ -280,7 +289,20 @@ const EmailInvoiceProcessor: React.FC<EmailInvoiceProcessorProps> = ({
                   </div>
                   
                   <div className="text-xs text-muted-foreground space-y-1">
-                    <div>📎 {result.attachments.length} attachments</div>
+                    {result.emailContext && (
+                      <div className="flex items-center gap-1">
+                        {result.emailContext.isLikelyInvoice ? (
+                          <CheckCircle className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <AlertCircle className="h-3 w-3 text-orange-500" />
+                        )}
+                        Invoice context: {result.emailContext.isLikelyInvoice ? 'Detected' : 'Not detected'}
+                        {result.emailContext.context.invoiceKeywords.length > 0 && (
+                          <span className="ml-1">({result.emailContext.context.invoiceKeywords.join(', ')})</span>
+                        )}
+                      </div>
+                    )}
+                    <div>📎 {result.attachments.length} attachments downloaded</div>
                     <div>✅ {result.invoiceValidation.filter(v => v.success && v.data?.is_invoice).length} invoices detected</div>
                     <div>📊 {result.extractedData.filter(e => e.success).length} invoices extracted</div>
                     {result.error && (

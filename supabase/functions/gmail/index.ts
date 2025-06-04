@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { accessToken, action, messageId, query, maxResults } = await req.json();
+    const { accessToken, action, messageId, query, maxResults, attachmentId } = await req.json();
     
     if (!accessToken) {
       throw new Error('Access token is required');
@@ -35,8 +35,7 @@ serve(async (req) => {
         format: 'full',
       });
       url += `?${queryParams}`;
-    } else if (action === 'attachment' && messageId) {
-      const { attachmentId } = await req.json();
+    } else if (action === 'attachment' && messageId && attachmentId) {
       url += `/messages/${messageId}/attachments/${attachmentId}`;
     }
 
