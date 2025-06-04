@@ -125,16 +125,32 @@ export class GmailAttachmentProcessor {
   }
 
   private base64ToArrayBuffer(base64: string): ArrayBuffer {
-    // Remove any whitespace and decode
-    const cleanBase64 = base64.replace(/\s/g, '');
-    const binaryString = atob(cleanBase64);
-    const bytes = new Uint8Array(binaryString.length);
-    
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
+    try {
+      // Handle URL-safe base64 and fix padding if needed
+      let cleanBase64 = base64.replace(/\s/g, '');
+      
+      // Convert URL-safe base64 to regular base64
+      cleanBase64 = cleanBase64.replace(/-/g, '+').replace(/_/g, '/');
+      
+      // Add padding if needed
+      while (cleanBase64.length % 4) {
+        cleanBase64 += '=';
+      }
+      
+      const binaryString = atob(cleanBase64);
+      const bytes = new Uint8Array(binaryString.length);
+      
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      return bytes.buffer;
+    } catch (error) {
+      console.error('Base64 decode error:', error);
+      console.error('Base64 string length:', base64.length);
+      console.error('Base64 sample:', base64.substring(0, 100));
+      throw new Error(`Failed to decode base64 data: ${error.message}`);
     }
-    
-    return bytes.buffer;
   }
 
   async analyzeEmailForInvoiceContext(messageId: string): Promise<{
@@ -180,8 +196,10 @@ export class GmailAttachmentProcessor {
       const hasInvoiceKeywords = foundKeywords.length > 0;
       const attachmentCount = this.extractAttachmentMetadata(message.payload?.parts || []).length;
 
+      // Since you mentioned all selected emails have invoice attachments, 
+      // let's be more permissive and assume emails with attachments are likely invoices
       return {
-        isLikelyInvoice: hasInvoiceKeywords && attachmentCount > 0,
+        isLikelyInvoice: attachmentCount > 0, // More permissive logic
         context: {
           subject,
           from,
