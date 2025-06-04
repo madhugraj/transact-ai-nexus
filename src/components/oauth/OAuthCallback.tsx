@@ -5,6 +5,7 @@ const OAuthCallback = () => {
   useEffect(() => {
     console.log('OAuth callback page loaded');
     console.log('Current URL:', window.location.href);
+    console.log('URL search params:', window.location.search);
     
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
@@ -54,6 +55,9 @@ const OAuthCallback = () => {
       <div className="text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
         <p>Processing authentication...</p>
+        <p className="text-sm text-muted-foreground mt-2">
+          If this page doesn't close automatically, please close it manually.
+        </p>
       </div>
     </div>
   );

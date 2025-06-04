@@ -38,6 +38,8 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
   // Use your pre-configured redirect URI based on the current domain
   const getRedirectUri = () => {
     const currentHost = window.location.host;
+    console.log('Current host:', currentHost);
+    
     if (currentHost.includes('lovable.app')) {
       return 'https://transact-ai-nexus.lovable.app/oauth/callback';
     } else if (currentHost.includes('lovableproject.com')) {
@@ -79,15 +81,20 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
 
       // Listen for messages from the popup
       const messageListener = async (event: MessageEvent) => {
+        console.log('Received message:', event.data);
+        
         if (event.origin !== window.location.origin) {
+          console.log('Message from different origin, ignoring');
           return;
         }
 
         if (event.data?.type === 'OAUTH_SUCCESS' && event.data?.code) {
+          console.log('OAuth success received');
           window.removeEventListener('message', messageListener);
           popup.close();
           await exchangeCodeForToken(event.data.code);
         } else if (event.data?.type === 'OAUTH_ERROR') {
+          console.log('OAuth error received:', event.data.error);
           window.removeEventListener('message', messageListener);
           popup.close();
           setIsConnecting(false);
@@ -106,6 +113,7 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
         if (popup.closed) {
           clearInterval(checkClosed);
           window.removeEventListener('message', messageListener);
+          console.log('Popup was closed manually');
           setIsConnecting(false);
         }
       }, 1000);
@@ -122,6 +130,7 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
   };
 
   const exchangeCodeForToken = async (authCode: string) => {
+    console.log('Exchanging code for token...');
     try {
       const { data, error } = await supabase.functions.invoke('google-auth', {
         body: { 
@@ -147,6 +156,7 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
       }
     } catch (error) {
       setIsConnecting(false);
+      console.error('Token exchange error:', error);
       toast({
         title: "Token exchange failed",
         description: "Failed to complete Gmail authentication",
