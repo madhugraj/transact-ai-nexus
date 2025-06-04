@@ -14,18 +14,21 @@ serve(async (req) => {
   }
 
   try {
-    const { authCode, scope } = await req.json();
+    const { authCode, scope, redirectUri } = await req.json();
     
     if (!authCode) {
       throw new Error('Authorization code is required');
     }
 
+    if (!redirectUri) {
+      throw new Error('Redirect URI is required');
+    }
+
     const CLIENT_ID = '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com';
     const CLIENT_SECRET = Deno.env.get('Client_secret');
     
-    // Construct redirect URI based on request origin
-    const origin = req.headers.get('origin') || 'https://transact-ai-nexus.lovable.app';
-    const REDIRECT_URI = `${origin}/oauth/callback`;
+    // Use the redirect URI passed from the frontend
+    const REDIRECT_URI = redirectUri;
 
     if (!CLIENT_SECRET) {
       throw new Error('Google client secret not configured');

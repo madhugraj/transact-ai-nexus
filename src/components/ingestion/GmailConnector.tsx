@@ -136,7 +136,11 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
     try {
       console.log('Exchanging auth code for token...');
       const { data, error } = await supabase.functions.invoke('google-auth', {
-        body: { authCode, scope: SCOPE }
+        body: { 
+          authCode, 
+          scope: SCOPE,
+          redirectUri: REDIRECT_URI
+        }
       });
 
       if (error) {
