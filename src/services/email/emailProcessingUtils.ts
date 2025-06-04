@@ -1,4 +1,3 @@
-
 import { GmailAttachmentProcessor } from '@/services/gmail/attachmentProcessor';
 import { InvoiceDetectionAgent } from '@/services/agents/InvoiceDetectionAgent';
 import { InvoiceDataExtractionAgent } from '@/services/agents/InvoiceDataExtractionAgent';
@@ -37,7 +36,7 @@ export class EmailProcessingService {
     email: GmailMessage, 
     accessToken: string
   ): Promise<ProcessingResult> {
-    console.log(`Processing email: ${email.subject}`);
+    console.log(`🔄 Processing email: ${email.subject}`);
 
     const result: ProcessingResult = {
       email,
@@ -52,19 +51,19 @@ export class EmailProcessingService {
       const attachmentProcessor = new GmailAttachmentProcessor(accessToken);
 
       // Step 1: Analyze email context for invoice indicators
-      console.log('Step 1: Analyzing email context...');
+      console.log('📧 Step 1: Analyzing email context...');
       const emailContext = await attachmentProcessor.analyzeEmailForInvoiceContext(email.id);
       result.emailContext = emailContext;
 
       if (!emailContext.isLikelyInvoice) {
-        console.log('Email does not appear to contain invoice-related content');
+        console.log('❌ Email does not appear to contain invoice-related content');
         result.status = 'completed';
         result.error = 'Email does not appear invoice-related';
         return result;
       }
 
       // Step 2: Extract real email attachments
-      console.log('Step 2: Extracting real attachments...');
+      console.log('📎 Step 2: Extracting email attachments...');
       const attachments = await attachmentProcessor.extractEmailAttachments(email.id);
       result.attachments = attachments;
 
@@ -74,55 +73,69 @@ export class EmailProcessingService {
         return result;
       }
 
-      console.log(`Found ${attachments.length} attachments to process`);
+      console.log(`✅ Found ${attachments.length} attachments to process`);
 
-      // Step 3: Validate each attachment as invoice using AI
-      console.log('Step 3: Validating invoices with AI...');
+      // Step 3: Process each attachment
       for (const attachment of attachments) {
-        console.log(`Processing attachment: ${attachment.filename}`);
+        await this.processAttachment(attachment, email, emailContext.context, result);
+      }
+
+      result.status = 'completed';
+      console.log(`✅ Email processing completed for: ${email.subject}`);
+
+    } catch (error) {
+      console.error(`❌ Error processing email ${email.subject}:`, error);
+      result.status = 'error';
+      result.error = error instanceof Error ? error.message : 'Unknown processing error';
+    }
+
+    return result;
+  }
+
+  private async processAttachment(
+    attachment: any,
+    email: GmailMessage,
+    emailContext: any,
+    result: ProcessingResult
+  ) {
+    console.log(`🔍 Processing attachment: ${attachment.filename}`);
+    
+    try {
+      // Step 3a: Validate attachment as invoice using AI
+      const validation = await this.invoiceDetectionAgent.process(attachment.file);
+      result.invoiceValidation.push({
+        ...validation,
+        filename: attachment.filename,
+        fileSize: attachment.size
+      });
+
+      // Step 3b: If it's an invoice, extract structured data
+      if (validation.success && validation.data?.is_invoice) {
+        console.log(`✅ Invoice detected: ${attachment.filename}`);
         
-        const validation = await this.invoiceDetectionAgent.process(attachment.file);
-        result.invoiceValidation.push({
-          ...validation,
+        const extraction = await this.invoiceDataExtractionAgent.process(attachment.file);
+        result.extractedData.push({
+          ...extraction,
           filename: attachment.filename,
           fileSize: attachment.size
         });
 
-        // Step 4: If it's an invoice, extract structured data
-        if (validation.success && validation.data?.is_invoice) {
-          console.log(`✅ Invoice detected: ${attachment.filename}`);
-          console.log('Step 4: Extracting invoice data with AI...');
-          
-          const extraction = await this.invoiceDataExtractionAgent.process(attachment.file);
-          result.extractedData.push({
-            ...extraction,
-            filename: attachment.filename,
-            fileSize: attachment.size
-          });
-
-          // Step 5: Store in database (with duplicate handling)
-          if (extraction.success && extraction.data) {
-            console.log('Step 5: Storing in database...');
-            await this.storeInvoiceInDatabase(
-              extraction.data, 
-              email, 
-              attachment.filename,
-              emailContext.context
-            );
-          }
-        } else {
-          console.log(`❌ Not an invoice: ${attachment.filename}`);
+        // Step 3c: Store in database
+        if (extraction.success && extraction.data) {
+          console.log('💾 Storing invoice data in database...');
+          await this.storeInvoiceInDatabase(
+            extraction.data, 
+            email, 
+            attachment.filename,
+            emailContext
+          );
         }
+      } else {
+        console.log(`❌ Not an invoice: ${attachment.filename}`);
       }
-
-      result.status = 'completed';
     } catch (error) {
-      console.error(`Error processing email ${email.subject}:`, error);
-      result.status = 'error';
-      result.error = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`Error processing attachment ${attachment.filename}:`, error);
     }
-
-    return result;
   }
 
   private async storeInvoiceInDatabase(

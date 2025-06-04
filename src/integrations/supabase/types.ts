@@ -187,24 +187,33 @@ export type Database = {
       }
       invoice_table: {
         Row: {
+          attachment_invoice_name: string | null
           created_at: string
           details: Json | null
+          email_date: string | null
+          email_header: string | null
           id: number
           invoice_date: string | null
           invoice_number: number
           po_number: number
         }
         Insert: {
+          attachment_invoice_name?: string | null
           created_at?: string
           details?: Json | null
+          email_date?: string | null
+          email_header?: string | null
           id?: number
           invoice_date?: string | null
           invoice_number: number
           po_number: number
         }
         Update: {
+          attachment_invoice_name?: string | null
           created_at?: string
           details?: Json | null
+          email_date?: string | null
+          email_header?: string | null
           id?: number
           invoice_date?: string | null
           invoice_number?: number
