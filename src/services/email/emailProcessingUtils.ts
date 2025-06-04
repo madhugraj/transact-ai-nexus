@@ -1,36 +1,16 @@
 
 import { GmailAttachmentProcessor } from '@/services/gmail/attachmentProcessor';
-import { InvoiceDetectionAgent } from '@/services/agents/InvoiceDetectionAgent';
-import { InvoiceDataExtractionAgent } from '@/services/agents/InvoiceDataExtractionAgent';
-import { supabase } from '@/integrations/supabase/client';
-
-interface GmailMessage {
-  id: string;
-  subject: string;
-  from: string;
-  date: string;
-  snippet: string;
-  hasAttachments: boolean;
-  labels: string[];
-}
-
-interface ProcessingResult {
-  email: GmailMessage;
-  emailContext: any;
-  attachments: any[];
-  invoiceValidation: any[];
-  extractedData: any[];
-  status: 'processing' | 'completed' | 'error';
-  error?: string;
-}
+import { EmailAttachmentProcessor } from './attachmentProcessor';
+import { DatabaseStorage } from './databaseStorage';
+import { GmailMessage, ProcessingResult } from './types';
 
 export class EmailProcessingService {
-  private invoiceDetectionAgent: InvoiceDetectionAgent;
-  private invoiceDataExtractionAgent: InvoiceDataExtractionAgent;
+  private emailAttachmentProcessor: EmailAttachmentProcessor;
+  private databaseStorage: DatabaseStorage;
 
   constructor() {
-    this.invoiceDetectionAgent = new InvoiceDetectionAgent();
-    this.invoiceDataExtractionAgent = new InvoiceDataExtractionAgent();
+    this.emailAttachmentProcessor = new EmailAttachmentProcessor();
+    this.databaseStorage = new DatabaseStorage();
   }
 
   async processEmailForInvoices(
@@ -113,131 +93,25 @@ export class EmailProcessingService {
     emailContext: any,
     result: ProcessingResult
   ): Promise<boolean> {
-    console.log(`🔍 Processing attachment: ${attachment.filename} (${attachment.mimeType})`);
+    const wasExtracted = await this.emailAttachmentProcessor.processAttachment(attachment, email, emailContext, result);
     
-    try {
-      // Step 3a: Validate attachment as invoice using AI
-      console.log(`🔍 Step 3a: Validating ${attachment.filename} as invoice...`);
-      const validation = await this.invoiceDetectionAgent.process(attachment.file);
+    if (wasExtracted) {
+      // Find the extraction result for this attachment
+      const extraction = result.extractedData.find(e => e.filename === attachment.filename);
       
-      const validationResult = {
-        ...validation,
-        filename: attachment.filename,
-        fileSize: attachment.size
-      };
-      result.invoiceValidation.push(validationResult);
-
-      console.log(`🔍 Invoice detection result for ${attachment.filename}: ${validation.success && validation.data?.is_invoice ? 'INVOICE' : 'NOT INVOICE'}`);
-
-      // Step 3b: If it's an invoice, extract structured data
-      if (validation.success && validation.data?.is_invoice) {
-        console.log(`✅ Invoice detected: ${attachment.filename} - proceeding with data extraction`);
-        
-        console.log(`📊 Step 3b: Extracting data from ${attachment.filename}...`);
-        const extraction = await this.invoiceDataExtractionAgent.process(attachment.file);
-        
-        const extractionResult = {
-          ...extraction,
-          filename: attachment.filename,
-          fileSize: attachment.size
-        };
-        result.extractedData.push(extractionResult);
-
-        // Step 3c: Store in database if extraction successful
-        if (extraction.success && extraction.data) {
-          console.log(`💾 Step 3c: Storing invoice data from ${attachment.filename} in database...`);
-          await this.storeInvoiceInDatabase(
-            extraction.data, 
-            email, 
-            attachment.filename,
-            emailContext
-          );
-          console.log(`✅ Successfully stored invoice data for ${attachment.filename}`);
-          return true; // Invoice was successfully processed and stored
-        } else {
-          console.log(`❌ Data extraction failed for ${attachment.filename}`);
-        }
-      } else {
-        console.log(`❌ Not an invoice: ${attachment.filename}`);
+      if (extraction && extraction.success && extraction.data) {
+        console.log(`💾 Step 3c: Storing invoice data from ${attachment.filename} in database...`);
+        await this.databaseStorage.storeInvoiceInDatabase(
+          extraction.data, 
+          email, 
+          attachment.filename,
+          emailContext
+        );
+        console.log(`✅ Successfully stored invoice data for ${attachment.filename}`);
+        return true;
       }
-    } catch (error) {
-      console.error(`❌ Error processing attachment ${attachment.filename}:`, error);
     }
     
-    return false; // Invoice was not processed/stored
-  }
-
-  private async storeInvoiceInDatabase(
-    invoiceData: any, 
-    email: GmailMessage, 
-    fileName: string,
-    emailContext: any
-  ) {
-    try {
-      console.log(`💾 Processing invoice data for storage: ${fileName}`);
-      console.log(`📊 Line items found: ${invoiceData.line_items?.length || 0}`);
-
-      // Handle case where there are no line items or line_items is not an array
-      const lineItems = Array.isArray(invoiceData.line_items) && invoiceData.line_items.length > 0 
-        ? invoiceData.line_items 
-        : [{ description: 'No line items found', quantity: 0, unit_price: 0, total_amount: 0 }];
-
-      console.log(`💾 Storing ${lineItems.length} line item(s) for invoice: ${invoiceData.invoice_number}`);
-
-      // Store each line item as a separate row in invoice_table
-      for (let i = 0; i < lineItems.length; i++) {
-        const lineItem = lineItems[i];
-        console.log(`💾 Inserting line item ${i + 1}/${lineItems.length} for invoice: ${invoiceData.invoice_number}`);
-
-        const invoiceRecord = {
-          invoice_number: parseInt(invoiceData.invoice_number) || 0,
-          po_number: parseInt(invoiceData.po_number) || 0,
-          invoice_date: invoiceData.invoice_date,
-          email_header: email.subject,
-          email_date: email.date,
-          attachment_invoice_name: fileName,
-          details: {
-            supplier_gst_number: invoiceData.supplier_gst_number,
-            bill_to_gst_number: invoiceData.bill_to_gst_number,
-            shipping_address: invoiceData.shipping_address,
-            seal_and_sign_present: invoiceData.seal_and_sign_present,
-            email_from: email.from,
-            file_name: fileName,
-            line_item: lineItem,
-            line_item_index: i + 1,
-            total_line_items: lineItems.length,
-            extraction_confidence: invoiceData.extraction_confidence,
-            email_context: emailContext,
-            processed_at: new Date().toISOString()
-          }
-        };
-
-        console.log(`💾 Inserting invoice record:`, {
-          invoice_number: invoiceRecord.invoice_number,
-          po_number: invoiceRecord.po_number,
-          fileName: fileName,
-          email_subject: email.subject,
-          line_item_index: i + 1,
-          total_line_items: lineItems.length
-        });
-
-        const { data, error } = await supabase
-          .from('invoice_table')
-          .insert(invoiceRecord)
-          .select();
-
-        if (error) {
-          console.error(`❌ Database insert error for line item ${i + 1}:`, error);
-          throw error; // Re-throw to be caught by outer try-catch
-        } else {
-          console.log(`✅ Line item ${i + 1}/${lineItems.length} stored successfully:`, data);
-        }
-      }
-
-      console.log(`✅ All ${lineItems.length} line item(s) stored successfully for ${fileName}`);
-    } catch (error) {
-      console.error(`❌ Error storing invoice in database for ${fileName}:`, error);
-      throw error; // Re-throw so the calling function knows there was an error
-    }
+    return false;
   }
 }
