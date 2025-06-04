@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -35,7 +34,20 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
   const { toast } = useToast();
 
   const CLIENT_ID = '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com';
-  const REDIRECT_URI = `${window.location.protocol}//${window.location.host}/oauth/callback`;
+  
+  // Use your pre-configured redirect URI based on the current domain
+  const getRedirectUri = () => {
+    const currentHost = window.location.host;
+    if (currentHost.includes('lovable.app')) {
+      return 'https://transact-ai-nexus.lovable.app/oauth/callback';
+    } else if (currentHost.includes('lovableproject.com')) {
+      return 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback';
+    }
+    // Fallback to the main production URL
+    return 'https://transact-ai-nexus.lovable.app/oauth/callback';
+  };
+  
+  const REDIRECT_URI = getRedirectUri();
   const SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
 
   const handleGmailAuth = async () => {
@@ -52,6 +64,7 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
       authUrl.searchParams.set('state', 'gmail_auth');
 
       console.log('Opening Gmail auth popup with URL:', authUrl.toString());
+      console.log('Using redirect URI:', REDIRECT_URI);
 
       // Open popup for authentication
       const popup = window.open(
