@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Loader, Check, Mail, Paperclip, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import EmailInvoiceProcessor from './EmailInvoiceProcessor';
 
 interface GmailMessage {
   id: string;

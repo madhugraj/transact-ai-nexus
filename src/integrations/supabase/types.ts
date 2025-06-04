@@ -185,6 +185,33 @@ export type Database = {
           },
         ]
       }
+      invoice_table: {
+        Row: {
+          created_at: string
+          details: Json | null
+          id: number
+          invoice_date: string | null
+          invoice_number: number
+          po_number: number
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          id?: number
+          invoice_date?: string | null
+          invoice_number: number
+          po_number: number
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          id?: number
+          invoice_date?: string | null
+          invoice_number?: number
+          po_number?: number
+        }
+        Relationships: []
+      }
       uploaded_files: {
         Row: {
           created_at: string
