@@ -1,3 +1,4 @@
+
 import { GmailAttachmentProcessor } from '@/services/gmail/attachmentProcessor';
 import { InvoiceDetectionAgent } from '@/services/agents/InvoiceDetectionAgent';
 import { InvoiceDataExtractionAgent } from '@/services/agents/InvoiceDataExtractionAgent';
@@ -147,49 +148,47 @@ export class EmailProcessingService {
     try {
       // Store each line item as a separate row in invoice_table
       for (const lineItem of invoiceData.line_items || []) {
-        // Generate a unique ID by combining invoice number, PO number, and timestamp
-        const uniqueId = `${invoiceData.invoice_number || 'no-inv'}-${invoiceData.po_number || 'no-po'}-${email.id}-${Date.now()}-${Math.random()}`;
-        
-        const { error } = await supabase
+        console.log('💾 Inserting invoice data:', {
+          invoice_number: invoiceData.invoice_number,
+          po_number: invoiceData.po_number,
+          fileName,
+          email_subject: email.subject
+        });
+
+        const { data, error } = await supabase
           .from('invoice_table')
-          .upsert({
-            id: Math.abs(uniqueId.split('').reduce((a, b) => {
-              a = ((a << 5) - a) + b.charCodeAt(0);
-              return a & a;
-            }, 0)), // Generate numeric ID from string
+          .insert({
             invoice_number: parseInt(invoiceData.invoice_number) || 0,
             po_number: parseInt(invoiceData.po_number) || 0,
             invoice_date: invoiceData.invoice_date,
+            email_header: email.subject,
+            email_date: email.date,
+            attachment_invoice_name: fileName,
             details: {
               supplier_gst_number: invoiceData.supplier_gst_number,
               bill_to_gst_number: invoiceData.bill_to_gst_number,
               shipping_address: invoiceData.shipping_address,
               seal_and_sign_present: invoiceData.seal_and_sign_present,
-              email_subject: email.subject,
               email_from: email.from,
-              email_date: email.date,
               file_name: fileName,
               line_item: lineItem,
               extraction_confidence: invoiceData.extraction_confidence,
               email_context: emailContext,
               processed_at: new Date().toISOString()
             }
-          }, {
-            onConflict: 'id'
-          });
+          })
+          .select();
 
         if (error) {
-          console.error('Database upsert error:', error);
-          // Don't throw error for duplicates, just log and continue
-          if (!error.message.includes('duplicate key')) {
-            throw error;
-          } else {
-            console.log('Invoice already exists in database, skipping...');
-          }
+          console.error('❌ Database insert error:', error);
+          // Log the error but continue processing other invoices
+          console.log('Continuing with next invoice...');
+        } else {
+          console.log('✅ Invoice data stored successfully:', data);
         }
       }
     } catch (error) {
-      console.error('Error storing invoice in database:', error);
+      console.error('❌ Error storing invoice in database:', error);
       // Don't throw error to continue processing other invoices
       console.log('Continuing with next invoice...');
     }
