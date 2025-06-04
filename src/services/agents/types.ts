@@ -9,6 +9,17 @@ export interface ProcessingContext {
 }
 
 /**
+ * Agent processing result interface
+ */
+export interface AgentResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+  agent: string;
+  metadata?: Record<string, any>;
+}
+
+/**
  * Interface that all agents must implement
  */
 export interface Agent {
@@ -19,7 +30,7 @@ export interface Agent {
   /**
    * Process data with this agent
    */
-  process(data: any, context?: ProcessingContext): Promise<any>;
+  process(data: any, context?: ProcessingContext): Promise<AgentResult>;
   
   /**
    * Determine if this agent can process the given data

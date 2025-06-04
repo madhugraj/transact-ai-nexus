@@ -7,6 +7,11 @@ export class InvoiceDataExtractionAgent implements Agent {
   name = 'Invoice Data Extraction Agent';
   description = 'Extracts structured data from invoices using Gemini Vision AI';
 
+  canProcess(data: any): boolean {
+    // Can process File objects or base64 image data
+    return data instanceof File || (typeof data === 'string' && data.startsWith('data:image'));
+  }
+
   async process(file: File): Promise<AgentResult> {
     console.log(`📊 ${this.name}: Starting data extraction for ${file.name}`);
     

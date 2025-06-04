@@ -7,6 +7,11 @@ export class InvoiceDetectionAgent implements Agent {
   name = 'Invoice Detection Agent';
   description = 'Validates if a document is an invoice using Gemini Vision AI';
 
+  canProcess(data: any): boolean {
+    // Can process File objects or base64 image data
+    return data instanceof File || (typeof data === 'string' && data.startsWith('data:image'));
+  }
+
   async process(file: File): Promise<AgentResult> {
     console.log(`🔍 ${this.name}: Starting invoice detection for ${file.name}`);
     
