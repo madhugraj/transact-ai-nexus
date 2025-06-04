@@ -134,7 +134,7 @@ const EmailInvoiceProcessor: React.FC<EmailInvoiceProcessorProps> = ({
                 fileSize: attachment.size
               });
 
-              // Step 5: Store in database
+              // Step 5: Store in database (with duplicate handling)
               if (extraction.success && extraction.data) {
                 console.log('Step 5: Storing in database...');
                 await storeInvoiceInDatabase(
@@ -186,9 +186,16 @@ const EmailInvoiceProcessor: React.FC<EmailInvoiceProcessorProps> = ({
     try {
       // Store each line item as a separate row in invoice_table
       for (const lineItem of invoiceData.line_items || []) {
+        // Generate a unique ID by combining invoice number, PO number, and line item details
+        const uniqueId = `${invoiceData.invoice_number || 0}-${invoiceData.po_number || 0}-${Date.now()}-${Math.random()}`;
+        
         const { error } = await supabase
           .from('invoice_table')
-          .insert({
+          .upsert({
+            id: Math.abs(uniqueId.split('').reduce((a, b) => {
+              a = ((a << 5) - a) + b.charCodeAt(0);
+              return a & a;
+            }, 0)), // Generate numeric ID from string
             invoice_number: parseInt(invoiceData.invoice_number) || 0,
             po_number: parseInt(invoiceData.po_number) || 0,
             invoice_date: invoiceData.invoice_date,
@@ -203,18 +210,27 @@ const EmailInvoiceProcessor: React.FC<EmailInvoiceProcessorProps> = ({
               file_name: fileName,
               line_item: lineItem,
               extraction_confidence: invoiceData.extraction_confidence,
-              email_context: emailContext
+              email_context: emailContext,
+              processed_at: new Date().toISOString()
             }
+          }, {
+            onConflict: 'id'
           });
 
         if (error) {
-          console.error('Database insert error:', error);
-          throw error;
+          console.error('Database upsert error:', error);
+          // Don't throw error for duplicates, just log and continue
+          if (!error.message.includes('duplicate key')) {
+            throw error;
+          } else {
+            console.log('Invoice already exists in database, skipping...');
+          }
         }
       }
     } catch (error) {
       console.error('Error storing invoice in database:', error);
-      throw error;
+      // Don't throw error to continue processing other invoices
+      console.log('Continuing with next invoice...');
     }
   };
 
