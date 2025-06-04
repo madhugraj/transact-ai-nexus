@@ -25,17 +25,23 @@ serve(async (req) => {
     }
 
     const CLIENT_ID = '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com';
-    const CLIENT_SECRET = Deno.env.get('Client_secret');
+    // Try different possible secret names to handle any naming variations
+    const CLIENT_SECRET = Deno.env.get('Client_secret') || 
+                         Deno.env.get('CLIENT_SECRET') || 
+                         Deno.env.get('client_secret') ||
+                         Deno.env.get('Client secret');
     
     // Use the redirect URI passed from the frontend
     const REDIRECT_URI = redirectUri;
 
     if (!CLIENT_SECRET) {
+      console.error('Available environment variables:', Object.keys(Deno.env.toObject()));
       throw new Error('Google client secret not configured');
     }
 
     console.log('Exchanging auth code for tokens...');
     console.log('Using redirect URI:', REDIRECT_URI);
+    console.log('Client secret found:', CLIENT_SECRET ? 'Yes' : 'No');
 
     // Exchange authorization code for access token
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -55,7 +61,7 @@ serve(async (req) => {
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.text();
       console.error('Token exchange error:', errorData);
-      throw new Error(`Token exchange failed: ${tokenResponse.status}`);
+      throw new Error(`Token exchange failed: ${tokenResponse.status} - ${errorData}`);
     }
 
     const tokenData = await tokenResponse.json();
