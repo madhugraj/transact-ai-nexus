@@ -7,7 +7,6 @@ import GmailAuth from './gmail/GmailAuth';
 import GmailSearchControls from './gmail/GmailSearchControls';
 import EmailList from './gmail/EmailList';
 import EmailInvoiceProcessor from './EmailInvoiceProcessor';
-
 interface GmailMessage {
   id: string;
   subject: string;
@@ -17,12 +16,12 @@ interface GmailMessage {
   hasAttachments: boolean;
   labels: string[];
 }
-
 interface GmailConnectorProps {
   onEmailsImported?: (emails: GmailMessage[]) => void;
 }
-
-const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
+const GmailConnector = ({
+  onEmailsImported
+}: GmailConnectorProps) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [emails, setEmails] = useState<GmailMessage[]>([]);
@@ -31,15 +30,15 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [maxResults, setMaxResults] = useState('50');
   const [accessToken, setAccessToken] = useState<string>('');
-  const { toast } = useToast();
-
+  const {
+    toast
+  } = useToast();
   const CLIENT_ID = '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com';
-  
+
   // Use your pre-configured redirect URI based on the current domain
   const getRedirectUri = () => {
     const currentHost = window.location.host;
     console.log('Current host:', currentHost);
-    
     if (currentHost.includes('lovable.app')) {
       return 'https://transact-ai-nexus.lovable.app/oauth/callback';
     } else if (currentHost.includes('lovableproject.com')) {
@@ -48,10 +47,8 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
     // Fallback to the main production URL
     return 'https://transact-ai-nexus.lovable.app/oauth/callback';
   };
-  
   const REDIRECT_URI = getRedirectUri();
   const SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
-
   const handleGmailAuth = async () => {
     setIsConnecting(true);
     try {
@@ -64,17 +61,11 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
       authUrl.searchParams.set('access_type', 'offline');
       authUrl.searchParams.set('prompt', 'consent');
       authUrl.searchParams.set('state', 'gmail_auth');
-
       console.log('Opening Gmail auth popup with URL:', authUrl.toString());
       console.log('Using redirect URI:', REDIRECT_URI);
 
       // Open popup for authentication
-      const popup = window.open(
-        authUrl.toString(),
-        'gmail-auth',
-        'width=500,height=600,scrollbars=yes,resizable=yes'
-      );
-
+      const popup = window.open(authUrl.toString(), 'gmail-auth', 'width=500,height=600,scrollbars=yes,resizable=yes');
       if (!popup) {
         throw new Error('Popup was blocked. Please allow popups for this site.');
       }
@@ -82,12 +73,10 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
       // Listen for messages from the popup
       const messageListener = async (event: MessageEvent) => {
         console.log('Received message:', event.data);
-        
         if (event.origin !== window.location.origin) {
           console.log('Message from different origin, ignoring');
           return;
         }
-
         if (event.data?.type === 'OAUTH_SUCCESS' && event.data?.code) {
           console.log('OAuth success received');
           window.removeEventListener('message', messageListener);
@@ -105,7 +94,6 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
           });
         }
       };
-
       window.addEventListener('message', messageListener);
 
       // Check if popup was closed manually
@@ -117,7 +105,6 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
           setIsConnecting(false);
         }
       }, 1000);
-
     } catch (error) {
       setIsConnecting(false);
       console.error('Gmail auth error:', error);
@@ -128,25 +115,24 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
       });
     }
   };
-
   const exchangeCodeForToken = async (authCode: string) => {
     console.log('Exchanging code for token...');
     try {
-      const { data, error } = await supabase.functions.invoke('google-auth', {
-        body: { 
-          authCode, 
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('google-auth', {
+        body: {
+          authCode,
           scope: SCOPE,
           redirectUri: REDIRECT_URI
         }
       });
-
       if (error) throw error;
-
       if (data.success) {
         setAccessToken(data.accessToken);
         setIsConnected(true);
         await loadGmailMessages(data.accessToken);
-        
         toast({
           title: "Connected to Gmail",
           description: "Successfully authenticated with your Gmail account"
@@ -164,11 +150,13 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
       });
     }
   };
-
   const loadGmailMessages = async (token: string) => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('gmail', {
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('gmail', {
         body: {
           accessToken: token,
           action: 'list',
@@ -176,9 +164,7 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
           maxResults: parseInt(maxResults)
         }
       });
-
       if (error) throw error;
-
       if (data.success) {
         setEmails(data.data);
       } else {
@@ -194,7 +180,6 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
       setIsLoading(false);
     }
   };
-
   const toggleEmailSelection = (email: GmailMessage) => {
     setSelectedEmails(prev => {
       const isSelected = prev.some(e => e.id === email.id);
@@ -205,7 +190,6 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
       }
     });
   };
-
   const importSelectedEmails = async () => {
     if (selectedEmails.length === 0) {
       toast({
@@ -214,13 +198,11 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
       });
       return;
     }
-
     setIsLoading(true);
     try {
       if (onEmailsImported) {
         onEmailsImported(selectedEmails);
       }
-      
       toast({
         title: "Emails imported",
         description: `Successfully imported ${selectedEmails.length} emails and their attachments`
@@ -235,85 +217,38 @@ const GmailConnector = ({ onEmailsImported }: GmailConnectorProps) => {
       setIsLoading(false);
     }
   };
-
   if (!isConnected) {
     return <GmailAuth isConnecting={isConnecting} onAuth={handleGmailAuth} />;
   }
-
-  return (
-    <div className="space-y-4">
+  return <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <Check className="h-4 w-4 text-green-500" />
           <span className="text-sm">Connected to Gmail</span>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            setIsConnected(false);
-            setEmails([]);
-            setSelectedEmails([]);
-            setAccessToken('');
-          }}
-        >
+        <Button variant="outline" size="sm" onClick={() => {
+        setIsConnected(false);
+        setEmails([]);
+        setSelectedEmails([]);
+        setAccessToken('');
+      }}>
           Disconnect
         </Button>
       </div>
 
-      <GmailSearchControls
-        searchQuery={searchQuery}
-        maxResults={maxResults}
-        isLoading={isLoading}
-        onSearchQueryChange={setSearchQuery}
-        onMaxResultsChange={setMaxResults}
-        onSearch={() => loadGmailMessages(accessToken)}
-      />
+      <GmailSearchControls searchQuery={searchQuery} maxResults={maxResults} isLoading={isLoading} onSearchQueryChange={setSearchQuery} onMaxResultsChange={setMaxResults} onSearch={() => loadGmailMessages(accessToken)} />
 
-      <EmailList
-        emails={emails}
-        selectedEmails={selectedEmails}
-        isLoading={isLoading}
-        onEmailSelect={toggleEmailSelection}
-      />
+      <EmailList emails={emails} selectedEmails={selectedEmails} isLoading={isLoading} onEmailSelect={toggleEmailSelection} />
 
       <div className="flex justify-between">
-        <Button
-          variant="outline"
-          onClick={() => loadGmailMessages(accessToken)}
-          disabled={isLoading}
-          size="sm"
-        >
+        <Button variant="outline" onClick={() => loadGmailMessages(accessToken)} disabled={isLoading} size="sm">
           Refresh
         </Button>
         
-        <Button
-          onClick={importSelectedEmails}
-          disabled={isLoading || selectedEmails.length === 0}
-          size="sm"
-        >
-          {isLoading ? (
-            <>
-              <Loader className="h-4 w-4 mr-1 animate-spin" />
-              Importing...
-            </>
-          ) : (
-            <>
-              <Download className="h-4 w-4 mr-1" />
-              Import {selectedEmails.length} email(s)
-            </>
-          )}
-        </Button>
+        
       </div>
 
-      {selectedEmails.length > 0 && (
-        <EmailInvoiceProcessor 
-          selectedEmails={selectedEmails}
-          accessToken={accessToken}
-        />
-      )}
-    </div>
-  );
+      {selectedEmails.length > 0 && <EmailInvoiceProcessor selectedEmails={selectedEmails} accessToken={accessToken} />}
+    </div>;
 };
-
 export default GmailConnector;
