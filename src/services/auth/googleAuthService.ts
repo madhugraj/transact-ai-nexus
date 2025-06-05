@@ -95,8 +95,16 @@ export class GoogleAuthService {
 
       // Listen for messages from the popup
       const messageListener = (event: MessageEvent) => {
-        // Only accept messages from our OAuth callback page
-        if (event.origin !== window.location.origin) {
+        // Accept messages from our OAuth callback page - be more permissive with origins
+        const allowedOrigins = [
+          window.location.origin,
+          'https://transact-ai-nexus.lovable.app',
+          'https://preview--transact-ai-nexus.lovable.app',
+          'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com'
+        ];
+        
+        if (!allowedOrigins.includes(event.origin)) {
+          console.log('Message from unexpected origin:', event.origin);
           return;
         }
 

@@ -35,20 +35,31 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   const [authError, setAuthError] = useState<string>('');
   const { toast } = useToast();
 
-  // Configure auth service with proper redirect URI for current domain
+  // Configure auth service with ALL possible redirect URIs for current domain
   const getRedirectUri = () => {
     const currentHost = window.location.hostname;
+    const currentOrigin = window.location.origin;
     
-    if (currentHost === '79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com') {
-      return 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback';
-    } else if (currentHost === 'transact-ai-nexus.lovable.app') {
-      return 'https://transact-ai-nexus.lovable.app/oauth/callback';
-    } else if (currentHost === 'preview--transact-ai-nexus.lovable.app') {
-      return 'https://preview--transact-ai-nexus.lovable.app/oauth/callback';
-    } else {
-      // Fallback for localhost and other domains
-      return `${window.location.origin}/oauth/callback`;
+    console.log('Current host:', currentHost);
+    console.log('Current origin:', currentOrigin);
+    
+    // Map of known domains to their callback URLs
+    const domainMap = {
+      '79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com': 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback',
+      'transact-ai-nexus.lovable.app': 'https://transact-ai-nexus.lovable.app/oauth/callback',
+      'preview--transact-ai-nexus.lovable.app': 'https://preview--transact-ai-nexus.lovable.app/oauth/callback'
+    };
+    
+    // Use exact domain mapping first
+    if (domainMap[currentHost]) {
+      console.log('Using mapped redirect URI:', domainMap[currentHost]);
+      return domainMap[currentHost];
     }
+    
+    // Fallback for any other domains (localhost, etc.)
+    const fallbackUri = `${currentOrigin}/oauth/callback`;
+    console.log('Using fallback redirect URI:', fallbackUri);
+    return fallbackUri;
   };
 
   const authService = new GoogleAuthService({

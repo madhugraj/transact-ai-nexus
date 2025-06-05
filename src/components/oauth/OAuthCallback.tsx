@@ -4,22 +4,40 @@ import { useEffect } from 'react';
 const OAuthCallback = () => {
   useEffect(() => {
     console.log('OAuth callback page loaded');
+    console.log('Current URL:', window.location.href);
+    console.log('Current origin:', window.location.origin);
     
     // Get the current URL and extract any parameters
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     const error = urlParams.get('error');
     
-    console.log('OAuth callback - code:', code, 'error:', error);
+    console.log('OAuth callback - code:', code ? 'present' : 'missing', 'error:', error);
     
     // Send the result back to the parent window
     if (window.opener) {
+      const targetOrigins = [
+        'https://lovable.dev',
+        'https://transact-ai-nexus.lovable.app',
+        'https://preview--transact-ai-nexus.lovable.app',
+        'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com'
+      ];
+      
       if (code) {
         console.log('Sending success message to parent window');
-        window.opener.postMessage({
+        const message = {
           type: 'OAUTH_SUCCESS',
           code: code
-        }, window.location.origin);
+        };
+        
+        // Send to all possible parent origins
+        targetOrigins.forEach(origin => {
+          try {
+            window.opener.postMessage(message, origin);
+          } catch (e) {
+            console.log('Failed to send message to origin:', origin);
+          }
+        });
         
         // Wait a bit before closing to ensure message is received
         setTimeout(() => {
@@ -27,10 +45,19 @@ const OAuthCallback = () => {
         }, 500);
       } else if (error) {
         console.log('Sending error message to parent window');
-        window.opener.postMessage({
+        const message = {
           type: 'OAUTH_ERROR',
           error: error
-        }, window.location.origin);
+        };
+        
+        // Send to all possible parent origins
+        targetOrigins.forEach(origin => {
+          try {
+            window.opener.postMessage(message, origin);
+          } catch (e) {
+            console.log('Failed to send error message to origin:', origin);
+          }
+        });
         
         setTimeout(() => {
           window.close();
