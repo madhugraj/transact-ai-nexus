@@ -51,40 +51,23 @@ export class GoogleAuthService {
     return !!tokens.accessToken;
   }
 
-  // Get the correct redirect URI based on current domain
-  private getRedirectUri(): string {
-    const currentHost = window.location.hostname;
-    
-    // Use the exact redirect URIs configured in Google Cloud Console
-    if (currentHost === '79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com') {
-      return 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback';
-    } else if (currentHost === 'transact-ai-nexus.lovable.app') {
-      return 'https://transact-ai-nexus.lovable.app/oauth/callback';
-    } else if (currentHost === 'preview--transact-ai-nexus.lovable.app') {
-      return 'https://preview--transact-ai-nexus.lovable.app/oauth/callback';
-    } else {
-      // Fallback for localhost or other domains
-      return `${window.location.origin}/oauth/callback`;
-    }
-  }
-
-  // Create auth URL with correct redirect URI
+  // Create auth URL for popup (no redirect needed)
   createAuthUrl(): string {
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    const redirectUri = this.getRedirectUri();
     
     console.log('Auth URL Debug Info:');
     console.log('- Client ID:', this.config.clientId);
-    console.log('- Redirect URI:', redirectUri);
+    console.log('- Using popup mode (no redirect URI)');
     console.log('- Current Host:', window.location.hostname);
     console.log('- Current URL:', window.location.href);
     
     authUrl.searchParams.set('client_id', this.config.clientId);
-    authUrl.searchParams.set('redirect_uri', redirectUri);
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('scope', this.config.scopes.join(' '));
     authUrl.searchParams.set('access_type', 'offline');
     authUrl.searchParams.set('prompt', 'consent');
+    // For popup mode, we use postMessage instead of redirect
+    authUrl.searchParams.set('redirect_uri', 'postmessage');
     
     const finalUrl = authUrl.toString();
     console.log('Final Auth URL:', finalUrl);
@@ -92,13 +75,17 @@ export class GoogleAuthService {
     return finalUrl;
   }
 
-  // Popup-based authentication
+  // Popup-based authentication using postMessage
   async authenticateWithPopup(): Promise<AuthResult> {
     return new Promise((resolve) => {
       const authUrl = this.createAuthUrl();
       console.log('Opening popup with URL:', authUrl);
       
-      const popup = window.open(authUrl, 'google-auth', 'width=500,height=600,scrollbars=yes,resizable=yes');
+      const popup = window.open(
+        authUrl, 
+        'google-auth', 
+        'width=500,height=600,scrollbars=yes,resizable=yes,toolbar=no,menubar=no,location=no,directories=no,status=no'
+      );
 
       if (!popup) {
         console.error('Popup was blocked');
@@ -106,24 +93,26 @@ export class GoogleAuthService {
         return;
       }
 
+      // Listen for postMessage from the popup
       const messageListener = (event: MessageEvent) => {
-        console.log('Received message:', event);
-        
-        if (event.origin !== window.location.origin) {
-          console.log('Message from different origin, ignoring:', event.origin);
+        // Google OAuth sends messages from accounts.google.com
+        if (event.origin !== 'https://accounts.google.com') {
           return;
         }
 
-        if (event.data?.type === 'OAUTH_SUCCESS' && event.data?.code) {
-          console.log('OAuth success received, code:', event.data.code);
+        console.log('Received message from Google:', event);
+        
+        if (event.data && event.data.type === 'authorization_response') {
           window.removeEventListener('message', messageListener);
           popup.close();
-          this.exchangeCodeForToken(event.data.code).then(resolve);
-        } else if (event.data?.type === 'OAUTH_ERROR') {
-          console.error('OAuth error received:', event.data.error);
-          window.removeEventListener('message', messageListener);
-          popup.close();
-          resolve({ success: false, error: event.data.error || 'Authentication failed' });
+          
+          if (event.data.response && event.data.response.code) {
+            console.log('OAuth success received, code:', event.data.response.code);
+            this.exchangeCodeForToken(event.data.response.code).then(resolve);
+          } else if (event.data.response && event.data.response.error) {
+            console.error('OAuth error received:', event.data.response.error);
+            resolve({ success: false, error: event.data.response.error || 'Authentication failed' });
+          }
         }
       };
 
@@ -151,7 +140,7 @@ export class GoogleAuthService {
         body: {
           authCode,
           scope: this.config.scopes.join(' '),
-          redirectUri: this.getRedirectUri()
+          redirectUri: 'postmessage' // Use postmessage for popup mode
         }
       });
 

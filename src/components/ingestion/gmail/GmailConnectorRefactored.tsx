@@ -35,11 +35,26 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   const [authError, setAuthError] = useState<string>('');
   const { toast } = useToast();
 
-  // Configure auth service - no dynamic redirect URI needed
+  // Configure auth service with proper redirect URI for current domain
+  const getRedirectUri = () => {
+    const currentHost = window.location.hostname;
+    const currentOrigin = window.location.origin;
+    
+    if (currentHost === '79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com') {
+      return 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback';
+    } else if (currentHost === 'transact-ai-nexus.lovable.app') {
+      return 'https://transact-ai-nexus.lovable.app/oauth/callback';
+    } else if (currentHost === 'preview--transact-ai-nexus.lovable.app') {
+      return 'https://preview--transact-ai-nexus.lovable.app/oauth/callback';
+    } else {
+      return `${currentOrigin}/oauth/callback`;
+    }
+  };
+
   const authService = new GoogleAuthService({
     clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
     scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
-    redirectUri: '' // Will be determined by the service based on current domain
+    redirectUri: getRedirectUri()
   }, 'gmail_auth_tokens');
 
   // Check for stored tokens on mount
