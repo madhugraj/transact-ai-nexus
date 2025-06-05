@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -36,26 +35,11 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   const [authError, setAuthError] = useState<string>('');
   const { toast } = useToast();
 
-  // Get the correct redirect URI based on environment
-  const getRedirectUri = () => {
-    const currentUrl = window.location.href;
-    console.log('Current URL for redirect calculation:', currentUrl);
-    
-    // Check if we're on a Lovable preview URL
-    if (currentUrl.includes('.lovable.app')) {
-      const baseUrl = currentUrl.split('/')[0] + '//' + currentUrl.split('/')[2];
-      return `${baseUrl}/oauth/callback`;
-    }
-    
-    // For localhost or custom domains
-    return `${window.location.origin}/oauth/callback`;
-  };
-
-  // Configure auth service with proper redirect URI
+  // Configure auth service - no dynamic redirect URI needed
   const authService = new GoogleAuthService({
     clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
     scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
-    redirectUri: getRedirectUri()
+    redirectUri: '' // Will be determined by the service based on current domain
   }, 'gmail_auth_tokens');
 
   // Check for stored tokens on mount

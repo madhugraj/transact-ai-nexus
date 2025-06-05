@@ -51,17 +51,32 @@ export class GoogleAuthService {
     return !!tokens.accessToken;
   }
 
-  // Create auth URL with proper redirect URI
+  // Get the correct redirect URI based on current domain
+  private getRedirectUri(): string {
+    const currentHost = window.location.hostname;
+    
+    // Use the exact redirect URIs configured in Google Cloud Console
+    if (currentHost === '79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com') {
+      return 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback';
+    } else if (currentHost === 'transact-ai-nexus.lovable.app') {
+      return 'https://transact-ai-nexus.lovable.app/oauth/callback';
+    } else if (currentHost === 'preview--transact-ai-nexus.lovable.app') {
+      return 'https://preview--transact-ai-nexus.lovable.app/oauth/callback';
+    } else {
+      // Fallback for localhost or other domains
+      return `${window.location.origin}/oauth/callback`;
+    }
+  }
+
+  // Create auth URL with correct redirect URI
   createAuthUrl(): string {
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    
-    // Use the configured redirect URI directly
-    const redirectUri = this.config.redirectUri;
+    const redirectUri = this.getRedirectUri();
     
     console.log('Auth URL Debug Info:');
     console.log('- Client ID:', this.config.clientId);
     console.log('- Redirect URI:', redirectUri);
-    console.log('- Current Origin:', window.location.origin);
+    console.log('- Current Host:', window.location.hostname);
     console.log('- Current URL:', window.location.href);
     
     authUrl.searchParams.set('client_id', this.config.clientId);
@@ -77,7 +92,7 @@ export class GoogleAuthService {
     return finalUrl;
   }
 
-  // Simplified popup authentication with better error handling
+  // Popup-based authentication
   async authenticateWithPopup(): Promise<AuthResult> {
     return new Promise((resolve) => {
       const authUrl = this.createAuthUrl();
@@ -136,7 +151,7 @@ export class GoogleAuthService {
         body: {
           authCode,
           scope: this.config.scopes.join(' '),
-          redirectUri: this.config.redirectUri
+          redirectUri: this.getRedirectUri()
         }
       });
 
