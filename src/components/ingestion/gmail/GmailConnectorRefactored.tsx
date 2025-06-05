@@ -35,37 +35,11 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   const [authError, setAuthError] = useState<string>('');
   const { toast } = useToast();
 
-  // Configure auth service with ALL possible redirect URIs for current domain
-  const getRedirectUri = () => {
-    const currentHost = window.location.hostname;
-    const currentOrigin = window.location.origin;
-    
-    console.log('Current host:', currentHost);
-    console.log('Current origin:', currentOrigin);
-    
-    // Map of known domains to their callback URLs
-    const domainMap = {
-      '79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com': 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback',
-      'transact-ai-nexus.lovable.app': 'https://transact-ai-nexus.lovable.app/oauth/callback',
-      'preview--transact-ai-nexus.lovable.app': 'https://preview--transact-ai-nexus.lovable.app/oauth/callback'
-    };
-    
-    // Use exact domain mapping first
-    if (domainMap[currentHost]) {
-      console.log('Using mapped redirect URI:', domainMap[currentHost]);
-      return domainMap[currentHost];
-    }
-    
-    // Fallback for any other domains (localhost, etc.)
-    const fallbackUri = `${currentOrigin}/oauth/callback`;
-    console.log('Using fallback redirect URI:', fallbackUri);
-    return fallbackUri;
-  };
-
+  // Use EXACT redirect URI that matches Google Cloud Console configuration
   const authService = new GoogleAuthService({
     clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
     scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
-    redirectUri: getRedirectUri()
+    redirectUri: 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback'
   }, 'gmail_auth_tokens');
 
   // Check for stored tokens on mount

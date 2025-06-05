@@ -51,13 +51,16 @@ export class GoogleAuthService {
     return !!tokens.accessToken;
   }
 
-  // Create auth URL for popup with proper redirect URI
+  // Create auth URL for popup with EXACT redirect URI
   createAuthUrl(): string {
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     
+    // Use the EXACT redirect URI that's configured in Google Cloud Console
+    const exactRedirectUri = 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback';
+    
     console.log('Auth URL Debug Info:');
     console.log('- Client ID:', this.config.clientId);
-    console.log('- Redirect URI:', this.config.redirectUri);
+    console.log('- EXACT Redirect URI:', exactRedirectUri);
     console.log('- Scopes:', this.config.scopes);
     
     authUrl.searchParams.set('client_id', this.config.clientId);
@@ -65,7 +68,7 @@ export class GoogleAuthService {
     authUrl.searchParams.set('scope', this.config.scopes.join(' '));
     authUrl.searchParams.set('access_type', 'offline');
     authUrl.searchParams.set('prompt', 'consent');
-    authUrl.searchParams.set('redirect_uri', this.config.redirectUri);
+    authUrl.searchParams.set('redirect_uri', exactRedirectUri);
     
     const finalUrl = authUrl.toString();
     console.log('Final Auth URL:', finalUrl);

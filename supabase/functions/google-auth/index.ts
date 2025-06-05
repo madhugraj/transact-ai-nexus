@@ -19,10 +19,6 @@ serve(async (req) => {
       throw new Error('Authorization code is required');
     }
 
-    if (!redirectUri) {
-      throw new Error('Redirect URI is required');
-    }
-
     const CLIENT_ID = '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com';
     // Try different possible secret names to handle any naming variations
     const CLIENT_SECRET = Deno.env.get('Client_secret') || 
@@ -30,8 +26,8 @@ serve(async (req) => {
                          Deno.env.get('client_secret') ||
                          Deno.env.get('Client secret');
     
-    // Use the redirect URI passed from the frontend
-    const REDIRECT_URI = redirectUri;
+    // Use the EXACT redirect URI that matches Google Cloud Console
+    const REDIRECT_URI = 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback';
 
     if (!CLIENT_SECRET) {
       console.error('Available environment variables:', Object.keys(Deno.env.toObject()));
@@ -39,7 +35,7 @@ serve(async (req) => {
     }
 
     console.log('Exchanging auth code for tokens...');
-    console.log('Using redirect URI:', REDIRECT_URI);
+    console.log('Using EXACT redirect URI:', REDIRECT_URI);
     console.log('Client secret found:', CLIENT_SECRET ? 'Yes' : 'No');
 
     // Exchange authorization code for access token
