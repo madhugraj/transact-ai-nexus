@@ -51,37 +51,61 @@ export class GoogleAuthService {
     return !!tokens.accessToken;
   }
 
-  // Create auth URL
+  // Create auth URL with proper redirect URI
   createAuthUrl(): string {
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    
+    // Use the configured redirect URI directly
+    const redirectUri = this.config.redirectUri;
+    
+    console.log('Auth URL Debug Info:');
+    console.log('- Client ID:', this.config.clientId);
+    console.log('- Redirect URI:', redirectUri);
+    console.log('- Current Origin:', window.location.origin);
+    console.log('- Current URL:', window.location.href);
+    
     authUrl.searchParams.set('client_id', this.config.clientId);
-    authUrl.searchParams.set('redirect_uri', this.config.redirectUri);
+    authUrl.searchParams.set('redirect_uri', redirectUri);
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('scope', this.config.scopes.join(' '));
     authUrl.searchParams.set('access_type', 'offline');
     authUrl.searchParams.set('prompt', 'consent');
-    return authUrl.toString();
+    
+    const finalUrl = authUrl.toString();
+    console.log('Final Auth URL:', finalUrl);
+    
+    return finalUrl;
   }
 
-  // Simplified popup authentication
+  // Simplified popup authentication with better error handling
   async authenticateWithPopup(): Promise<AuthResult> {
     return new Promise((resolve) => {
       const authUrl = this.createAuthUrl();
+      console.log('Opening popup with URL:', authUrl);
+      
       const popup = window.open(authUrl, 'google-auth', 'width=500,height=600,scrollbars=yes,resizable=yes');
 
       if (!popup) {
+        console.error('Popup was blocked');
         resolve({ success: false, error: 'Popup was blocked. Please allow popups for this site.' });
         return;
       }
 
       const messageListener = (event: MessageEvent) => {
-        if (event.origin !== window.location.origin) return;
+        console.log('Received message:', event);
+        
+        if (event.origin !== window.location.origin) {
+          console.log('Message from different origin, ignoring:', event.origin);
+          return;
+        }
 
         if (event.data?.type === 'OAUTH_SUCCESS' && event.data?.code) {
+          console.log('OAuth success received, code:', event.data.code);
           window.removeEventListener('message', messageListener);
           popup.close();
           this.exchangeCodeForToken(event.data.code).then(resolve);
         } else if (event.data?.type === 'OAUTH_ERROR') {
+          console.error('OAuth error received:', event.data.error);
           window.removeEventListener('message', messageListener);
           popup.close();
           resolve({ success: false, error: event.data.error || 'Authentication failed' });
@@ -93,6 +117,7 @@ export class GoogleAuthService {
       // Check if popup was closed manually
       const checkClosed = setInterval(() => {
         if (popup.closed) {
+          console.log('Popup was closed manually');
           clearInterval(checkClosed);
           window.removeEventListener('message', messageListener);
           resolve({ success: false, error: 'Authentication was cancelled' });
@@ -104,6 +129,7 @@ export class GoogleAuthService {
   // Exchange auth code for tokens
   private async exchangeCodeForToken(authCode: string): Promise<AuthResult> {
     try {
+      console.log('Exchanging auth code for tokens...');
       const { supabase } = await import('@/integrations/supabase/client');
       
       const { data, error } = await supabase.functions.invoke('google-auth', {
@@ -114,7 +140,12 @@ export class GoogleAuthService {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
+
+      console.log('Token exchange response:', data);
 
       if (data.success) {
         this.storeTokens(data.accessToken, data.refreshToken);

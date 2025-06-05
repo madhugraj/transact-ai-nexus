@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -35,18 +36,35 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   const [authError, setAuthError] = useState<string>('');
   const { toast } = useToast();
 
-  // Configure auth service
+  // Get the correct redirect URI based on environment
+  const getRedirectUri = () => {
+    const currentUrl = window.location.href;
+    console.log('Current URL for redirect calculation:', currentUrl);
+    
+    // Check if we're on a Lovable preview URL
+    if (currentUrl.includes('.lovable.app')) {
+      const baseUrl = currentUrl.split('/')[0] + '//' + currentUrl.split('/')[2];
+      return `${baseUrl}/oauth/callback`;
+    }
+    
+    // For localhost or custom domains
+    return `${window.location.origin}/oauth/callback`;
+  };
+
+  // Configure auth service with proper redirect URI
   const authService = new GoogleAuthService({
     clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
     scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
-    redirectUri: `${window.location.origin}/oauth/callback`
+    redirectUri: getRedirectUri()
   }, 'gmail_auth_tokens');
 
   // Check for stored tokens on mount
   React.useEffect(() => {
+    console.log('Gmail connector mounted, checking for stored tokens...');
     if (authService.hasValidTokens()) {
       const tokens = authService.getStoredTokens();
       if (tokens.accessToken) {
+        console.log('Found stored tokens, setting connected state');
         setAccessToken(tokens.accessToken);
         setIsConnected(true);
         loadGmailMessages(tokens.accessToken);
@@ -55,11 +73,13 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   }, []);
 
   const handleGmailAuth = async () => {
+    console.log('Starting Gmail authentication...');
     setIsConnecting(true);
     setAuthError('');
 
     try {
       const result = await authService.authenticateWithPopup();
+      console.log('Authentication result:', result);
       
       if (result.success && result.accessToken) {
         setAccessToken(result.accessToken);
@@ -72,9 +92,11 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
           description: "Successfully authenticated with your Gmail account"
         });
       } else {
+        console.error('Authentication failed:', result.error);
         setAuthError(result.error || 'Authentication failed');
       }
     } catch (error) {
+      console.error('Authentication error:', error);
       setAuthError(error instanceof Error ? error.message : 'Authentication failed');
     } finally {
       setIsConnecting(false);
@@ -82,6 +104,7 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   };
 
   const handleDisconnect = () => {
+    console.log('Disconnecting from Gmail...');
     authService.clearTokens();
     setIsConnected(false);
     setEmails([]);
@@ -96,6 +119,7 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   };
 
   const loadGmailMessages = async (token: string) => {
+    console.log('Loading Gmail messages...');
     setIsLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('gmail', {
@@ -107,14 +131,19 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Gmail API error:', error);
+        throw error;
+      }
 
+      console.log('Gmail messages loaded:', data);
       if (data.success) {
         setEmails(data.data);
       } else {
         throw new Error(data.error);
       }
     } catch (error) {
+      console.error('Error loading emails:', error);
       toast({
         title: "Error loading emails",
         description: "Failed to load emails from Gmail",
