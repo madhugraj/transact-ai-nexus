@@ -51,23 +51,21 @@ export class GoogleAuthService {
     return !!tokens.accessToken;
   }
 
-  // Create auth URL for popup (no redirect needed)
+  // Create auth URL for popup with proper redirect URI
   createAuthUrl(): string {
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     
     console.log('Auth URL Debug Info:');
     console.log('- Client ID:', this.config.clientId);
-    console.log('- Using popup mode (no redirect URI)');
-    console.log('- Current Host:', window.location.hostname);
-    console.log('- Current URL:', window.location.href);
+    console.log('- Redirect URI:', this.config.redirectUri);
+    console.log('- Scopes:', this.config.scopes);
     
     authUrl.searchParams.set('client_id', this.config.clientId);
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('scope', this.config.scopes.join(' '));
     authUrl.searchParams.set('access_type', 'offline');
     authUrl.searchParams.set('prompt', 'consent');
-    // For popup mode, we use postMessage instead of redirect
-    authUrl.searchParams.set('redirect_uri', 'postmessage');
+    authUrl.searchParams.set('redirect_uri', this.config.redirectUri);
     
     const finalUrl = authUrl.toString();
     console.log('Final Auth URL:', finalUrl);
@@ -75,7 +73,7 @@ export class GoogleAuthService {
     return finalUrl;
   }
 
-  // Popup-based authentication using postMessage
+  // Popup-based authentication
   async authenticateWithPopup(): Promise<AuthResult> {
     return new Promise((resolve) => {
       const authUrl = this.createAuthUrl();
@@ -93,26 +91,31 @@ export class GoogleAuthService {
         return;
       }
 
-      // Listen for postMessage from the popup
+      // Listen for messages from the popup
       const messageListener = (event: MessageEvent) => {
-        // Google OAuth sends messages from accounts.google.com
-        if (event.origin !== 'https://accounts.google.com') {
+        // Only accept messages from our OAuth callback page
+        if (event.origin !== window.location.origin) {
           return;
         }
 
-        console.log('Received message from Google:', event);
+        console.log('Received message from popup:', event);
         
-        if (event.data && event.data.type === 'authorization_response') {
+        if (event.data && event.data.type === 'OAUTH_SUCCESS') {
           window.removeEventListener('message', messageListener);
           popup.close();
           
-          if (event.data.response && event.data.response.code) {
-            console.log('OAuth success received, code:', event.data.response.code);
-            this.exchangeCodeForToken(event.data.response.code).then(resolve);
-          } else if (event.data.response && event.data.response.error) {
-            console.error('OAuth error received:', event.data.response.error);
-            resolve({ success: false, error: event.data.response.error || 'Authentication failed' });
+          if (event.data.code) {
+            console.log('OAuth success received, code:', event.data.code);
+            this.exchangeCodeForToken(event.data.code).then(resolve);
+          } else {
+            console.error('No authorization code received');
+            resolve({ success: false, error: 'No authorization code received' });
           }
+        } else if (event.data && event.data.type === 'OAUTH_ERROR') {
+          window.removeEventListener('message', messageListener);
+          popup.close();
+          console.error('OAuth error received:', event.data.error);
+          resolve({ success: false, error: event.data.error || 'Authentication failed' });
         }
       };
 
@@ -140,7 +143,7 @@ export class GoogleAuthService {
         body: {
           authCode,
           scope: this.config.scopes.join(' '),
-          redirectUri: 'postmessage' // Use postmessage for popup mode
+          redirectUri: this.config.redirectUri
         }
       });
 

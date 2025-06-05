@@ -35,7 +35,6 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
   // Configure auth service with proper redirect URI for current domain
   const getRedirectUri = () => {
     const currentHost = window.location.hostname;
-    const currentOrigin = window.location.origin;
     
     if (currentHost === '79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com') {
       return 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback';
@@ -44,11 +43,12 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
     } else if (currentHost === 'preview--transact-ai-nexus.lovable.app') {
       return 'https://preview--transact-ai-nexus.lovable.app/oauth/callback';
     } else {
-      return `${currentOrigin}/oauth/callback`;
+      // Fallback for localhost and other domains
+      return `${window.location.origin}/oauth/callback`;
     }
   };
 
-  // Configure auth service - no dynamic redirect URI needed
+  // Configure auth service with proper redirect URI
   const authService = new GoogleAuthService({
     clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
     scopes: ['https://www.googleapis.com/auth/drive.readonly'],
