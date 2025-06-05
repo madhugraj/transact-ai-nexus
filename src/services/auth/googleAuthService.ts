@@ -91,6 +91,8 @@ export class GoogleAuthService {
         return;
       }
 
+      let messageReceived = false;
+
       // Listen for messages from the popup
       const messageListener = (event: MessageEvent) => {
         // Only accept messages from our OAuth callback page
@@ -101,8 +103,15 @@ export class GoogleAuthService {
         console.log('Received message from popup:', event);
         
         if (event.data && event.data.type === 'OAUTH_SUCCESS') {
+          messageReceived = true;
           window.removeEventListener('message', messageListener);
-          popup.close();
+          
+          // Don't close popup immediately, let the callback handle it
+          setTimeout(() => {
+            if (!popup.closed) {
+              popup.close();
+            }
+          }, 100);
           
           if (event.data.code) {
             console.log('OAuth success received, code:', event.data.code);
@@ -112,8 +121,15 @@ export class GoogleAuthService {
             resolve({ success: false, error: 'No authorization code received' });
           }
         } else if (event.data && event.data.type === 'OAUTH_ERROR') {
+          messageReceived = true;
           window.removeEventListener('message', messageListener);
-          popup.close();
+          
+          setTimeout(() => {
+            if (!popup.closed) {
+              popup.close();
+            }
+          }, 100);
+          
           console.error('OAuth error received:', event.data.error);
           resolve({ success: false, error: event.data.error || 'Authentication failed' });
         }
@@ -121,15 +137,20 @@ export class GoogleAuthService {
 
       window.addEventListener('message', messageListener);
 
-      // Check if popup was closed manually
+      // Check if popup was closed manually - but wait longer and check for messages first
       const checkClosed = setInterval(() => {
         if (popup.closed) {
-          console.log('Popup was closed manually');
+          console.log('Popup was closed');
           clearInterval(checkClosed);
           window.removeEventListener('message', messageListener);
-          resolve({ success: false, error: 'Authentication was cancelled' });
+          
+          // Only treat as cancelled if no message was received
+          if (!messageReceived) {
+            console.log('Popup closed without receiving auth message');
+            resolve({ success: false, error: 'Authentication was cancelled' });
+          }
         }
-      }, 1000);
+      }, 2000); // Check every 2 seconds instead of 1 second to give more time for messages
     });
   }
 
