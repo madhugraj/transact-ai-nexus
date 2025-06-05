@@ -1,101 +1,165 @@
 
 import { GmailApiService } from './gmailApiService';
 
-export interface EmailContext {
-  isLikelyInvoice: boolean;
-  context: {
-    subject: string;
-    from: string;
-    hasInvoiceKeywords: boolean;
-    attachmentCount: number;
-    invoiceKeywords: string[];
-  };
-}
-
 export class EmailContextAnalyzer {
-  private invoiceKeywords = [
-    'invoice', 'bill', 'receipt', 'payment', 'due', 'amount',
-    'po number', 'purchase order', 'gst', 'tax', 'total',
-    'payable', 'remittance', 'statement', 'quote', 'estimate'
-  ];
+  private gmailApi: GmailApiService;
 
-  constructor(private gmailApi: GmailApiService) {}
+  constructor(gmailApi: GmailApiService) {
+    this.gmailApi = gmailApi;
+  }
 
-  async analyzeForInvoiceContext(messageId: string, attachmentCount: number): Promise<EmailContext> {
+  async analyzeForInvoiceContext(messageId: string, attachmentCount: number): Promise<any> {
     try {
-      console.log(`Analyzing email context for message: ${messageId}, attachments: ${attachmentCount}`);
+      console.log(`📧 Analyzing email ${messageId} for invoice context...`);
       
-      const response = await this.gmailApi.getMessageDetails(messageId);
-      
-      if (!response.success) {
+      const messageResponse = await this.gmailApi.getMessageDetails(messageId);
+      if (!messageResponse.success) {
         console.error('Failed to get message details for context analysis');
-        return this.getDefaultContext(attachmentCount);
+        return {
+          isLikelyInvoice: false,
+          context: {
+            attachmentCount: 0,
+            hasInvoiceKeywords: false,
+            hasFinancialKeywords: false,
+            hasBusinessKeywords: false,
+            subject: '',
+            from: '',
+            analysis: 'Failed to analyze email'
+          }
+        };
       }
 
-      const message = response.data;
+      const message = messageResponse.data;
       const headers = message.payload?.headers || [];
       
-      const subject = headers.find(h => h.name === 'Subject')?.value || '';
-      const from = headers.find(h => h.name === 'From')?.value || '';
+      // Extract key email data
+      const subject = headers.find(h => h.name.toLowerCase() === 'subject')?.value || '';
+      const from = headers.find(h => h.name.toLowerCase() === 'from')?.value || '';
+      const to = headers.find(h => h.name.toLowerCase() === 'to')?.value || '';
       
-      // Also check email body for invoice keywords
-      let bodyText = '';
-      if (message.payload?.body?.data) {
-        try {
-          bodyText = atob(message.payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-        } catch (e) {
-          console.log('Could not decode email body');
-        }
-      }
+      // Get email body for content analysis
+      const bodyText = this.extractEmailBodyText(message.payload);
       
-      const foundKeywords = this.invoiceKeywords.filter(keyword => 
-        subject.toLowerCase().includes(keyword) || 
-        from.toLowerCase().includes(keyword) ||
-        bodyText.toLowerCase().includes(keyword)
+      console.log(`📧 Email analysis - Subject: "${subject}", From: "${from}"`);
+      console.log(`📧 Body preview: "${bodyText.substring(0, 200)}..."`);
+      
+      // Enhanced keyword detection for invoices
+      const invoiceKeywords = [
+        'invoice', 'bill', 'receipt', 'payment', 'charge', 'statement',
+        'due', 'amount', 'total', 'subtotal', 'tax', 'vat', 'gst',
+        'purchase order', 'po#', 'order number', 'transaction',
+        'remittance', 'payable', 'outstanding', 'balance',
+        'factura', 'rechnung', 'fattura', 'note de frais'
+      ];
+      
+      const financialKeywords = [
+        'cost', 'price', 'fee', 'expense', 'billing', 'accounting',
+        'financial', 'money', 'payment due', 'overdue', 'credit',
+        'debit', 'refund', 'deposit', 'subscription', 'renewal'
+      ];
+      
+      const businessKeywords = [
+        'vendor', 'supplier', 'customer', 'client', 'service',
+        'delivery', 'order', 'purchase', 'sale', 'contract',
+        'agreement', 'terms', 'conditions', 'net 30', 'net 60'
+      ];
+
+      // Combine subject, from, to, and body for comprehensive analysis
+      const fullText = `${subject} ${from} ${to} ${bodyText}`.toLowerCase();
+      
+      const hasInvoiceKeywords = invoiceKeywords.some(keyword => 
+        fullText.includes(keyword.toLowerCase())
+      );
+      
+      const hasFinancialKeywords = financialKeywords.some(keyword => 
+        fullText.includes(keyword.toLowerCase())
+      );
+      
+      const hasBusinessKeywords = businessKeywords.some(keyword => 
+        fullText.includes(keyword.toLowerCase())
       );
 
-      const hasInvoiceKeywords = foundKeywords.length > 0;
-      
-      // An email is likely an invoice if it has attachments OR contains invoice keywords
-      // Being more permissive since user mentioned emails contain invoices
-      const isLikelyInvoice = attachmentCount > 0 || hasInvoiceKeywords;
+      // More permissive logic - consider it likely invoice if:
+      // 1. Has attachments AND any relevant keywords, OR
+      // 2. Strong invoice indicators in text regardless of attachments, OR
+      // 3. Financial keywords with business context
+      const isLikelyInvoice = 
+        (attachmentCount > 0 && (hasInvoiceKeywords || hasFinancialKeywords || hasBusinessKeywords)) ||
+        hasInvoiceKeywords ||
+        (hasFinancialKeywords && hasBusinessKeywords);
 
-      console.log(`Email analysis result:`);
-      console.log(`- Subject: "${subject}"`);
-      console.log(`- From: "${from}"`);
-      console.log(`- Attachments: ${attachmentCount}`);
-      console.log(`- Keywords found: [${foundKeywords.join(', ')}]`);
-      console.log(`- Final decision: ${isLikelyInvoice ? 'LIKELY INVOICE' : 'NOT INVOICE'}`);
+      const context = {
+        attachmentCount,
+        hasInvoiceKeywords,
+        hasFinancialKeywords,
+        hasBusinessKeywords,
+        subject,
+        from,
+        bodyPreview: bodyText.substring(0, 300),
+        analysis: `Keywords found - Invoice: ${hasInvoiceKeywords}, Financial: ${hasFinancialKeywords}, Business: ${hasBusinessKeywords}`
+      };
+
+      console.log(`📧 Context analysis complete:`, {
+        isLikelyInvoice,
+        attachmentCount,
+        hasInvoiceKeywords,
+        hasFinancialKeywords,
+        hasBusinessKeywords
+      });
 
       return {
         isLikelyInvoice,
-        context: {
-          subject,
-          from,
-          hasInvoiceKeywords,
-          attachmentCount,
-          invoiceKeywords: foundKeywords
-        }
+        context
       };
+
     } catch (error) {
       console.error('Error analyzing email context:', error);
-      return this.getDefaultContext(attachmentCount);
+      return {
+        isLikelyInvoice: false,
+        context: {
+          attachmentCount: 0,
+          hasInvoiceKeywords: false,
+          hasFinancialKeywords: false,
+          hasBusinessKeywords: false,
+          subject: '',
+          from: '',
+          analysis: `Error during analysis: ${error instanceof Error ? error.message : 'Unknown error'}`
+        }
+      };
     }
   }
 
-  private getDefaultContext(attachmentCount: number = 0): EmailContext {
-    // If we have attachments, assume it might be invoice-related as fallback
-    const isLikelyInvoice = attachmentCount > 0;
-    
-    return {
-      isLikelyInvoice,
-      context: {
-        subject: '',
-        from: '',
-        hasInvoiceKeywords: false,
-        attachmentCount,
-        invoiceKeywords: []
+  private extractEmailBodyText(payload: any): string {
+    if (!payload) return '';
+
+    try {
+      // Handle multipart emails
+      if (payload.parts && payload.parts.length > 0) {
+        let bodyText = '';
+        for (const part of payload.parts) {
+          bodyText += this.extractEmailBodyText(part);
+        }
+        return bodyText;
       }
-    };
+
+      // Handle single part emails
+      if (payload.body && payload.body.data) {
+        const mimeType = payload.mimeType || '';
+        if (mimeType.includes('text/plain') || mimeType.includes('text/html')) {
+          try {
+            const decodedData = atob(payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+            return decodedData;
+          } catch (decodeError) {
+            console.warn('Failed to decode email body:', decodeError);
+            return '';
+          }
+        }
+      }
+
+      return '';
+    } catch (error) {
+      console.error('Error extracting email body text:', error);
+      return '';
+    }
   }
 }

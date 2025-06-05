@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -30,6 +31,7 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
   const [isLoading, setIsLoading] = useState(false);
   const [accessToken, setAccessToken] = useState<string>('');
   const [authError, setAuthError] = useState<string>('');
+  const [hasLoadedInitialFiles, setHasLoadedInitialFiles] = useState(false);
   const { toast } = useToast();
 
   // Use EXACT redirect URI that matches Google Cloud Console configuration
@@ -39,19 +41,29 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
     redirectUri: 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback'
   }, 'drive_auth_tokens');
 
-  // Check for stored tokens on mount
+  // Check for stored tokens on mount and maintain connection
   React.useEffect(() => {
     console.log('Drive connector mounted, checking for stored tokens...');
-    if (authService.hasValidTokens()) {
-      const tokens = authService.getStoredTokens();
-      if (tokens.accessToken) {
-        console.log('Found stored tokens, setting connected state');
-        setAccessToken(tokens.accessToken);
-        setIsConnected(true);
-        loadGoogleDriveFiles(tokens.accessToken);
+    
+    const checkStoredAuth = () => {
+      if (authService.hasValidTokens()) {
+        const tokens = authService.getStoredTokens();
+        if (tokens.accessToken) {
+          console.log('Found stored tokens, setting connected state');
+          setAccessToken(tokens.accessToken);
+          setIsConnected(true);
+          
+          // Only load files if we haven't loaded them yet
+          if (!hasLoadedInitialFiles) {
+            loadGoogleDriveFiles(tokens.accessToken);
+            setHasLoadedInitialFiles(true);
+          }
+        }
       }
-    }
-  }, []);
+    };
+
+    checkStoredAuth();
+  }, [hasLoadedInitialFiles]);
 
   const handleGoogleAuth = async () => {
     console.log('Starting Google Drive authentication...');
@@ -66,7 +78,9 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
         setAccessToken(result.accessToken);
         setIsConnected(true);
         setShowAuthDialog(false);
+        setHasLoadedInitialFiles(false); // Reset to allow loading
         await loadGoogleDriveFiles(result.accessToken);
+        setHasLoadedInitialFiles(true);
         
         toast({
           title: "Connected to Google Drive",
@@ -92,6 +106,7 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
     setSelectedFiles([]);
     setAccessToken('');
     setShowAuthDialog(false);
+    setHasLoadedInitialFiles(false);
     
     toast({
       title: "Disconnected",
@@ -113,12 +128,20 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
 
       if (error) {
         console.error('Google Drive API error:', error);
+        // If token is invalid, clear stored tokens and require re-auth
+        if (error.message && error.message.includes('invalid_grant')) {
+          authService.clearTokens();
+          setIsConnected(false);
+          setAccessToken('');
+          throw new Error('Session expired. Please reconnect to Google Drive.');
+        }
         throw error;
       }
 
       console.log('Google Drive files loaded:', data);
       if (data.success) {
         setFiles(data.data);
+        console.log(`Successfully loaded ${data.data.length} files`);
       } else {
         throw new Error(data.error);
       }
@@ -126,7 +149,7 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
       console.error('Error loading files:', error);
       toast({
         title: "Error loading files",
-        description: "Failed to load files from Google Drive",
+        description: error instanceof Error ? error.message : "Failed to load files from Google Drive",
         variant: "destructive"
       });
     } finally {
@@ -199,6 +222,12 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    if (accessToken) {
+      loadGoogleDriveFiles(accessToken);
     }
   };
 
@@ -281,11 +310,11 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
       <div className="flex justify-between">
         <Button
           variant="outline"
-          onClick={() => loadGoogleDriveFiles(accessToken)}
+          onClick={handleRefresh}
           disabled={isLoading}
           size="sm"
         >
-          Refresh
+          {isLoading ? 'Loading...' : 'Refresh'}
         </Button>
         
         <Button

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -33,6 +34,7 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   const [maxResults, setMaxResults] = useState('50');
   const [accessToken, setAccessToken] = useState<string>('');
   const [authError, setAuthError] = useState<string>('');
+  const [hasLoadedInitialEmails, setHasLoadedInitialEmails] = useState(false);
   const { toast } = useToast();
 
   // Use EXACT redirect URI that matches Google Cloud Console configuration
@@ -42,19 +44,29 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
     redirectUri: 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback'
   }, 'gmail_auth_tokens');
 
-  // Check for stored tokens on mount
+  // Check for stored tokens on mount and maintain connection
   React.useEffect(() => {
     console.log('Gmail connector mounted, checking for stored tokens...');
-    if (authService.hasValidTokens()) {
-      const tokens = authService.getStoredTokens();
-      if (tokens.accessToken) {
-        console.log('Found stored tokens, setting connected state');
-        setAccessToken(tokens.accessToken);
-        setIsConnected(true);
-        loadGmailMessages(tokens.accessToken);
+    
+    const checkStoredAuth = () => {
+      if (authService.hasValidTokens()) {
+        const tokens = authService.getStoredTokens();
+        if (tokens.accessToken) {
+          console.log('Found stored tokens, setting connected state');
+          setAccessToken(tokens.accessToken);
+          setIsConnected(true);
+          
+          // Only load emails if we haven't loaded them yet
+          if (!hasLoadedInitialEmails) {
+            loadGmailMessages(tokens.accessToken);
+            setHasLoadedInitialEmails(true);
+          }
+        }
       }
-    }
-  }, []);
+    };
+
+    checkStoredAuth();
+  }, [hasLoadedInitialEmails]);
 
   const handleGmailAuth = async () => {
     console.log('Starting Gmail authentication...');
@@ -69,7 +81,9 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
         setAccessToken(result.accessToken);
         setIsConnected(true);
         setShowAuthDialog(false);
+        setHasLoadedInitialEmails(false); // Reset to allow loading
         await loadGmailMessages(result.accessToken);
+        setHasLoadedInitialEmails(true);
         
         toast({
           title: "Connected to Gmail",
@@ -95,6 +109,7 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
     setSelectedEmails([]);
     setAccessToken('');
     setShowAuthDialog(false);
+    setHasLoadedInitialEmails(false);
     
     toast({
       title: "Disconnected",
@@ -117,12 +132,20 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
 
       if (error) {
         console.error('Gmail API error:', error);
+        // If token is invalid, clear stored tokens and require re-auth
+        if (error.message && error.message.includes('invalid_grant')) {
+          authService.clearTokens();
+          setIsConnected(false);
+          setAccessToken('');
+          throw new Error('Session expired. Please reconnect to Gmail.');
+        }
         throw error;
       }
 
       console.log('Gmail messages loaded:', data);
       if (data.success) {
         setEmails(data.data);
+        console.log(`Successfully loaded ${data.data.length} emails`);
       } else {
         throw new Error(data.error);
       }
@@ -130,7 +153,7 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
       console.error('Error loading emails:', error);
       toast({
         title: "Error loading emails",
-        description: "Failed to load emails from Gmail",
+        description: error instanceof Error ? error.message : "Failed to load emails from Gmail",
         variant: "destructive"
       });
     } finally {
@@ -147,6 +170,18 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
         return [...prev, email];
       }
     });
+  };
+
+  const handleSearch = () => {
+    if (accessToken) {
+      loadGmailMessages(accessToken);
+    }
+  };
+
+  const handleRefresh = () => {
+    if (accessToken) {
+      loadGmailMessages(accessToken);
+    }
   };
 
   if (!isConnected) {
@@ -186,7 +221,7 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
         isLoading={isLoading}
         onSearchQueryChange={setSearchQuery}
         onMaxResultsChange={setMaxResults}
-        onSearch={() => loadGmailMessages(accessToken)}
+        onSearch={handleSearch}
       />
 
       <EmailList
@@ -198,11 +233,11 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
 
       <Button
         variant="outline"
-        onClick={() => loadGmailMessages(accessToken)}
+        onClick={handleRefresh}
         disabled={isLoading}
         size="sm"
       >
-        Refresh
+        {isLoading ? 'Loading...' : 'Refresh'}
       </Button>
 
       {selectedEmails.length > 0 && (
