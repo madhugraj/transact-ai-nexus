@@ -49,35 +49,34 @@ export class DatabaseStorage {
           const lineItem = lineItems[i];
           console.log(`💾 Inserting line item ${i + 1}/${lineItems.length} for invoice: ${extractedData.invoice_number}`);
           
+          // Map to the actual invoice_table schema
           const invoiceRecord = {
-            invoice_number: extractedData.invoice_number || 0,
-            po_number: poExists ? extractedData.po_number : null, // Only include PO if it exists
+            po_number: poExists ? extractedData.po_number : null,
             invoice_date: extractedData.invoice_date || null,
-            vendor_name: extractedData.vendor_name || '',
-            item_description: lineItem.description || lineItem.item_description || '',
-            quantity: lineItem.quantity || 0,
-            unit_price: lineItem.unit_price || lineItem.price || 0,
-            line_total: lineItem.total || lineItem.line_total || (lineItem.quantity * lineItem.unit_price) || 0,
-            gst_rate: lineItem.gst_rate || extractedData.gst_rate || 0,
-            gst_amount: lineItem.gst_amount || extractedData.gst_amount || 0,
-            total_amount: lineItem.total_amount || extractedData.total_amount || 0,
-            fileName: filename,
-            email_subject: email.subject || '',
-            email_from: email.from || '',
-            email_date: email.date || new Date().toISOString(),
-            line_item_index: i + 1,
-            total_line_items: lineItems.length,
-            extraction_confidence: extractedData.extraction_confidence || 0,
-            created_at: new Date().toISOString()
+            invoice_number: extractedData.invoice_number || 0,
+            email_date: email.date ? new Date(email.date).toISOString().split('T')[0] : null,
+            details: {
+              vendor_name: extractedData.vendor_name || '',
+              item_description: lineItem.description || lineItem.item_description || '',
+              quantity: lineItem.quantity || 0,
+              unit_price: lineItem.unit_price || lineItem.price || 0,
+              line_total: lineItem.total || lineItem.line_total || (lineItem.quantity * lineItem.unit_price) || 0,
+              gst_rate: lineItem.gst_rate || extractedData.gst_rate || 0,
+              gst_amount: lineItem.gst_amount || extractedData.gst_amount || 0,
+              total_amount: lineItem.total_amount || extractedData.total_amount || 0,
+              line_item_index: i + 1,
+              total_line_items: lineItems.length,
+              extraction_confidence: extractedData.extraction_confidence || 0
+            },
+            attachment_invoice_name: filename,
+            email_header: email.subject || ''
           };
 
           console.log(`💾 Inserting invoice record:`, {
             invoice_number: invoiceRecord.invoice_number,
             po_number: invoiceRecord.po_number,
-            fileName: invoiceRecord.fileName,
-            email_subject: invoiceRecord.email_subject,
-            line_item_index: invoiceRecord.line_item_index,
-            total_line_items: invoiceRecord.total_line_items
+            attachment_invoice_name: invoiceRecord.attachment_invoice_name,
+            email_header: invoiceRecord.email_header
           });
 
           try {
@@ -101,25 +100,23 @@ export class DatabaseStorage {
         console.log(`💾 No line items found, creating single invoice record`);
         
         const invoiceRecord = {
-          invoice_number: extractedData.invoice_number || 0,
-          po_number: poExists ? extractedData.po_number : null, // Only include PO if it exists
+          po_number: poExists ? extractedData.po_number : null,
           invoice_date: extractedData.invoice_date || null,
-          vendor_name: extractedData.vendor_name || '',
-          item_description: extractedData.description || 'No description available',
-          quantity: 1,
-          unit_price: extractedData.total_amount || 0,
-          line_total: extractedData.total_amount || 0,
-          gst_rate: extractedData.gst_rate || 0,
-          gst_amount: extractedData.gst_amount || 0,
-          total_amount: extractedData.total_amount || 0,
-          fileName: filename,
-          email_subject: email.subject || '',
-          email_from: email.from || '',
-          email_date: email.date || new Date().toISOString(),
-          line_item_index: 1,
-          total_line_items: 1,
-          extraction_confidence: extractedData.extraction_confidence || 0,
-          created_at: new Date().toISOString()
+          invoice_number: extractedData.invoice_number || 0,
+          email_date: email.date ? new Date(email.date).toISOString().split('T')[0] : null,
+          details: {
+            vendor_name: extractedData.vendor_name || '',
+            item_description: extractedData.description || 'No description available',
+            quantity: 1,
+            unit_price: extractedData.total_amount || 0,
+            line_total: extractedData.total_amount || 0,
+            gst_rate: extractedData.gst_rate || 0,
+            gst_amount: extractedData.gst_amount || 0,
+            total_amount: extractedData.total_amount || 0,
+            extraction_confidence: extractedData.extraction_confidence || 0
+          },
+          attachment_invoice_name: filename,
+          email_header: email.subject || ''
         };
 
         try {
