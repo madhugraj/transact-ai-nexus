@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -7,6 +6,7 @@ import { Loader, Check, FolderOpen, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { GoogleAuthService } from '@/services/auth/googleAuthService';
 import CompactAuthDialog from '@/components/auth/CompactAuthDialog';
+import POFileProcessor from '../POFileProcessor';
 
 interface GoogleDriveFile {
   id: string;
@@ -32,6 +32,8 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
   const [accessToken, setAccessToken] = useState<string>('');
   const [authError, setAuthError] = useState<string>('');
   const [hasLoadedInitialFiles, setHasLoadedInitialFiles] = useState(false);
+  const [downloadedFiles, setDownloadedFiles] = useState<File[]>([]);
+  const [showPOProcessor, setShowPOProcessor] = useState(false);
   const { toast } = useToast();
 
   // Use EXACT redirect URI that matches Google Cloud Console configuration
@@ -207,7 +209,11 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
       }
       
       if (downloadedFiles.length > 0) {
+        setDownloadedFiles(downloadedFiles);
         onFilesSelected(downloadedFiles);
+        
+        // Show PO processor option
+        setShowPOProcessor(true);
         
         toast({
           title: "Files downloaded",
@@ -226,8 +232,19 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
   };
 
   const handleRefresh = () => {
+    console.log('Refresh button clicked for Google Drive');
     if (accessToken) {
       loadGoogleDriveFiles(accessToken);
+      toast({
+        title: "Refreshing files",
+        description: "Reloading files from Google Drive..."
+      });
+    } else {
+      toast({
+        title: "Not connected",
+        description: "Please connect to Google Drive first",
+        variant: "destructive"
+      });
     }
   };
 
@@ -332,6 +349,19 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
           )}
         </Button>
       </div>
+
+      {showPOProcessor && downloadedFiles.length > 0 && (
+        <Card className="p-4">
+          <POFileProcessor
+            selectedFiles={downloadedFiles}
+            onProcessingComplete={(results) => {
+              console.log('PO processing completed:', results);
+              setShowPOProcessor(false);
+              setDownloadedFiles([]);
+            }}
+          />
+        </Card>
+      )}
     </div>
   );
 };

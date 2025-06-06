@@ -219,6 +219,65 @@ export type Database = {
           invoice_number?: number
           po_number?: number
         }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_table_po_number_fkey"
+            columns: ["po_number"]
+            isOneToOne: false
+            referencedRelation: "po_table"
+            referencedColumns: ["po_number"]
+          },
+        ]
+      }
+      po_table: {
+        Row: {
+          bill_to_address: string | null
+          created_at: string
+          del_end_date: string | null
+          del_start_date: string | null
+          description: Json | null
+          file_name: string | null
+          gstn: string | null
+          id: number
+          po_date: string | null
+          po_number: number
+          project: string | null
+          ship_to: string | null
+          terms_conditions: string | null
+          vendor_code: string | null
+        }
+        Insert: {
+          bill_to_address?: string | null
+          created_at?: string
+          del_end_date?: string | null
+          del_start_date?: string | null
+          description?: Json | null
+          file_name?: string | null
+          gstn?: string | null
+          id?: number
+          po_date?: string | null
+          po_number: number
+          project?: string | null
+          ship_to?: string | null
+          terms_conditions?: string | null
+          vendor_code?: string | null
+        }
+        Update: {
+          bill_to_address?: string | null
+          created_at?: string
+          del_end_date?: string | null
+          del_start_date?: string | null
+          description?: Json | null
+          file_name?: string | null
+          gstn?: string | null
+          id?: number
+          po_date?: string | null
+          po_number?: number
+          project?: string | null
+          ship_to?: string | null
+          terms_conditions?: string | null
+          vendor_code?: string | null
+        }
         Relationships: []
       }
       uploaded_files: {

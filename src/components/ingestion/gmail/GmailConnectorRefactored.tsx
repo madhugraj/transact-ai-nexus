@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -117,8 +116,8 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
     });
   };
 
-  const loadGmailMessages = async (token: string) => {
-    console.log('Loading Gmail messages...');
+  const loadGmailMessages = async (token: string, forceRefresh: boolean = false) => {
+    console.log('Loading Gmail messages...', forceRefresh ? '(forced refresh)' : '');
     setIsLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('gmail', {
@@ -132,11 +131,11 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
 
       if (error) {
         console.error('Gmail API error:', error);
-        // If token is invalid, clear stored tokens and require re-auth
         if (error.message && error.message.includes('invalid_grant')) {
           authService.clearTokens();
           setIsConnected(false);
           setAccessToken('');
+          setHasLoadedInitialEmails(false);
           throw new Error('Session expired. Please reconnect to Gmail.');
         }
         throw error;
@@ -146,6 +145,13 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
       if (data.success) {
         setEmails(data.data);
         console.log(`Successfully loaded ${data.data.length} emails`);
+        
+        if (forceRefresh) {
+          toast({
+            title: "Emails refreshed",
+            description: `Loaded ${data.data.length} emails from Gmail`
+          });
+        }
       } else {
         throw new Error(data.error);
       }
@@ -179,8 +185,15 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   };
 
   const handleRefresh = () => {
+    console.log('Refresh button clicked');
     if (accessToken) {
-      loadGmailMessages(accessToken);
+      loadGmailMessages(accessToken, true); // Force refresh with toast
+    } else {
+      toast({
+        title: "Not connected",
+        description: "Please connect to Gmail first",
+        variant: "destructive"
+      });
     }
   };
 
