@@ -1,13 +1,13 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader, Check, FolderOpen, FileText, Download, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { GoogleAuthService } from '@/services/auth/googleAuthService';
 import CompactAuthDialog from '@/components/auth/CompactAuthDialog';
-import POFileProcessor from '../POFileProcessor';
+import ConnectionStatus from './ConnectionStatus';
+import FileBrowser from './FileBrowser';
+import ProcessingSection from './ProcessingSection';
 
 interface GoogleDriveFile {
   id: string;
@@ -34,10 +34,8 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
   const [authError, setAuthError] = useState<string>('');
   const [hasLoadedInitialFiles, setHasLoadedInitialFiles] = useState(false);
   const [downloadedFiles, setDownloadedFiles] = useState<File[]>([]);
-  const [showPOProcessor, setShowPOProcessor] = useState(false);
   const { toast } = useToast();
 
-  // Use EXACT redirect URI that matches Google Cloud Console configuration
   const authService = new GoogleAuthService({
     clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
     scopes: ['https://www.googleapis.com/auth/drive.readonly'],
@@ -110,7 +108,6 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
     setShowAuthDialog(false);
     setHasLoadedInitialFiles(false);
     setDownloadedFiles([]);
-    setShowPOProcessor(false);
     
     toast({
       title: "Disconnected",
@@ -212,7 +209,6 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
       if (downloadedFiles.length > 0) {
         setDownloadedFiles(downloadedFiles);
         onFilesSelected(downloadedFiles);
-        setShowPOProcessor(true);
         
         toast({
           title: "Files imported successfully",
@@ -247,6 +243,17 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
     }
   };
 
+  const handleProcessingComplete = (results: any[]) => {
+    console.log('PO processing completed:', results);
+    setDownloadedFiles([]);
+    setSelectedFiles([]);
+  };
+
+  const handleCloseProcessing = () => {
+    setDownloadedFiles([]);
+    setSelectedFiles([]);
+  };
+
   if (!isConnected) {
     return (
       <div className="flex flex-col items-center justify-center py-12 space-y-4">
@@ -278,130 +285,26 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
 
   return (
     <div className="space-y-6">
-      {/* Connection Status & Controls */}
-      <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-          <span className="text-green-700 font-medium">Connected to Google Drive</span>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleDisconnect}>
-            Disconnect
-          </Button>
-        </div>
-      </div>
+      <ConnectionStatus
+        isConnected={isConnected}
+        isLoading={isLoading}
+        onRefresh={handleRefresh}
+        onDisconnect={handleDisconnect}
+      />
 
-      {/* File Browser */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Your Google Drive Files</span>
-            <div className="flex items-center gap-4">
-              {selectedFiles.length > 0 && (
-                <span className="text-sm text-muted-foreground">
-                  {selectedFiles.length} file(s) selected
-                </span>
-              )}
-              <Button
-                onClick={downloadSelectedFiles}
-                disabled={isLoading || selectedFiles.length === 0}
-                size="sm"
-                className="gap-2"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader className="h-4 w-4 animate-spin" />
-                    Importing...
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-4 w-4" />
-                    Import {selectedFiles.length > 0 ? `${selectedFiles.length} ` : ''}Files
-                  </>
-                )}
-              </Button>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading && files.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 space-y-4">
-              <Loader className="h-8 w-8 animate-spin text-blue-500" />
-              <p className="text-muted-foreground">Loading your files...</p>
-            </div>
-          ) : files.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 space-y-4 text-center">
-              <FileText className="h-12 w-12 text-muted-foreground/50" />
-              <div>
-                <h3 className="font-medium text-muted-foreground">No files found</h3>
-                <p className="text-sm text-muted-foreground">No files were found in your Google Drive</p>
-              </div>
-            </div>
-          ) : (
-            <div className="grid gap-2 max-h-80 overflow-y-auto border rounded-md">
-              {files.map((file) => (
-                <div
-                  key={file.id}
-                  className={`p-3 flex items-center gap-3 hover:bg-muted/40 cursor-pointer border-b last:border-b-0 transition-colors ${
-                    selectedFiles.some(f => f.id === file.id) ? 'bg-blue-50 border-blue-200' : ''
-                  }`}
-                  onClick={() => toggleFileSelection(file)}
-                >
-                  {file.mimeType === 'application/vnd.google-apps.folder' ? (
-                    <FolderOpen className="h-5 w-5 text-blue-500 flex-shrink-0" />
-                  ) : (
-                    <FileText className="h-5 w-5 text-gray-500 flex-shrink-0" />
-                  )}
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{file.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {file.size && `${file.size} • `}
-                      {new Date(file.modifiedTime).toLocaleDateString()}
-                    </div>
-                  </div>
-                  
-                  {file.mimeType !== 'application/vnd.google-apps.folder' && (
-                    <div className={`flex h-5 w-5 rounded border-2 items-center justify-center flex-shrink-0 ${
-                      selectedFiles.some(f => f.id === file.id) 
-                        ? 'bg-blue-500 border-blue-500' 
-                        : 'border-gray-300'
-                    }`}>
-                      {selectedFiles.some(f => f.id === file.id) && (
-                        <Check className="h-3 w-3 text-white" />
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <FileBrowser
+        files={files}
+        selectedFiles={selectedFiles}
+        isLoading={isLoading}
+        onFileToggle={toggleFileSelection}
+        onImportFiles={downloadSelectedFiles}
+      />
 
-      {/* PO Processing Section */}
-      {showPOProcessor && downloadedFiles.length > 0 && (
-        <Card className="border-blue-200 bg-blue-50/30">
-          <CardHeader>
-            <CardTitle className="text-blue-900">Process Purchase Orders</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <POFileProcessor
-              selectedFiles={downloadedFiles}
-              onProcessingComplete={(results) => {
-                console.log('PO processing completed:', results);
-                setShowPOProcessor(false);
-                setDownloadedFiles([]);
-                setSelectedFiles([]);
-              }}
-            />
-          </CardContent>
-        </Card>
-      )}
+      <ProcessingSection
+        downloadedFiles={downloadedFiles}
+        onProcessingComplete={handleProcessingComplete}
+        onClose={handleCloseProcessing}
+      />
     </div>
   );
 };
