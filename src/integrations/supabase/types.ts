@@ -195,7 +195,7 @@ export type Database = {
           id: number
           invoice_date: string | null
           invoice_number: number
-          po_number: number
+          po_number: number | null
         }
         Insert: {
           attachment_invoice_name?: string | null
@@ -206,7 +206,7 @@ export type Database = {
           id?: number
           invoice_date?: string | null
           invoice_number: number
-          po_number: number
+          po_number?: number | null
         }
         Update: {
           attachment_invoice_name?: string | null
@@ -217,7 +217,7 @@ export type Database = {
           id?: number
           invoice_date?: string | null
           invoice_number?: number
-          po_number?: number
+          po_number?: number | null
         }
         Relationships: [
           {

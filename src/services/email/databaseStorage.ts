@@ -59,9 +59,11 @@ export class DatabaseStorage {
             poNumber = poNumberValue;
             console.log(`✅ PO number ${poNumberValue} exists in po_table`);
           } else {
-            console.log(`⚠️ PO number ${poNumberValue} not found in po_table - will proceed without PO reference`);
+            console.log(`⚠️ PO number ${poNumberValue} not found in po_table - will proceed with null PO reference`);
           }
         }
+      } else {
+        console.log(`ℹ️ No PO number found in extracted data - will proceed with null PO reference`);
       }
 
       // Process line items
@@ -77,7 +79,7 @@ export class DatabaseStorage {
           
           // Map to the actual invoice_table schema
           const invoiceRecord = {
-            po_number: poNumber,
+            po_number: poNumber, // This can now be null
             invoice_date: extractedData.invoice_date || null,
             invoice_number: invoiceNumber,
             email_date: email.date ? new Date(email.date).toISOString().split('T')[0] : null,
@@ -114,14 +116,14 @@ export class DatabaseStorage {
             if (insertError) {
               console.error(`❌ Database insert error for line item ${i + 1}:`, insertError);
               console.error(`❌ Failed record:`, invoiceRecord);
-              // Don't throw here, continue with other items
+              throw insertError; // Throw to stop processing if insertion fails
             } else {
-              console.log(`✅ Successfully inserted line item ${i + 1}/${lineItems.length}`, data);
+              console.log(`✅ Successfully inserted line item ${i + 1}/${lineItems.length} into invoice_table`, data);
             }
           } catch (itemError) {
             console.error(`❌ Error inserting line item ${i + 1}:`, itemError);
             console.error(`❌ Failed record:`, invoiceRecord);
-            // Continue with other items
+            throw itemError; // Re-throw to stop processing
           }
         }
       } else {
@@ -129,7 +131,7 @@ export class DatabaseStorage {
         console.log(`💾 No line items found, creating single invoice record`);
         
         const invoiceRecord = {
-          po_number: poNumber,
+          po_number: poNumber, // This can now be null
           invoice_date: extractedData.invoice_date || null,
           invoice_number: invoiceNumber,
           email_date: email.date ? new Date(email.date).toISOString().split('T')[0] : null,
@@ -165,7 +167,7 @@ export class DatabaseStorage {
             console.error(`❌ Failed record:`, invoiceRecord);
             throw insertError;
           } else {
-            console.log(`✅ Successfully inserted invoice record`, data);
+            console.log(`✅ Successfully inserted invoice record into invoice_table`, data);
           }
         } catch (insertError) {
           console.error(`❌ Failed to insert invoice record:`, insertError);
@@ -174,7 +176,7 @@ export class DatabaseStorage {
         }
       }
 
-      console.log(`✅ Successfully processed invoice data for ${filename}`);
+      console.log(`✅ Successfully processed invoice data for ${filename} - check invoice_table in Supabase`);
 
     } catch (error) {
       console.error(`❌ Error storing invoice in database for ${filename}:`, error);
