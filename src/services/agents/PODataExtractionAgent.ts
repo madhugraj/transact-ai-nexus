@@ -12,7 +12,17 @@ export class PODataExtractionAgent {
         const imageData = await this.convertPdfToImage(file);
         
         if (!imageData) {
-          throw new Error('Failed to convert PDF to image');
+          console.log(`📄 PODataExtractionAgent: PDF conversion failed, trying direct upload to Gemini for ${file.name}`);
+          // Fallback: try sending PDF directly to Gemini
+          const base64Data = await fileToBase64(file);
+          const extractedData = await this.extractPODataWithGemini(base64Data, file.type, file.name);
+          
+          if (!extractedData.success) {
+            console.error(`❌ PODataExtractionAgent: Both image conversion and direct PDF processing failed for ${file.name}`);
+            return { success: false, error: 'Failed to process PDF file' };
+          }
+          
+          return extractedData;
         }
         
         // Extract PO data using Gemini AI with converted image
@@ -69,7 +79,26 @@ export class PODataExtractionAgent {
       pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
       
       const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      
+      // Add validation for PDF structure
+      if (arrayBuffer.byteLength < 100) {
+        console.error(`❌ PODataExtractionAgent: PDF file too small: ${arrayBuffer.byteLength} bytes`);
+        return null;
+      }
+      
+      // Check for PDF header
+      const header = new Uint8Array(arrayBuffer.slice(0, 5));
+      const headerString = String.fromCharCode(...header);
+      if (!headerString.startsWith('%PDF')) {
+        console.error(`❌ PODataExtractionAgent: Invalid PDF header: ${headerString}`);
+        return null;
+      }
+      
+      const pdf = await pdfjsLib.getDocument({ 
+        data: arrayBuffer,
+        verbosity: 0, // Reduce console noise
+        stopAtErrors: false // Continue processing even with minor errors
+      }).promise;
       
       console.log(`📄 PODataExtractionAgent: PDF loaded with ${pdf.numPages} pages`);
       
@@ -104,47 +133,51 @@ export class PODataExtractionAgent {
     }
   }
   
-  private async extractPODataWithGemini(base64Image: string, mimeType: string, fileName: string): Promise<{ success: boolean; data?: any; error?: string }> {
+  private async extractPODataWithGemini(base64Data: string, mimeType: string, fileName: string): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
       const prompt = `
-You are an OCR assistant specializing in extracting Purchase Order (PO) data from documents. Read this document image and extract ALL relevant PO information.
+You are an expert OCR and data extraction AI. Please analyze this Purchase Order document and extract ALL the relevant information.
 
-Extract the following fields if present:
-- po_number: The purchase order number (extract as number)
-- po_date: The PO date (format as YYYY-MM-DD)
-- vendor_code: Vendor/supplier code or ID
-- gstn: GST number if available
-- project: Project name or code
-- bill_to_address: Billing address
-- ship_to: Shipping address
-- del_start_date: Delivery start date (format as YYYY-MM-DD)
-- del_end_date: Delivery end date (format as YYYY-MM-DD)
-- terms_conditions: Terms and conditions text
-- description: Array of line items with item, quantity, unit_price, total for each item
+IMPORTANT INSTRUCTIONS:
+1. Look carefully at the document - it contains a Purchase Order with structured data
+2. Extract EVERY piece of information you can find, even if some fields are blank
+3. For PO number: Look for patterns like "PO#", "Purchase Order No.", "Order No.", or similar
+4. Convert all dates to YYYY-MM-DD format
+5. For line items: Extract item description, quantity, unit price, and total for each row
+6. If you cannot find a specific field, use null for that field
+7. ALWAYS return valid JSON - never return empty objects
 
-FORMAT YOUR RESPONSE AS JSON:
+REQUIRED EXTRACTION FORMAT (return ONLY this JSON structure):
 {
-  "po_number": 12345,
-  "po_date": "2024-01-15",
-  "vendor_code": "V001",
-  "gstn": "22ABCDE1234F1Z5",
-  "project": "Project Alpha",
-  "bill_to_address": "123 Main St, City",
-  "ship_to": "456 Oak Ave, Town",
-  "del_start_date": "2024-02-01",
-  "del_end_date": "2024-02-28",
-  "terms_conditions": "Payment within 30 days",
+  "po_number": "extract the PO number as string, look for patterns like PO#, Order No, etc",
+  "po_date": "YYYY-MM-DD format or null",
+  "vendor_code": "vendor/supplier code if available or null",
+  "gstn": "GST number if available or null", 
+  "project": "project name/code if available or null",
+  "bill_to_address": "full billing address or null",
+  "ship_to": "full shipping address or null",
+  "del_start_date": "delivery start date in YYYY-MM-DD or null",
+  "del_end_date": "delivery end date in YYYY-MM-DD or null", 
+  "terms_conditions": "payment terms and conditions or null",
   "description": [
     {
-      "item": "Product A",
-      "quantity": 10,
-      "unit_price": 100.00,
-      "total": 1000.00
+      "item": "item description",
+      "quantity": number,
+      "unit_price": number,
+      "total": number
     }
   ]
 }
 
-Only return valid JSON with no additional text, explanations or markdown. If a field is not found, use null for that field.
+Document Analysis Instructions:
+- Look for headers like "Purchase Order", "PO#", "Order No"
+- Check for vendor/supplier information
+- Find delivery addresses and dates
+- Extract all line items with quantities and prices
+- Look for payment terms
+- Extract GST/tax information
+
+Return ONLY valid JSON with no additional text or explanations.
 `;
 
       console.log(`🤖 PODataExtractionAgent: Sending request to Gemini for ${fileName}`);
@@ -168,7 +201,7 @@ Only return valid JSON with no additional text, explanations or markdown. If a f
                   {
                     inline_data: {
                       mime_type: mimeType,
-                      data: base64Image
+                      data: base64Data
                     }
                   }
                 ]
@@ -192,18 +225,54 @@ Only return valid JSON with no additional text, explanations or markdown. If a f
       
       console.log(`🤖 PODataExtractionAgent: Raw Gemini response for ${fileName}:`, responseText);
       
-      // Extract JSON from response text
-      const jsonMatch = responseText.match(/\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}/);
-      if (!jsonMatch) {
-        throw new Error("No valid JSON found in the Gemini response");
+      if (!responseText || responseText.trim() === '') {
+        throw new Error("Empty response from Gemini API");
       }
       
-      // Parse the JSON content
-      const parsedData = JSON.parse(jsonMatch[0]);
+      // Extract JSON from response text - try multiple approaches
+      let parsedData;
       
-      // Validate that we have at least a PO number
-      if (!parsedData.po_number) {
-        throw new Error("No PO number found in the extracted data");
+      // First try: direct JSON parsing
+      try {
+        parsedData = JSON.parse(responseText.trim());
+      } catch (e) {
+        console.log(`🔄 PODataExtractionAgent: Direct JSON parse failed, trying extraction methods...`);
+        
+        // Second try: extract JSON from code blocks
+        const codeBlockMatch = responseText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+        if (codeBlockMatch) {
+          try {
+            parsedData = JSON.parse(codeBlockMatch[1]);
+          } catch (e2) {
+            console.log(`🔄 PODataExtractionAgent: Code block extraction failed`);
+          }
+        }
+        
+        // Third try: find JSON object with regex
+        if (!parsedData) {
+          const jsonMatch = responseText.match(/\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}/);
+          if (jsonMatch) {
+            try {
+              parsedData = JSON.parse(jsonMatch[0]);
+            } catch (e3) {
+              console.log(`🔄 PODataExtractionAgent: Regex extraction failed`);
+            }
+          }
+        }
+        
+        if (!parsedData) {
+          throw new Error("Could not extract valid JSON from Gemini response");
+        }
+      }
+      
+      // Validate that we have some data
+      if (!parsedData || typeof parsedData !== 'object') {
+        throw new Error("Invalid data structure from Gemini");
+      }
+      
+      // Check if we have at least a PO number or some meaningful data
+      if (!parsedData.po_number && !parsedData.description && !parsedData.vendor_code) {
+        throw new Error("No meaningful PO data found - response appears to be empty");
       }
       
       console.log(`✅ PODataExtractionAgent: Successfully parsed data for ${fileName}:`, parsedData);
