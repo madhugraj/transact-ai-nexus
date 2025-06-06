@@ -73,14 +73,10 @@ export class GoogleAuthService {
     return hasTokens;
   }
 
-  // Get the correct redirect URI based on current domain
+  // Get the correct redirect URI - ALWAYS use the specified domain
   private getRedirectUri(): string {
-    const currentOrigin = window.location.origin;
-    
-    // Always use the current origin + /oauth/callback
-    const redirectUri = `${currentOrigin}/oauth/callback`;
-    
-    console.log('Using redirect URI:', redirectUri, 'for origin:', currentOrigin);
+    const redirectUri = 'https://transact-ai-nexus.lovable.app/oauth/callback';
+    console.log('Using fixed redirect URI:', redirectUri);
     return redirectUri;
   }
 

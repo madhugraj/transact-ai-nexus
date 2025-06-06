@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -37,11 +36,11 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   const [hasLoadedInitialEmails, setHasLoadedInitialEmails] = useState(false);
   const { toast } = useToast();
 
-  // Use current domain for redirect URI
+  // Use FIXED redirect URI as specified
   const authService = new GoogleAuthService({
     clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
     scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
-    redirectUri: '' // This will be determined dynamically
+    redirectUri: 'https://transact-ai-nexus.lovable.app/oauth/callback'
   }, 'gmail_auth_tokens');
 
   // Check for stored tokens on mount and maintain connection
