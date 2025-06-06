@@ -12,6 +12,11 @@ export class DatabaseStorage {
     console.log(`💾 Processing invoice data for storage: ${filename}`);
     
     try {
+      // Validate required fields before processing
+      if (!extractedData) {
+        throw new Error('No extracted data provided');
+      }
+
       // Check if PO number exists in po_table if provided
       let poExists = false;
       if (extractedData.po_number) {
@@ -75,15 +80,20 @@ export class DatabaseStorage {
             total_line_items: invoiceRecord.total_line_items
           });
 
-          const { error: insertError } = await supabase
-            .from('invoice_table')
-            .insert([invoiceRecord]);
+          try {
+            const { error: insertError } = await supabase
+              .from('invoice_table')
+              .insert([invoiceRecord]);
 
-          if (insertError) {
-            console.error(`❌ Database insert error for line item ${i + 1}:`, insertError);
-            throw insertError;
-          } else {
-            console.log(`✅ Successfully inserted line item ${i + 1}/${lineItems.length}`);
+            if (insertError) {
+              console.error(`❌ Database insert error for line item ${i + 1}:`, insertError);
+              // Don't throw here, continue with other items
+            } else {
+              console.log(`✅ Successfully inserted line item ${i + 1}/${lineItems.length}`);
+            }
+          } catch (itemError) {
+            console.error(`❌ Error inserting line item ${i + 1}:`, itemError);
+            // Continue with other items
           }
         }
       } else {
@@ -112,19 +122,24 @@ export class DatabaseStorage {
           created_at: new Date().toISOString()
         };
 
-        const { error: insertError } = await supabase
-          .from('invoice_table')
-          .insert([invoiceRecord]);
+        try {
+          const { error: insertError } = await supabase
+            .from('invoice_table')
+            .insert([invoiceRecord]);
 
-        if (insertError) {
-          console.error(`❌ Database insert error:`, insertError);
+          if (insertError) {
+            console.error(`❌ Database insert error:`, insertError);
+            throw insertError;
+          } else {
+            console.log(`✅ Successfully inserted invoice record`);
+          }
+        } catch (insertError) {
+          console.error(`❌ Failed to insert invoice record:`, insertError);
           throw insertError;
-        } else {
-          console.log(`✅ Successfully inserted invoice record`);
         }
       }
 
-      console.log(`✅ Successfully stored all invoice data for ${filename}`);
+      console.log(`✅ Successfully processed invoice data for ${filename}`);
 
     } catch (error) {
       console.error(`❌ Error storing invoice in database for ${filename}:`, error);

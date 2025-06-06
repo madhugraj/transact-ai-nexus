@@ -33,50 +33,73 @@ export class EmailProcessingService {
 
       // Step 1: Analyze email context for invoice indicators
       console.log('📧 Step 1: Analyzing email context...');
-      const emailContext = await attachmentProcessor.analyzeEmailForInvoiceContext(email.id);
-      result.emailContext = emailContext;
       
-      console.log(`📧 Email context analysis: ${emailContext.isLikelyInvoice ? 'LIKELY INVOICE' : 'NOT INVOICE'}`);
-      console.log(`📎 Total attachments detected: ${emailContext.context.attachmentCount}`);
+      try {
+        const emailContext = await attachmentProcessor.analyzeEmailForInvoiceContext(email.id);
+        result.emailContext = emailContext;
+        
+        console.log(`📧 Email context analysis: ${emailContext.isLikelyInvoice ? 'LIKELY INVOICE' : 'NOT INVOICE'}`);
+        console.log(`📎 Total attachments detected: ${emailContext.context.attachmentCount}`);
 
-      if (!emailContext.isLikelyInvoice) {
-        console.log('❌ Email does not appear to contain invoice-related content');
-        result.status = 'completed';
-        result.error = 'Email does not appear invoice-related';
-        return result;
+        if (!emailContext.isLikelyInvoice) {
+          console.log('❌ Email does not appear to contain invoice-related content');
+          result.status = 'completed';
+          result.error = 'Email does not appear invoice-related';
+          return result;
+        }
+      } catch (contextError) {
+        console.error('❌ Error analyzing email context:', contextError);
+        // Continue processing even if context analysis fails
+        result.emailContext = {
+          isLikelyInvoice: true,
+          context: { attachmentCount: 0, hasInvoiceKeywords: false }
+        };
       }
 
       // Step 2: Extract real email attachments (only supported types)
       console.log('📎 Step 2: Extracting supported email attachments (PDF/Images)...');
-      const attachments = await attachmentProcessor.extractEmailAttachments(email.id);
-      result.attachments = attachments;
+      
+      try {
+        const attachments = await attachmentProcessor.extractEmailAttachments(email.id);
+        result.attachments = attachments;
 
-      console.log(`📎 Total attachments found: ${emailContext.context.attachmentCount}`);
-      console.log(`📎 Supported attachments extracted: ${attachments.length}`);
+        console.log(`📎 Total attachments found: ${result.emailContext?.context?.attachmentCount || 0}`);
+        console.log(`📎 Supported attachments extracted: ${attachments.length}`);
 
-      if (attachments.length === 0) {
-        result.status = 'completed';
-        result.error = 'No supported attachments found (PDF/Image files)';
-        return result;
-      }
-
-      console.log(`✅ Found ${attachments.length} supported attachments to process`);
-
-      // Step 3: Process each attachment individually
-      let processedInvoices = 0;
-      for (let i = 0; i < attachments.length; i++) {
-        const attachment = attachments[i];
-        console.log(`🔍 Processing attachment ${i + 1}/${attachments.length}: ${attachment.filename}`);
-        
-        const wasInvoiceProcessed = await this.processAttachment(attachment, email, emailContext.context, result);
-        if (wasInvoiceProcessed) {
-          processedInvoices++;
+        if (attachments.length === 0) {
+          result.status = 'completed';
+          result.error = 'No supported attachments found (PDF/Image files)';
+          return result;
         }
-      }
 
-      result.status = 'completed';
-      console.log(`✅ Email processing completed for: ${email.subject}`);
-      console.log(`📊 Summary: ${processedInvoices} invoices stored from ${attachments.length} attachments`);
+        console.log(`✅ Found ${attachments.length} supported attachments to process`);
+
+        // Step 3: Process each attachment individually
+        let processedInvoices = 0;
+        for (let i = 0; i < attachments.length; i++) {
+          const attachment = attachments[i];
+          console.log(`🔍 Processing attachment ${i + 1}/${attachments.length}: ${attachment.filename}`);
+          
+          try {
+            const wasInvoiceProcessed = await this.processAttachment(attachment, email, result.emailContext?.context || {}, result);
+            if (wasInvoiceProcessed) {
+              processedInvoices++;
+            }
+          } catch (attachmentError) {
+            console.error(`❌ Error processing attachment ${attachment.filename}:`, attachmentError);
+            // Continue with other attachments
+          }
+        }
+
+        result.status = 'completed';
+        console.log(`✅ Email processing completed for: ${email.subject}`);
+        console.log(`📊 Summary: ${processedInvoices} invoices stored from ${attachments.length} attachments`);
+
+      } catch (attachmentError) {
+        console.error('❌ Error extracting attachments:', attachmentError);
+        result.status = 'error';
+        result.error = `Failed to extract attachments: ${attachmentError instanceof Error ? attachmentError.message : 'Unknown error'}`;
+      }
 
     } catch (error) {
       console.error(`❌ Error processing email ${email.subject}:`, error);
@@ -93,25 +116,36 @@ export class EmailProcessingService {
     emailContext: any,
     result: ProcessingResult
   ): Promise<boolean> {
-    const wasExtracted = await this.emailAttachmentProcessor.processAttachment(attachment, email, emailContext, result);
-    
-    if (wasExtracted) {
-      // Find the extraction result for this attachment
-      const extraction = result.extractedData.find(e => e.filename === attachment.filename);
+    try {
+      const wasExtracted = await this.emailAttachmentProcessor.processAttachment(attachment, email, emailContext, result);
       
-      if (extraction && extraction.success && extraction.data) {
-        console.log(`💾 Step 3c: Storing invoice data from ${attachment.filename} in database...`);
-        await this.databaseStorage.storeInvoiceInDatabase(
-          extraction.data, 
-          email, 
-          attachment.filename,
-          emailContext
-        );
-        console.log(`✅ Successfully stored invoice data for ${attachment.filename}`);
-        return true;
+      if (wasExtracted) {
+        // Find the extraction result for this attachment
+        const extraction = result.extractedData.find(e => e.filename === attachment.filename);
+        
+        if (extraction && extraction.success && extraction.data) {
+          console.log(`💾 Step 3c: Storing invoice data from ${attachment.filename} in database...`);
+          
+          try {
+            await this.databaseStorage.storeInvoiceInDatabase(
+              extraction.data, 
+              email, 
+              attachment.filename,
+              emailContext
+            );
+            console.log(`✅ Successfully stored invoice data for ${attachment.filename}`);
+            return true;
+          } catch (dbError) {
+            console.error(`❌ Database storage failed for ${attachment.filename}:`, dbError);
+            // Don't throw, just log the error and continue
+          }
+        }
       }
+      
+      return false;
+    } catch (error) {
+      console.error(`❌ Error in processAttachment for ${attachment.filename}:`, error);
+      return false;
     }
-    
-    return false;
   }
 }
