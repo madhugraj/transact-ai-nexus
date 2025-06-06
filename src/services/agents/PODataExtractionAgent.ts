@@ -6,30 +6,101 @@ export class PODataExtractionAgent {
     try {
       console.log(`📊 PODataExtractionAgent: Processing file ${file.name} with Gemini AI`);
       
-      // Convert file to base64 for Gemini processing
-      const base64Data = await fileToBase64(file);
-      console.log(`📊 PODataExtractionAgent: File converted to base64`);
-      
-      // Extract PO data using Gemini AI
-      const extractedData = await this.extractPODataWithGemini(base64Data, file.type, file.name);
-      
-      if (!extractedData.success) {
-        console.error(`❌ PODataExtractionAgent: Gemini extraction failed for ${file.name}:`, extractedData.error);
-        return extractedData;
+      // Check if it's a PDF file
+      if (file.type === 'application/pdf') {
+        console.log(`📄 PODataExtractionAgent: Converting PDF to images for ${file.name}`);
+        const imageData = await this.convertPdfToImage(file);
+        
+        if (!imageData) {
+          throw new Error('Failed to convert PDF to image');
+        }
+        
+        // Extract PO data using Gemini AI with converted image
+        const extractedData = await this.extractPODataWithGemini(imageData.base64, imageData.mimeType, file.name);
+        
+        if (!extractedData.success) {
+          console.error(`❌ PODataExtractionAgent: Gemini extraction failed for ${file.name}:`, extractedData.error);
+          return extractedData;
+        }
+        
+        console.log(`📊 PODataExtractionAgent: Successfully extracted data for ${file.name}:`, extractedData.data);
+        
+        return {
+          success: true,
+          data: extractedData.data
+        };
+      } else {
+        // For image files, convert directly to base64
+        const base64Data = await fileToBase64(file);
+        console.log(`📊 PODataExtractionAgent: File converted to base64`);
+        
+        // Extract PO data using Gemini AI
+        const extractedData = await this.extractPODataWithGemini(base64Data, file.type, file.name);
+        
+        if (!extractedData.success) {
+          console.error(`❌ PODataExtractionAgent: Gemini extraction failed for ${file.name}:`, extractedData.error);
+          return extractedData;
+        }
+        
+        console.log(`📊 PODataExtractionAgent: Successfully extracted data for ${file.name}:`, extractedData.data);
+        
+        return {
+          success: true,
+          data: extractedData.data
+        };
       }
-      
-      console.log(`📊 PODataExtractionAgent: Successfully extracted data for ${file.name}:`, extractedData.data);
-      
-      return {
-        success: true,
-        data: extractedData.data
-      };
     } catch (error) {
       console.error(`❌ PODataExtractionAgent error for ${file.name}:`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Data extraction failed'
       };
+    }
+  }
+  
+  private async convertPdfToImage(file: File): Promise<{ base64: string; mimeType: string } | null> {
+    try {
+      console.log(`🔄 PODataExtractionAgent: Starting PDF to image conversion for ${file.name}`);
+      
+      // Use PDF.js to convert PDF to canvas/image
+      const pdfjsLib = await import('pdfjs-dist');
+      
+      // Set worker source
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+      
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      
+      console.log(`📄 PODataExtractionAgent: PDF loaded with ${pdf.numPages} pages`);
+      
+      // Get the first page
+      const page = await pdf.getPage(1);
+      const viewport = page.getViewport({ scale: 2.0 }); // Higher scale for better quality
+      
+      // Create canvas
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d')!;
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+      
+      // Render page to canvas
+      await page.render({
+        canvasContext: context,
+        viewport: viewport
+      }).promise;
+      
+      // Convert canvas to base64
+      const base64 = canvas.toDataURL('image/png').split(',')[1];
+      
+      console.log(`✅ PODataExtractionAgent: Successfully converted PDF to image for ${file.name}`);
+      
+      return {
+        base64,
+        mimeType: 'image/png'
+      };
+    } catch (error) {
+      console.error(`❌ PODataExtractionAgent: PDF conversion error for ${file.name}:`, error);
+      return null;
     }
   }
   
@@ -97,7 +168,7 @@ Only return valid JSON with no additional text, explanations or markdown. If a f
                   {
                     inline_data: {
                       mime_type: mimeType,
-                      data: base64Image.replace(/^data:image\/\w+;base64,/, '')
+                      data: base64Image
                     }
                   }
                 ]
