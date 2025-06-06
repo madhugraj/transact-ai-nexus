@@ -45,6 +45,9 @@ const ProcessingSection = ({ downloadedFiles, onProcessingComplete, onClose }: P
           description: `Successfully processed ${successCount} PO files. ${errorCount > 0 ? `${errorCount} errors. ` : ''}${skippedCount > 0 ? `${skippedCount} files skipped.` : ''}`,
           variant: errorCount > successCount ? "destructive" : "default"
         });
+        
+        // Call the completion callback
+        onProcessingComplete(results);
       } else if (errorCount > 0) {
         toast({
           title: "Processing Failed",
@@ -58,7 +61,6 @@ const ProcessingSection = ({ downloadedFiles, onProcessingComplete, onClose }: P
         });
       }
 
-      onProcessingComplete(results);
     } catch (error) {
       console.error(`❌ Processing error:`, error);
       toast({
