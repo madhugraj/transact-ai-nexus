@@ -74,17 +74,19 @@ export class GoogleAuthService {
     return hasTokens;
   }
 
-  // Create auth URL for popup with EXACT redirect URI
+  // Create auth URL for popup with dynamic redirect URI
   createAuthUrl(): string {
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     
-    // Use the EXACT redirect URI that's configured in Google Cloud Console
-    const exactRedirectUri = 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback';
+    // Use current origin for redirect URI to handle different deployments
+    const currentOrigin = window.location.origin;
+    const redirectUri = `${currentOrigin}/oauth/callback`;
     
     console.log('Creating auth URL with config:', {
       clientId: this.config.clientId,
-      redirectUri: exactRedirectUri,
-      scopes: this.config.scopes.join(' ')
+      redirectUri: redirectUri,
+      scopes: this.config.scopes.join(' '),
+      currentOrigin
     });
     
     authUrl.searchParams.set('client_id', this.config.clientId);
@@ -92,7 +94,7 @@ export class GoogleAuthService {
     authUrl.searchParams.set('scope', this.config.scopes.join(' '));
     authUrl.searchParams.set('access_type', 'offline');
     authUrl.searchParams.set('prompt', 'consent');
-    authUrl.searchParams.set('redirect_uri', exactRedirectUri);
+    authUrl.searchParams.set('redirect_uri', redirectUri);
     
     const finalUrl = authUrl.toString();
     console.log('Generated auth URL (truncated):', finalUrl.substring(0, 100) + '...');
@@ -123,12 +125,11 @@ export class GoogleAuthService {
 
       // Listen for messages from the popup
       const messageListener = (event: MessageEvent) => {
-        // Accept messages from our OAuth callback page
+        // Accept messages from our OAuth callback page and current origin
         const allowedOrigins = [
           window.location.origin,
           'https://transact-ai-nexus.lovable.app',
-          'https://preview--transact-ai-nexus.lovable.app',
-          'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com'
+          'https://preview--transact-ai-nexus.lovable.app'
         ];
         
         if (!allowedOrigins.includes(event.origin)) {
@@ -194,11 +195,15 @@ export class GoogleAuthService {
       console.log('Exchanging authorization code for access token...');
       const { supabase } = await import('@/integrations/supabase/client');
       
+      // Use dynamic redirect URI for token exchange
+      const currentOrigin = window.location.origin;
+      const redirectUri = `${currentOrigin}/oauth/callback`;
+      
       const { data, error } = await supabase.functions.invoke('google-auth', {
         body: {
           authCode,
           scope: this.config.scopes.join(' '),
-          redirectUri: this.config.redirectUri
+          redirectUri: redirectUri
         }
       });
 
