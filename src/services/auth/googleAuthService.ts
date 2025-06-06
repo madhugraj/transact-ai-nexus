@@ -1,4 +1,3 @@
-
 export interface AuthConfig {
   clientId: string;
   scopes: string[];
@@ -74,19 +73,19 @@ export class GoogleAuthService {
     return hasTokens;
   }
 
-  // Create auth URL for popup with dynamic redirect URI
+  // Create auth URL for popup with specific redirect URI
   createAuthUrl(): string {
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     
-    // Use current origin for redirect URI to handle different deployments
-    const currentOrigin = window.location.origin;
-    const redirectUri = `${currentOrigin}/oauth/callback`;
+    // Use the specific redirect URI that must match Google Cloud Console configuration
+    // This needs to be the exact URL configured in Google Cloud Console
+    const redirectUri = 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback';
     
     console.log('Creating auth URL with config:', {
       clientId: this.config.clientId,
       redirectUri: redirectUri,
       scopes: this.config.scopes.join(' '),
-      currentOrigin
+      currentOrigin: window.location.origin
     });
     
     authUrl.searchParams.set('client_id', this.config.clientId);
@@ -195,9 +194,8 @@ export class GoogleAuthService {
       console.log('Exchanging authorization code for access token...');
       const { supabase } = await import('@/integrations/supabase/client');
       
-      // Use dynamic redirect URI for token exchange
-      const currentOrigin = window.location.origin;
-      const redirectUri = `${currentOrigin}/oauth/callback`;
+      // Use the same redirect URI as in createAuthUrl for consistency
+      const redirectUri = 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback';
       
       const { data, error } = await supabase.functions.invoke('google-auth', {
         body: {

@@ -17,6 +17,7 @@ const OAuthCallback = () => {
     // Send the result back to the parent window
     if (window.opener) {
       const targetOrigins = [
+        window.location.origin,
         'https://lovable.dev',
         'https://transact-ai-nexus.lovable.app',
         'https://preview--transact-ai-nexus.lovable.app',
