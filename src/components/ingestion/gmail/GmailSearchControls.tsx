@@ -60,6 +60,9 @@ const GmailSearchControls: React.FC<GmailSearchControlsProps> = ({
           <div>• <code>subject:invoice</code> - subject contains "invoice"</div>
           <div>• <code>newer_than:7d</code> - emails from last 7 days</div>
         </div>
+        <div className="mt-1 text-blue-600">
+          Current limit: {maxResults} emails - increase for more results
+        </div>
       </div>
     </div>
   );

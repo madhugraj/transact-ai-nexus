@@ -10,6 +10,7 @@ export class DatabaseStorage {
     emailContext: any
   ): Promise<void> {
     console.log(`💾 Processing invoice data for storage: ${filename}`);
+    console.log(`📊 Extracted data:`, extractedData);
     
     try {
       // Validate required fields before processing
@@ -17,24 +18,49 @@ export class DatabaseStorage {
         throw new Error('No extracted data provided');
       }
 
+      // Extract invoice number - handle string to number conversion
+      let invoiceNumber = 0;
+      if (extractedData.invoice_number) {
+        if (typeof extractedData.invoice_number === 'string') {
+          // Try to extract numbers from string
+          const numberMatch = extractedData.invoice_number.match(/\d+/);
+          invoiceNumber = numberMatch ? parseInt(numberMatch[0]) : 0;
+        } else {
+          invoiceNumber = parseInt(extractedData.invoice_number) || 0;
+        }
+      }
+
+      console.log(`📋 Invoice number extracted: ${invoiceNumber}`);
+
       // Check if PO number exists in po_table if provided
-      let poExists = false;
+      let poNumber = null;
       if (extractedData.po_number) {
         console.log(`🔍 Checking if PO number ${extractedData.po_number} exists in po_table...`);
         
-        const { data: poData, error: poError } = await supabase
-          .from('po_table')
-          .select('po_number')
-          .eq('po_number', extractedData.po_number)
-          .single();
-
-        if (poError && poError.code !== 'PGRST116') { // PGRST116 is "not found"
-          console.error('Error checking PO existence:', poError);
-        } else if (poData) {
-          poExists = true;
-          console.log(`✅ PO number ${extractedData.po_number} exists in po_table`);
+        let poNumberValue;
+        if (typeof extractedData.po_number === 'string') {
+          // Try to extract numbers from string
+          const numberMatch = extractedData.po_number.match(/\d+/);
+          poNumberValue = numberMatch ? parseInt(numberMatch[0]) : null;
         } else {
-          console.log(`⚠️ PO number ${extractedData.po_number} not found in po_table - will proceed without PO reference`);
+          poNumberValue = parseInt(extractedData.po_number) || null;
+        }
+
+        if (poNumberValue) {
+          const { data: poData, error: poError } = await supabase
+            .from('po_table')
+            .select('po_number')
+            .eq('po_number', poNumberValue)
+            .single();
+
+          if (poError && poError.code !== 'PGRST116') { // PGRST116 is "not found"
+            console.error('Error checking PO existence:', poError);
+          } else if (poData) {
+            poNumber = poNumberValue;
+            console.log(`✅ PO number ${poNumberValue} exists in po_table`);
+          } else {
+            console.log(`⚠️ PO number ${poNumberValue} not found in po_table - will proceed without PO reference`);
+          }
         }
       }
 
@@ -43,17 +69,17 @@ export class DatabaseStorage {
       console.log(`📊 Line items found: ${lineItems.length}`);
 
       if (lineItems.length > 0) {
-        console.log(`💾 Storing ${lineItems.length} line item(s) for invoice: ${extractedData.invoice_number}`);
+        console.log(`💾 Storing ${lineItems.length} line item(s) for invoice: ${invoiceNumber}`);
         
         for (let i = 0; i < lineItems.length; i++) {
           const lineItem = lineItems[i];
-          console.log(`💾 Inserting line item ${i + 1}/${lineItems.length} for invoice: ${extractedData.invoice_number}`);
+          console.log(`💾 Inserting line item ${i + 1}/${lineItems.length} for invoice: ${invoiceNumber}`);
           
           // Map to the actual invoice_table schema
           const invoiceRecord = {
-            po_number: poExists ? extractedData.po_number : null,
+            po_number: poNumber,
             invoice_date: extractedData.invoice_date || null,
-            invoice_number: extractedData.invoice_number || 0,
+            invoice_number: invoiceNumber,
             email_date: email.date ? new Date(email.date).toISOString().split('T')[0] : null,
             details: {
               vendor_name: extractedData.vendor_name || '',
@@ -72,7 +98,7 @@ export class DatabaseStorage {
             email_header: email.subject || ''
           };
 
-          console.log(`💾 Inserting invoice record:`, {
+          console.log(`💾 Attempting to insert invoice record:`, {
             invoice_number: invoiceRecord.invoice_number,
             po_number: invoiceRecord.po_number,
             attachment_invoice_name: invoiceRecord.attachment_invoice_name,
@@ -80,18 +106,21 @@ export class DatabaseStorage {
           });
 
           try {
-            const { error: insertError } = await supabase
+            const { data, error: insertError } = await supabase
               .from('invoice_table')
-              .insert([invoiceRecord]);
+              .insert([invoiceRecord])
+              .select();
 
             if (insertError) {
               console.error(`❌ Database insert error for line item ${i + 1}:`, insertError);
+              console.error(`❌ Failed record:`, invoiceRecord);
               // Don't throw here, continue with other items
             } else {
-              console.log(`✅ Successfully inserted line item ${i + 1}/${lineItems.length}`);
+              console.log(`✅ Successfully inserted line item ${i + 1}/${lineItems.length}`, data);
             }
           } catch (itemError) {
             console.error(`❌ Error inserting line item ${i + 1}:`, itemError);
+            console.error(`❌ Failed record:`, invoiceRecord);
             // Continue with other items
           }
         }
@@ -100,9 +129,9 @@ export class DatabaseStorage {
         console.log(`💾 No line items found, creating single invoice record`);
         
         const invoiceRecord = {
-          po_number: poExists ? extractedData.po_number : null,
+          po_number: poNumber,
           invoice_date: extractedData.invoice_date || null,
-          invoice_number: extractedData.invoice_number || 0,
+          invoice_number: invoiceNumber,
           email_date: email.date ? new Date(email.date).toISOString().split('T')[0] : null,
           details: {
             vendor_name: extractedData.vendor_name || '',
@@ -119,19 +148,28 @@ export class DatabaseStorage {
           email_header: email.subject || ''
         };
 
+        console.log(`💾 Attempting to insert single invoice record:`, {
+          invoice_number: invoiceRecord.invoice_number,
+          po_number: invoiceRecord.po_number,
+          attachment_invoice_name: invoiceRecord.attachment_invoice_name
+        });
+
         try {
-          const { error: insertError } = await supabase
+          const { data, error: insertError } = await supabase
             .from('invoice_table')
-            .insert([invoiceRecord]);
+            .insert([invoiceRecord])
+            .select();
 
           if (insertError) {
             console.error(`❌ Database insert error:`, insertError);
+            console.error(`❌ Failed record:`, invoiceRecord);
             throw insertError;
           } else {
-            console.log(`✅ Successfully inserted invoice record`);
+            console.log(`✅ Successfully inserted invoice record`, data);
           }
         } catch (insertError) {
           console.error(`❌ Failed to insert invoice record:`, insertError);
+          console.error(`❌ Failed record:`, invoiceRecord);
           throw insertError;
         }
       }
