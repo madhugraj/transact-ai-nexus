@@ -25,30 +25,53 @@ export class GoogleAuthService {
   getStoredTokens(): { accessToken?: string; refreshToken?: string } {
     try {
       const stored = localStorage.getItem(this.storageKey);
-      return stored ? JSON.parse(stored) : {};
-    } catch {
+      if (!stored) return {};
+      
+      const parsed = JSON.parse(stored);
+      console.log('Retrieved stored tokens:', { 
+        hasAccessToken: !!parsed.accessToken,
+        timestamp: parsed.timestamp,
+        age: parsed.timestamp ? Date.now() - parsed.timestamp : 'unknown'
+      });
+      
+      return parsed;
+    } catch (error) {
+      console.error('Error retrieving stored tokens:', error);
       return {};
     }
   }
 
   // Store tokens
   storeTokens(accessToken: string, refreshToken?: string): void {
-    localStorage.setItem(this.storageKey, JSON.stringify({
-      accessToken,
-      refreshToken,
-      timestamp: Date.now()
-    }));
+    try {
+      const tokenData = {
+        accessToken,
+        refreshToken,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(this.storageKey, JSON.stringify(tokenData));
+      console.log('Stored new tokens:', { hasAccessToken: !!accessToken, hasRefreshToken: !!refreshToken });
+    } catch (error) {
+      console.error('Error storing tokens:', error);
+    }
   }
 
   // Clear stored tokens
   clearTokens(): void {
-    localStorage.removeItem(this.storageKey);
+    try {
+      localStorage.removeItem(this.storageKey);
+      console.log('Cleared stored tokens');
+    } catch (error) {
+      console.error('Error clearing tokens:', error);
+    }
   }
 
   // Check if we have valid stored tokens
   hasValidTokens(): boolean {
     const tokens = this.getStoredTokens();
-    return !!tokens.accessToken;
+    const hasTokens = !!tokens.accessToken;
+    console.log('Checking token validity:', { hasTokens });
+    return hasTokens;
   }
 
   // Create auth URL for popup with EXACT redirect URI
@@ -58,10 +81,11 @@ export class GoogleAuthService {
     // Use the EXACT redirect URI that's configured in Google Cloud Console
     const exactRedirectUri = 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback';
     
-    console.log('Auth URL Debug Info:');
-    console.log('- Client ID:', this.config.clientId);
-    console.log('- EXACT Redirect URI:', exactRedirectUri);
-    console.log('- Scopes:', this.config.scopes);
+    console.log('Creating auth URL with config:', {
+      clientId: this.config.clientId,
+      redirectUri: exactRedirectUri,
+      scopes: this.config.scopes.join(' ')
+    });
     
     authUrl.searchParams.set('client_id', this.config.clientId);
     authUrl.searchParams.set('response_type', 'code');
@@ -71,16 +95,17 @@ export class GoogleAuthService {
     authUrl.searchParams.set('redirect_uri', exactRedirectUri);
     
     const finalUrl = authUrl.toString();
-    console.log('Final Auth URL:', finalUrl);
+    console.log('Generated auth URL (truncated):', finalUrl.substring(0, 100) + '...');
     
     return finalUrl;
   }
 
   // Popup-based authentication
   async authenticateWithPopup(): Promise<AuthResult> {
+    console.log('Starting popup authentication...');
+    
     return new Promise((resolve) => {
       const authUrl = this.createAuthUrl();
-      console.log('Opening popup with URL:', authUrl);
       
       const popup = window.open(
         authUrl, 
@@ -89,7 +114,7 @@ export class GoogleAuthService {
       );
 
       if (!popup) {
-        console.error('Popup was blocked');
+        console.error('Popup was blocked by browser');
         resolve({ success: false, error: 'Popup was blocked. Please allow popups for this site.' });
         return;
       }
@@ -98,7 +123,7 @@ export class GoogleAuthService {
 
       // Listen for messages from the popup
       const messageListener = (event: MessageEvent) => {
-        // Accept messages from our OAuth callback page - be more permissive with origins
+        // Accept messages from our OAuth callback page
         const allowedOrigins = [
           window.location.origin,
           'https://transact-ai-nexus.lovable.app',
@@ -107,17 +132,16 @@ export class GoogleAuthService {
         ];
         
         if (!allowedOrigins.includes(event.origin)) {
-          console.log('Message from unexpected origin:', event.origin);
+          console.log('Message from unexpected origin ignored:', event.origin);
           return;
         }
 
-        console.log('Received message from popup:', event);
+        console.log('Received auth message:', event.data);
         
         if (event.data && event.data.type === 'OAUTH_SUCCESS') {
           messageReceived = true;
           window.removeEventListener('message', messageListener);
           
-          // Don't close popup immediately, let the callback handle it
           setTimeout(() => {
             if (!popup.closed) {
               popup.close();
@@ -125,7 +149,7 @@ export class GoogleAuthService {
           }, 100);
           
           if (event.data.code) {
-            console.log('OAuth success received, code:', event.data.code);
+            console.log('OAuth success, exchanging code for tokens...');
             this.exchangeCodeForToken(event.data.code).then(resolve);
           } else {
             console.error('No authorization code received');
@@ -141,34 +165,33 @@ export class GoogleAuthService {
             }
           }, 100);
           
-          console.error('OAuth error received:', event.data.error);
+          console.error('OAuth error:', event.data.error);
           resolve({ success: false, error: event.data.error || 'Authentication failed' });
         }
       };
 
       window.addEventListener('message', messageListener);
 
-      // Check if popup was closed manually - but wait longer and check for messages first
+      // Check if popup was closed manually
       const checkClosed = setInterval(() => {
         if (popup.closed) {
-          console.log('Popup was closed');
+          console.log('Popup was closed manually');
           clearInterval(checkClosed);
           window.removeEventListener('message', messageListener);
           
-          // Only treat as cancelled if no message was received
           if (!messageReceived) {
-            console.log('Popup closed without receiving auth message');
+            console.log('Authentication cancelled by user');
             resolve({ success: false, error: 'Authentication was cancelled' });
           }
         }
-      }, 2000); // Check every 2 seconds instead of 1 second to give more time for messages
+      }, 2000);
     });
   }
 
   // Exchange auth code for tokens
   private async exchangeCodeForToken(authCode: string): Promise<AuthResult> {
     try {
-      console.log('Exchanging auth code for tokens...');
+      console.log('Exchanging authorization code for access token...');
       const { supabase } = await import('@/integrations/supabase/client');
       
       const { data, error } = await supabase.functions.invoke('google-auth', {
@@ -180,11 +203,15 @@ export class GoogleAuthService {
       });
 
       if (error) {
-        console.error('Supabase function error:', error);
+        console.error('Token exchange error:', error);
         throw error;
       }
 
-      console.log('Token exchange response:', data);
+      console.log('Token exchange response:', { 
+        success: data?.success, 
+        hasAccessToken: !!data?.accessToken,
+        hasRefreshToken: !!data?.refreshToken 
+      });
 
       if (data.success) {
         this.storeTokens(data.accessToken, data.refreshToken);
@@ -197,7 +224,7 @@ export class GoogleAuthService {
         throw new Error(data.error);
       }
     } catch (error) {
-      console.error('Token exchange error:', error);
+      console.error('Token exchange failed:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Token exchange failed'
