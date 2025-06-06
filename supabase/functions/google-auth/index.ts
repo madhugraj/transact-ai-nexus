@@ -26,8 +26,8 @@ serve(async (req) => {
                          Deno.env.get('client_secret') ||
                          Deno.env.get('Client secret');
     
-    // Use the specific redirect URI that matches Google Cloud Console configuration
-    const REDIRECT_URI = 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback';
+    // Use the redirect URI passed from the client (it will be one of the configured ones)
+    const REDIRECT_URI = redirectUri;
 
     if (!CLIENT_SECRET) {
       console.error('Available environment variables:', Object.keys(Deno.env.toObject()));
@@ -35,7 +35,7 @@ serve(async (req) => {
     }
 
     console.log('Exchanging auth code for tokens...');
-    console.log('Using exact redirect URI:', REDIRECT_URI);
+    console.log('Using redirect URI:', REDIRECT_URI);
     console.log('Client secret found:', CLIENT_SECRET ? 'Yes' : 'No');
 
     // Exchange authorization code for access token

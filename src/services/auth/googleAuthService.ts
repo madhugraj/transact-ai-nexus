@@ -73,13 +73,36 @@ export class GoogleAuthService {
     return hasTokens;
   }
 
-  // Create auth URL for popup with specific redirect URI
+  // Get the correct redirect URI based on current domain
+  private getRedirectUri(): string {
+    const currentOrigin = window.location.origin;
+    
+    // Map of allowed origins to their redirect URIs
+    const allowedRedirects = [
+      'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback',
+      'https://transact-ai-nexus.lovable.app/oauth/callback',
+      'https://preview--transact-ai-nexus.lovable.app/oauth/callback'
+    ];
+    
+    // Find matching redirect URI for current origin
+    for (const uri of allowedRedirects) {
+      const uriOrigin = new URL(uri).origin;
+      if (currentOrigin === uriOrigin) {
+        console.log('Using redirect URI:', uri, 'for origin:', currentOrigin);
+        return uri;
+      }
+    }
+    
+    // Fallback to the project-specific URI
+    const fallbackUri = 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback';
+    console.log('No exact match found, using fallback URI:', fallbackUri, 'for origin:', currentOrigin);
+    return fallbackUri;
+  }
+
+  // Create auth URL for popup with correct redirect URI
   createAuthUrl(): string {
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    
-    // Use the specific redirect URI that must match Google Cloud Console configuration
-    // This needs to be the exact URL configured in Google Cloud Console
-    const redirectUri = 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback';
+    const redirectUri = this.getRedirectUri();
     
     console.log('Creating auth URL with config:', {
       clientId: this.config.clientId,
@@ -195,7 +218,7 @@ export class GoogleAuthService {
       const { supabase } = await import('@/integrations/supabase/client');
       
       // Use the same redirect URI as in createAuthUrl for consistency
-      const redirectUri = 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback';
+      const redirectUri = this.getRedirectUri();
       
       const { data, error } = await supabase.functions.invoke('google-auth', {
         body: {
