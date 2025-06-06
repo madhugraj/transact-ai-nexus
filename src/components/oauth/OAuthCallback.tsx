@@ -16,14 +16,6 @@ const OAuthCallback = () => {
     
     // Send the result back to the parent window
     if (window.opener) {
-      const targetOrigins = [
-        window.location.origin,
-        'https://lovable.dev',
-        'https://transact-ai-nexus.lovable.app',
-        'https://preview--transact-ai-nexus.lovable.app',
-        'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com'
-      ];
-      
       if (code) {
         console.log('Sending success message to parent window');
         const message = {
@@ -31,14 +23,12 @@ const OAuthCallback = () => {
           code: code
         };
         
-        // Send to all possible parent origins
-        targetOrigins.forEach(origin => {
-          try {
-            window.opener.postMessage(message, origin);
-          } catch (e) {
-            console.log('Failed to send message to origin:', origin);
-          }
-        });
+        // Send to parent window (any origin since we're in a popup)
+        try {
+          window.opener.postMessage(message, '*');
+        } catch (e) {
+          console.log('Failed to send message to parent window:', e);
+        }
         
         // Wait a bit before closing to ensure message is received
         setTimeout(() => {
@@ -51,14 +41,12 @@ const OAuthCallback = () => {
           error: error
         };
         
-        // Send to all possible parent origins
-        targetOrigins.forEach(origin => {
-          try {
-            window.opener.postMessage(message, origin);
-          } catch (e) {
-            console.log('Failed to send error message to origin:', origin);
-          }
-        });
+        // Send to parent window (any origin since we're in a popup)
+        try {
+          window.opener.postMessage(message, '*');
+        } catch (e) {
+          console.log('Failed to send error message to parent window:', e);
+        }
         
         setTimeout(() => {
           window.close();

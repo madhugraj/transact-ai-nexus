@@ -77,26 +77,11 @@ export class GoogleAuthService {
   private getRedirectUri(): string {
     const currentOrigin = window.location.origin;
     
-    // Map of allowed origins to their redirect URIs
-    const allowedRedirects = [
-      'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback',
-      'https://transact-ai-nexus.lovable.app/oauth/callback',
-      'https://preview--transact-ai-nexus.lovable.app/oauth/callback'
-    ];
+    // Always use the current origin + /oauth/callback
+    const redirectUri = `${currentOrigin}/oauth/callback`;
     
-    // Find matching redirect URI for current origin
-    for (const uri of allowedRedirects) {
-      const uriOrigin = new URL(uri).origin;
-      if (currentOrigin === uriOrigin) {
-        console.log('Using redirect URI:', uri, 'for origin:', currentOrigin);
-        return uri;
-      }
-    }
-    
-    // Fallback to the project-specific URI
-    const fallbackUri = 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback';
-    console.log('No exact match found, using fallback URI:', fallbackUri, 'for origin:', currentOrigin);
-    return fallbackUri;
+    console.log('Using redirect URI:', redirectUri, 'for origin:', currentOrigin);
+    return redirectUri;
   }
 
   // Create auth URL for popup with correct redirect URI

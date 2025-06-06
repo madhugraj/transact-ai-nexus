@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -36,11 +37,11 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   const [hasLoadedInitialEmails, setHasLoadedInitialEmails] = useState(false);
   const { toast } = useToast();
 
-  // Use EXACT redirect URI that matches Google Cloud Console configuration
+  // Use current domain for redirect URI
   const authService = new GoogleAuthService({
     clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
     scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
-    redirectUri: 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com/oauth/callback'
+    redirectUri: '' // This will be determined dynamically
   }, 'gmail_auth_tokens');
 
   // Check for stored tokens on mount and maintain connection
