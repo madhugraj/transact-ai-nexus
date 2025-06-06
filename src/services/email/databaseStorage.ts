@@ -4,75 +4,130 @@ import { GmailMessage } from './types';
 
 export class DatabaseStorage {
   async storeInvoiceInDatabase(
-    invoiceData: any, 
-    email: GmailMessage, 
-    fileName: string,
+    extractedData: any,
+    email: GmailMessage,
+    filename: string,
     emailContext: any
-  ) {
+  ): Promise<void> {
+    console.log(`💾 Processing invoice data for storage: ${filename}`);
+    
     try {
-      console.log(`💾 Processing invoice data for storage: ${fileName}`);
-      console.log(`📊 Line items found: ${invoiceData.line_items?.length || 0}`);
+      // Check if PO number exists in po_table if provided
+      let poExists = false;
+      if (extractedData.po_number) {
+        console.log(`🔍 Checking if PO number ${extractedData.po_number} exists in po_table...`);
+        
+        const { data: poData, error: poError } = await supabase
+          .from('po_table')
+          .select('po_number')
+          .eq('po_number', extractedData.po_number)
+          .single();
 
-      // Handle case where there are no line items or line_items is not an array
-      const lineItems = Array.isArray(invoiceData.line_items) && invoiceData.line_items.length > 0 
-        ? invoiceData.line_items 
-        : [{ description: 'No line items found', quantity: 0, unit_price: 0, total_amount: 0 }];
-
-      console.log(`💾 Storing ${lineItems.length} line item(s) for invoice: ${invoiceData.invoice_number}`);
-
-      // Store each line item as a separate row in invoice_table
-      for (let i = 0; i < lineItems.length; i++) {
-        const lineItem = lineItems[i];
-        console.log(`💾 Inserting line item ${i + 1}/${lineItems.length} for invoice: ${invoiceData.invoice_number}`);
-
-        const invoiceRecord = {
-          invoice_number: parseInt(invoiceData.invoice_number) || 0,
-          po_number: parseInt(invoiceData.po_number) || 0,
-          invoice_date: invoiceData.invoice_date,
-          email_header: email.subject,
-          email_date: email.date,
-          attachment_invoice_name: fileName,
-          details: {
-            supplier_gst_number: invoiceData.supplier_gst_number,
-            bill_to_gst_number: invoiceData.bill_to_gst_number,
-            shipping_address: invoiceData.shipping_address,
-            seal_and_sign_present: invoiceData.seal_and_sign_present,
-            email_from: email.from,
-            file_name: fileName,
-            line_item: lineItem,
-            line_item_index: i + 1,
-            total_line_items: lineItems.length,
-            extraction_confidence: invoiceData.extraction_confidence,
-            email_context: emailContext,
-            processed_at: new Date().toISOString()
-          }
-        };
-
-        console.log(`💾 Inserting invoice record:`, {
-          invoice_number: invoiceRecord.invoice_number,
-          po_number: invoiceRecord.po_number,
-          fileName: fileName,
-          email_subject: email.subject,
-          line_item_index: i + 1,
-          total_line_items: lineItems.length
-        });
-
-        const { data, error } = await supabase
-          .from('invoice_table')
-          .insert(invoiceRecord)
-          .select();
-
-        if (error) {
-          console.error(`❌ Database insert error for line item ${i + 1}:`, error);
-          throw error;
+        if (poError && poError.code !== 'PGRST116') { // PGRST116 is "not found"
+          console.error('Error checking PO existence:', poError);
+        } else if (poData) {
+          poExists = true;
+          console.log(`✅ PO number ${extractedData.po_number} exists in po_table`);
         } else {
-          console.log(`✅ Line item ${i + 1}/${lineItems.length} stored successfully:`, data);
+          console.log(`⚠️ PO number ${extractedData.po_number} not found in po_table - will proceed without PO reference`);
         }
       }
 
-      console.log(`✅ All ${lineItems.length} line item(s) stored successfully for ${fileName}`);
+      // Process line items
+      const lineItems = extractedData.line_items || [];
+      console.log(`📊 Line items found: ${lineItems.length}`);
+
+      if (lineItems.length > 0) {
+        console.log(`💾 Storing ${lineItems.length} line item(s) for invoice: ${extractedData.invoice_number}`);
+        
+        for (let i = 0; i < lineItems.length; i++) {
+          const lineItem = lineItems[i];
+          console.log(`💾 Inserting line item ${i + 1}/${lineItems.length} for invoice: ${extractedData.invoice_number}`);
+          
+          const invoiceRecord = {
+            invoice_number: extractedData.invoice_number || 0,
+            po_number: poExists ? extractedData.po_number : null, // Only include PO if it exists
+            invoice_date: extractedData.invoice_date || null,
+            vendor_name: extractedData.vendor_name || '',
+            item_description: lineItem.description || lineItem.item_description || '',
+            quantity: lineItem.quantity || 0,
+            unit_price: lineItem.unit_price || lineItem.price || 0,
+            line_total: lineItem.total || lineItem.line_total || (lineItem.quantity * lineItem.unit_price) || 0,
+            gst_rate: lineItem.gst_rate || extractedData.gst_rate || 0,
+            gst_amount: lineItem.gst_amount || extractedData.gst_amount || 0,
+            total_amount: lineItem.total_amount || extractedData.total_amount || 0,
+            fileName: filename,
+            email_subject: email.subject || '',
+            email_from: email.from || '',
+            email_date: email.date || new Date().toISOString(),
+            line_item_index: i + 1,
+            total_line_items: lineItems.length,
+            extraction_confidence: extractedData.extraction_confidence || 0,
+            created_at: new Date().toISOString()
+          };
+
+          console.log(`💾 Inserting invoice record:`, {
+            invoice_number: invoiceRecord.invoice_number,
+            po_number: invoiceRecord.po_number,
+            fileName: invoiceRecord.fileName,
+            email_subject: invoiceRecord.email_subject,
+            line_item_index: invoiceRecord.line_item_index,
+            total_line_items: invoiceRecord.total_line_items
+          });
+
+          const { error: insertError } = await supabase
+            .from('invoice_table')
+            .insert([invoiceRecord]);
+
+          if (insertError) {
+            console.error(`❌ Database insert error for line item ${i + 1}:`, insertError);
+            throw insertError;
+          } else {
+            console.log(`✅ Successfully inserted line item ${i + 1}/${lineItems.length}`);
+          }
+        }
+      } else {
+        // Handle case with no line items - create single record
+        console.log(`💾 No line items found, creating single invoice record`);
+        
+        const invoiceRecord = {
+          invoice_number: extractedData.invoice_number || 0,
+          po_number: poExists ? extractedData.po_number : null, // Only include PO if it exists
+          invoice_date: extractedData.invoice_date || null,
+          vendor_name: extractedData.vendor_name || '',
+          item_description: extractedData.description || 'No description available',
+          quantity: 1,
+          unit_price: extractedData.total_amount || 0,
+          line_total: extractedData.total_amount || 0,
+          gst_rate: extractedData.gst_rate || 0,
+          gst_amount: extractedData.gst_amount || 0,
+          total_amount: extractedData.total_amount || 0,
+          fileName: filename,
+          email_subject: email.subject || '',
+          email_from: email.from || '',
+          email_date: email.date || new Date().toISOString(),
+          line_item_index: 1,
+          total_line_items: 1,
+          extraction_confidence: extractedData.extraction_confidence || 0,
+          created_at: new Date().toISOString()
+        };
+
+        const { error: insertError } = await supabase
+          .from('invoice_table')
+          .insert([invoiceRecord]);
+
+        if (insertError) {
+          console.error(`❌ Database insert error:`, insertError);
+          throw insertError;
+        } else {
+          console.log(`✅ Successfully inserted invoice record`);
+        }
+      }
+
+      console.log(`✅ Successfully stored all invoice data for ${filename}`);
+
     } catch (error) {
-      console.error(`❌ Error storing invoice in database for ${fileName}:`, error);
+      console.error(`❌ Error storing invoice in database for ${filename}:`, error);
       throw error;
     }
   }

@@ -187,7 +187,9 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   const handleRefresh = () => {
     console.log('Refresh button clicked');
     if (accessToken) {
+      setHasLoadedInitialEmails(false); // Reset to allow fresh load
       loadGmailMessages(accessToken, true); // Force refresh with toast
+      setHasLoadedInitialEmails(true);
     } else {
       toast({
         title: "Not connected",
@@ -223,9 +225,14 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <span className="text-sm text-green-600">✓ Connected to Gmail</span>
-        <Button variant="outline" size="sm" onClick={handleDisconnect}>
-          Disconnect
-        </Button>
+        <div className="flex space-x-2">
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading}>
+            {isLoading ? 'Refreshing...' : 'Refresh Emails'}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleDisconnect}>
+            Disconnect
+          </Button>
+        </div>
       </div>
 
       <GmailSearchControls
@@ -243,15 +250,6 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
         isLoading={isLoading}
         onEmailSelect={toggleEmailSelection}
       />
-
-      <Button
-        variant="outline"
-        onClick={handleRefresh}
-        disabled={isLoading}
-        size="sm"
-      >
-        {isLoading ? 'Loading...' : 'Refresh'}
-      </Button>
 
       {selectedEmails.length > 0 && (
         <EmailInvoiceProcessor
