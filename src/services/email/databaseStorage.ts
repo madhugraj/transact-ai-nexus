@@ -77,6 +77,19 @@ export class DatabaseStorage {
           const lineItem = lineItems[i];
           console.log(`💾 Inserting line item ${i + 1}/${lineItems.length} for invoice: ${invoiceNumber}`);
           
+          // Check if this exact record already exists to prevent duplicates
+          const { data: existingRecord } = await supabase
+            .from('invoice_table')
+            .select('*')
+            .eq('invoice_number', invoiceNumber)
+            .eq('attachment_invoice_name', filename)
+            .eq('email_header', email.subject || '');
+
+          if (existingRecord && existingRecord.length > 0) {
+            console.log(`⚠️ Record already exists for invoice ${invoiceNumber} with filename ${filename}, skipping insertion`);
+            continue;
+          }
+          
           // Map to the actual invoice_table schema
           const invoiceRecord = {
             po_number: poNumber, // This can now be null
@@ -116,19 +129,46 @@ export class DatabaseStorage {
             if (insertError) {
               console.error(`❌ Database insert error for line item ${i + 1}:`, insertError);
               console.error(`❌ Failed record:`, invoiceRecord);
-              throw insertError; // Throw to stop processing if insertion fails
+              
+              // If it's a duplicate key error, log it but don't throw to continue processing
+              if (insertError.code === '23505') {
+                console.log(`⚠️ Duplicate key detected for line item ${i + 1}, skipping but continuing with next items`);
+                continue;
+              }
+              
+              throw insertError; // Throw for other types of errors
             } else {
               console.log(`✅ Successfully inserted line item ${i + 1}/${lineItems.length} into invoice_table`, data);
             }
-          } catch (itemError) {
+          } catch (itemError: any) {
             console.error(`❌ Error inserting line item ${i + 1}:`, itemError);
             console.error(`❌ Failed record:`, invoiceRecord);
-            throw itemError; // Re-throw to stop processing
+            
+            // If it's a duplicate key error, continue with next item
+            if (itemError.code === '23505') {
+              console.log(`⚠️ Duplicate key detected for line item ${i + 1}, continuing with next items`);
+              continue;
+            }
+            
+            throw itemError; // Re-throw for other types of errors
           }
         }
       } else {
         // Handle case with no line items - create single record
         console.log(`💾 No line items found, creating single invoice record`);
+        
+        // Check if this exact record already exists to prevent duplicates
+        const { data: existingRecord } = await supabase
+          .from('invoice_table')
+          .select('*')
+          .eq('invoice_number', invoiceNumber)
+          .eq('attachment_invoice_name', filename)
+          .eq('email_header', email.subject || '');
+
+        if (existingRecord && existingRecord.length > 0) {
+          console.log(`⚠️ Record already exists for invoice ${invoiceNumber} with filename ${filename}, skipping insertion`);
+          return;
+        }
         
         const invoiceRecord = {
           po_number: poNumber, // This can now be null
@@ -165,13 +205,27 @@ export class DatabaseStorage {
           if (insertError) {
             console.error(`❌ Database insert error:`, insertError);
             console.error(`❌ Failed record:`, invoiceRecord);
+            
+            // If it's a duplicate key error, log it but don't throw
+            if (insertError.code === '23505') {
+              console.log(`⚠️ Duplicate key detected for invoice record, but processing completed`);
+              return;
+            }
+            
             throw insertError;
           } else {
             console.log(`✅ Successfully inserted invoice record into invoice_table`, data);
           }
-        } catch (insertError) {
+        } catch (insertError: any) {
           console.error(`❌ Failed to insert invoice record:`, insertError);
           console.error(`❌ Failed record:`, invoiceRecord);
+          
+          // If it's a duplicate key error, log it but don't throw
+          if (insertError.code === '23505') {
+            console.log(`⚠️ Duplicate key detected for invoice record, but processing completed`);
+            return;
+          }
+          
           throw insertError;
         }
       }
