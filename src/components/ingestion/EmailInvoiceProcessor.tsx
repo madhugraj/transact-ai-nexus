@@ -123,7 +123,7 @@ const EmailInvoiceProcessor: React.FC<EmailInvoiceProcessorProps> = ({
           </div>
         )}
 
-        <ProcessingResults results={results} />
+        <ProcessingResults results={results} isProcessing={processing} />
       </CardContent>
     </Card>
   );
