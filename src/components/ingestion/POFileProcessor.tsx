@@ -59,6 +59,7 @@ const POFileProcessor = ({ selectedFiles, onProcessingComplete }: POFileProcesso
           }
 
           // Step 2: Extract PO data
+          console.log(`📊 Extracting data for PO file: ${file.name}`);
           const extractionResult = await poDataExtractionAgent.process(file);
           
           if (!extractionResult.success) {
@@ -75,26 +76,45 @@ const POFileProcessor = ({ selectedFiles, onProcessingComplete }: POFileProcesso
           const extractedData = extractionResult.data;
           console.log(`📊 Extracted data for ${file.name}:`, extractedData);
 
+          // Validate PO number is present
+          if (!extractedData.po_number) {
+            console.error('❌ Missing required PO number for', file.name);
+            results.push({
+              fileName: file.name,
+              isPO: true,
+              extractedData,
+              error: 'Missing required PO number',
+              status: 'error'
+            });
+            continue;
+          }
+
           // Step 3: Store in po_table
           try {
             console.log(`💾 Inserting PO data for ${file.name} into database...`);
             
+            // Prepare record with proper typing
+            const poRecord = {
+              file_name: file.name,
+              po_number: typeof extractedData.po_number === 'string' ? 
+                parseInt(extractedData.po_number) : extractedData.po_number,
+              po_date: extractedData.po_date,
+              vendor_code: extractedData.vendor_code,
+              gstn: extractedData.gstn,
+              project: extractedData.project,
+              bill_to_address: extractedData.bill_to_address,
+              ship_to: extractedData.ship_to,
+              del_start_date: extractedData.del_start_date,
+              del_end_date: extractedData.del_end_date,
+              terms_conditions: extractedData.terms_conditions,
+              description: Array.isArray(extractedData.description) ? extractedData.description : []
+            };
+
+            console.log(`💾 Inserting PO record:`, poRecord);
+
             const { data: insertData, error: insertError } = await supabase
               .from('po_table')
-              .insert({
-                file_name: file.name,
-                po_number: extractedData.po_number,
-                po_date: extractedData.po_date,
-                vendor_code: extractedData.vendor_code,
-                gstn: extractedData.gstn,
-                project: extractedData.project,
-                bill_to_address: extractedData.bill_to_address,
-                ship_to: extractedData.ship_to,
-                del_start_date: extractedData.del_start_date,
-                del_end_date: extractedData.del_end_date,
-                terms_conditions: extractedData.terms_conditions,
-                description: extractedData.description
-              })
+              .insert(poRecord)
               .select();
 
             if (insertError) {
@@ -107,7 +127,7 @@ const POFileProcessor = ({ selectedFiles, onProcessingComplete }: POFileProcesso
                 status: 'error'
               });
             } else {
-              console.log('✅ Successfully stored PO data for', file.name);
+              console.log('✅ Successfully stored PO data for', file.name, 'Database response:', insertData);
               results.push({
                 fileName: file.name,
                 isPO: true,

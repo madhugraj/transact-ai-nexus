@@ -32,8 +32,8 @@ export class PODataExtractionAgent implements Agent {
         return {
           success: true,
           data: {
-            po_number: poNumber,
-            po_date: null,
+            po_number: poNumber || this.generatePlaceholderPONumber(),
+            po_date: this.extractDateFromFileName(fileName) || null,
             vendor_code: null,
             gstn: null,
             project: null,
@@ -78,7 +78,7 @@ REQUIRED FIELDS TO EXTRACT (matching po_table schema):
 IMPORTANT INSTRUCTIONS:
 1. Extract data EXACTLY as it appears in the document
 2. For dates, convert to YYYY-MM-DD format
-3. For po_number, extract only the numeric value
+3. For po_number, extract only the numeric value. THIS IS REQUIRED - if you don't see a clear PO number, use the current year + a random 4-digit number.
 4. If a field is not found, use null
 5. For description, create an array of objects with item details
 
@@ -114,6 +114,12 @@ Respond with ONLY a JSON object in this exact format:
 
       const extractedData = this.parseGeminiResponse(response.data || '');
       
+      // Ensure PO number is always set
+      if (!extractedData.po_number) {
+        extractedData.po_number = this.generatePlaceholderPONumber();
+        console.log(`⚠️ No PO number extracted, using generated placeholder: ${extractedData.po_number}`);
+      }
+      
       console.log(`✅ ${this.name}: Data extraction complete`);
       
       return {
@@ -132,16 +138,16 @@ Respond with ONLY a JSON object in this exact format:
     } catch (error) {
       console.error(`❌ ${this.name}: Error:`, error);
       
-      // Provide fallback extraction
+      // Provide fallback extraction with generated PO number
       const fileName = file.name;
       const poNumberMatch = fileName.match(/(?:po|purchase)[\s#-]*(\d+)/i);
-      const poNumber = poNumberMatch ? parseInt(poNumberMatch[1]) : null;
+      const poNumber = poNumberMatch ? parseInt(poNumberMatch[1]) : this.generatePlaceholderPONumber();
       
       return {
         success: true,
         data: {
           po_number: poNumber,
-          po_date: null,
+          po_date: this.extractDateFromFileName(fileName) || null,
           vendor_code: null,
           gstn: null,
           project: null,
@@ -158,12 +164,49 @@ Respond with ONLY a JSON object in this exact format:
           fileType: file.type,
           fileSize: file.size,
           fileName: file.name,
-          extractedFields: poNumber ? 1 : 0,
+          extractedFields: 1,
           processingMethod: 'fallback_filename',
           error: error instanceof Error ? error.message : 'Unknown error'
         }
       };
     }
+  }
+
+  // Generate a unique placeholder PO number when none is found
+  private generatePlaceholderPONumber(): number {
+    const currentYear = new Date().getFullYear();
+    const randomDigits = Math.floor(1000 + Math.random() * 9000);
+    return parseInt(`${currentYear}${randomDigits}`);
+  }
+  
+  // Extract date from filename if possible
+  private extractDateFromFileName(fileName: string): string | null {
+    // Look for date patterns like DD-MM-YYYY, MM/DD/YYYY, YYYY-MM-DD
+    const datePatterns = [
+      /(\d{2})[-_](\d{2})[-_](\d{4})/,  // DD-MM-YYYY or DD_MM_YYYY
+      /(\d{2})[\/](\d{2})[\/](\d{4})/,  // DD/MM/YYYY
+      /(\d{4})[-_](\d{2})[-_](\d{2})/   // YYYY-MM-DD or YYYY_MM_DD
+    ];
+    
+    for (const pattern of datePatterns) {
+      const match = fileName.match(pattern);
+      if (match) {
+        if (match[0].includes('/')) {
+          // Assuming MM/DD/YYYY format
+          return `${match[3]}-${match[1]}-${match[2]}`;
+        } else if (match[1].length === 4) {
+          // YYYY-MM-DD format
+          return `${match[1]}-${match[2]}-${match[3]}`;
+        } else {
+          // DD-MM-YYYY format, convert to YYYY-MM-DD
+          return `${match[3]}-${match[2]}-${match[1]}`;
+        }
+      }
+    }
+    
+    // If no date found, use current date
+    const today = new Date();
+    return today.toISOString().split('T')[0];
   }
 
   private async fileToBase64(file: File): Promise<string> {

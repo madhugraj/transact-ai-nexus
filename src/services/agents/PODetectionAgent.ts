@@ -20,6 +20,10 @@ export class PODetectionAgent implements Agent {
         throw new Error('File is empty or invalid');
       }
 
+      // Quick check on filename to enhance detection
+      const fileName = file.name.toLowerCase();
+      const isPOFilename = fileName.includes('po') || fileName.includes('purchase') || fileName.includes('order');
+      
       // For PDFs, we need to handle them differently
       if (file.type === 'application/pdf') {
         console.log(`📄 Processing PDF file: ${file.name}`);
@@ -30,17 +34,18 @@ export class PODetectionAgent implements Agent {
           throw new Error('PDF file appears to be empty');
         }
 
-        // For now, let's assume it's a PO if it's a PDF with PO in the name
+        // For now, assume it's a PO if it's a PDF with PO in the name
         // This is a fallback until we implement proper PDF processing
-        const fileName = file.name.toLowerCase();
-        const isPO = fileName.includes('po') || fileName.includes('purchase');
+        const isPO = isPOFilename;
+        const confidence = isPOFilename ? 0.85 : 0.3;
         
         return {
           success: true,
           data: {
             is_po: isPO,
-            confidence: isPO ? 0.8 : 0.2,
-            reason: isPO ? 'Filename suggests this is a Purchase Order document' : 'Filename does not suggest this is a Purchase Order',
+            confidence: confidence,
+            reason: isPO ? `Filename "${file.name}" suggests this is a Purchase Order document` : 
+                         `Filename "${file.name}" does not suggest this is a Purchase Order`,
             document_type: isPO ? 'purchase_order' : 'other_document'
           },
           agent: this.id,
@@ -69,6 +74,10 @@ A Purchase Order typically contains:
 - Terms and conditions
 - Authorization signatures
 
+If you see multiple instances of "PO", "P.O.", "Purchase Order", or similar terms, it's very likely to be a Purchase Order.
+Even if the document doesn't explicitly say "Purchase Order" but has most of the above elements, please classify it as a PO.
+Be generous in your classification - when in doubt, mark it as a Purchase Order.
+
 Respond with ONLY a JSON object in this exact format:
 {
   "is_po": true/false,
@@ -86,7 +95,16 @@ Respond with ONLY a JSON object in this exact format:
 
       const result = this.parseGeminiResponse(response.data || '');
       
-      console.log(`✅ ${this.name}: Detection complete - ${result.is_po ? 'PURCHASE ORDER' : 'NOT PURCHASE ORDER'}`);
+      // If filename strongly suggests it's a PO but AI didn't detect it, increase confidence
+      if (isPOFilename && !result.is_po && result.confidence < 0.7) {
+        console.log(`⚠️ AI didn't detect PO but filename suggests it is - overriding classification`);
+        result.is_po = true;
+        result.confidence = Math.max(result.confidence, 0.75);
+        result.reason = `Filename "${file.name}" strongly suggests this is a Purchase Order despite visual analysis results`;
+        result.document_type = 'purchase_order';
+      }
+      
+      console.log(`✅ ${this.name}: Detection complete - ${result.is_po ? 'PURCHASE ORDER' : 'NOT PURCHASE ORDER'} with confidence ${result.confidence}`);
       
       return {
         success: true,
@@ -105,7 +123,7 @@ Respond with ONLY a JSON object in this exact format:
       
       // Return a fallback result instead of failing completely
       const fileName = file.name.toLowerCase();
-      const isPO = fileName.includes('po') || fileName.includes('purchase');
+      const isPO = fileName.includes('po') || fileName.includes('purchase') || fileName.includes('order');
       
       return {
         success: true,
