@@ -8,19 +8,20 @@ export class POProcessor {
   private poDataExtractionAgent = new PODataExtractionAgent();
 
   async processFiles(files: File[]): Promise<any[]> {
+    console.log(`🚀 POProcessor: Starting to process ${files.length} files`);
     const results = [];
 
     for (const [index, file] of files.entries()) {
-      console.log(`📄 Processing file ${index + 1}/${files.length}:`, file.name);
+      console.log(`📄 POProcessor: Processing file ${index + 1}/${files.length}: ${file.name}`);
       
       try {
         // Step 1: Detect if it's a PO
-        console.log(`🔍 Starting PO detection for: ${file.name}`);
+        console.log(`🔍 POProcessor: Starting PO detection for: ${file.name}`);
         const detectionResult = await this.poDetectionAgent.process(file);
-        console.log(`🔍 Detection result:`, detectionResult);
+        console.log(`🔍 POProcessor: Detection result for ${file.name}:`, detectionResult);
         
         if (!detectionResult.success) {
-          console.error(`❌ Detection failed for ${file.name}:`, detectionResult.error);
+          console.error(`❌ POProcessor: Detection failed for ${file.name}:`, detectionResult.error);
           results.push({
             fileName: file.name,
             isPO: false,
@@ -31,7 +32,7 @@ export class POProcessor {
         }
 
         const isPO = detectionResult.data?.is_po;
-        console.log(`📋 Is PO: ${isPO} for file: ${file.name}`);
+        console.log(`📋 POProcessor: Is PO result: ${isPO} for file: ${file.name}`);
         
         if (!isPO) {
           results.push({
@@ -44,12 +45,12 @@ export class POProcessor {
         }
 
         // Step 2: Extract PO data
-        console.log(`📊 Starting data extraction for: ${file.name}`);
+        console.log(`📊 POProcessor: Starting data extraction for: ${file.name}`);
         const extractionResult = await this.poDataExtractionAgent.process(file);
-        console.log(`📊 Extraction result:`, extractionResult);
+        console.log(`📊 POProcessor: Extraction result for ${file.name}:`, extractionResult);
         
         if (!extractionResult.success) {
-          console.error(`❌ Data extraction failed for ${file.name}:`, extractionResult.error);
+          console.error(`❌ POProcessor: Data extraction failed for ${file.name}:`, extractionResult.error);
           results.push({
             fileName: file.name,
             isPO: true,
@@ -60,10 +61,10 @@ export class POProcessor {
         }
 
         const extractedData = extractionResult.data;
-        console.log(`📊 Extracted data for ${file.name}:`, extractedData);
+        console.log(`📊 POProcessor: Extracted data for ${file.name}:`, extractedData);
 
         if (!extractedData.po_number) {
-          console.error(`❌ Missing PO number for ${file.name}`);
+          console.error(`❌ POProcessor: Missing PO number for ${file.name}`);
           results.push({
             fileName: file.name,
             isPO: true,
@@ -75,13 +76,13 @@ export class POProcessor {
         }
 
         // Step 3: Store in database
-        console.log(`💾 Storing data for: ${file.name}`);
+        console.log(`💾 POProcessor: Storing data for: ${file.name}`);
         const dbResult = await this.storeInDatabase(file.name, extractedData);
-        console.log(`💾 Database result for ${file.name}:`, dbResult);
+        console.log(`💾 POProcessor: Database result for ${file.name}:`, dbResult);
         results.push(dbResult);
 
       } catch (error) {
-        console.error(`❌ Processing error for ${file.name}:`, error);
+        console.error(`❌ POProcessor: Processing error for ${file.name}:`, error);
         results.push({
           fileName: file.name,
           isPO: false,
@@ -91,13 +92,15 @@ export class POProcessor {
       }
     }
 
-    console.log(`✅ Processing complete. Results:`, results);
+    console.log(`✅ POProcessor: Processing complete. Total results:`, results.length);
+    console.log(`📊 POProcessor: Results summary:`, results);
     return results;
   }
 
   private async storeInDatabase(fileName: string, extractedData: any) {
     try {
-      console.log(`💾 Preparing to store data for ${fileName}:`, extractedData);
+      console.log(`💾 POProcessor: Preparing to store data for ${fileName}`);
+      console.log(`💾 POProcessor: Data to store:`, extractedData);
       
       // Ensure po_number is a number
       let poNumber = extractedData.po_number;
@@ -124,7 +127,21 @@ export class POProcessor {
         description: Array.isArray(extractedData.description) ? extractedData.description : []
       };
 
-      console.log(`💾 Inserting PO record:`, poRecord);
+      console.log(`💾 POProcessor: Inserting PO record:`, poRecord);
+
+      // Test database connection first
+      console.log(`🔍 POProcessor: Testing database connection...`);
+      const { data: testData, error: testError } = await supabase
+        .from('po_table')
+        .select('count(*)')
+        .limit(1);
+
+      if (testError) {
+        console.error(`❌ POProcessor: Database connection test failed:`, testError);
+        throw new Error(`Database connection failed: ${testError.message}`);
+      }
+
+      console.log(`✅ POProcessor: Database connection test successful`);
 
       const { data: insertData, error: insertError } = await supabase
         .from('po_table')
@@ -132,7 +149,7 @@ export class POProcessor {
         .select();
 
       if (insertError) {
-        console.error(`❌ Database insert error for ${fileName}:`, insertError);
+        console.error(`❌ POProcessor: Database insert error for ${fileName}:`, insertError);
         return {
           fileName,
           isPO: true,
@@ -142,7 +159,7 @@ export class POProcessor {
         };
       }
 
-      console.log(`✅ Successfully stored ${fileName} in database:`, insertData);
+      console.log(`✅ POProcessor: Successfully stored ${fileName} in database:`, insertData);
       return {
         fileName,
         isPO: true,
@@ -151,7 +168,7 @@ export class POProcessor {
         status: 'success'
       };
     } catch (error) {
-      console.error(`❌ Database storage error for ${fileName}:`, error);
+      console.error(`❌ POProcessor: Database storage error for ${fileName}:`, error);
       return {
         fileName,
         isPO: true,
