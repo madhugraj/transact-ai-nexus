@@ -3,7 +3,7 @@ import { useState } from "react";
 import { FileList } from "./FileList";
 import FileUploadActions from "./FileUploadActions";
 import { useFileProcessing } from "@/hooks/useFileProcessing";
-import { FileProcessingDialog } from "./dialog/FileProcessingDialog";
+import { FileProcessingDialog } from "./FileProcessingDialog";
 import PostProcessingWorkflow from "./PostProcessingWorkflow";
 import DropZone from "./DropZone";
 

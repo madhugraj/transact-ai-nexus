@@ -16,10 +16,23 @@ interface ProcessingResult {
 }
 
 interface ProcessingResultsProps {
-  results: ProcessingResult[];
+  results?: ProcessingResult[];
+  processingResults?: any;
+  hasFileToPreview?: boolean;
+  getFileUrl?: () => string | null;
+  files?: any[];
 }
 
-export const ProcessingResults: React.FC<ProcessingResultsProps> = ({ results }) => {
+export const ProcessingResults: React.FC<ProcessingResultsProps> = ({ 
+  results, 
+  processingResults, 
+  hasFileToPreview,
+  getFileUrl,
+  files 
+}) => {
+  // Use either results prop or processingResults prop
+  const resultData = results || processingResults || [];
+  
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'success':
@@ -46,12 +59,20 @@ export const ProcessingResults: React.FC<ProcessingResultsProps> = ({ results })
     }
   };
 
+  if (!resultData || !Array.isArray(resultData) || resultData.length === 0) {
+    return (
+      <div className="text-center text-muted-foreground py-8">
+        No processing results available
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-medium">Processing Results</h3>
       
       <div className="grid gap-3">
-        {results.map((result, index) => (
+        {resultData.map((result, index) => (
           <Card key={index} className={cn(
             "border-l-4",
             result.status === 'success' && "border-l-green-500",
