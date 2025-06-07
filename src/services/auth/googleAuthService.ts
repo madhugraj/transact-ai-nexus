@@ -122,6 +122,8 @@ export class GoogleAuthService {
     return new Promise((resolve) => {
       const authUrl = this.createAuthUrl();
       
+      console.log('🔗 Opening popup with URL:', authUrl);
+      
       const popup = window.open(
         authUrl, 
         'google-auth', 
@@ -137,27 +139,34 @@ export class GoogleAuthService {
         return;
       }
 
+      console.log('✅ Popup opened successfully');
+
       let messageReceived = false;
       let checkClosedInterval: NodeJS.Timeout;
+      let messageCount = 0;
 
-      // Listen for messages from the popup - accept from any origin for OAuth callback
+      // Listen for messages from the popup with enhanced debugging
       const messageListener = (event: MessageEvent) => {
-        console.log('📨 Received message event:', {
+        messageCount++;
+        console.log(`📨 Message #${messageCount} received:`, {
           origin: event.origin,
           type: event.data?.type,
+          source: event.data?.source,
           hasCode: !!event.data?.code,
           timestamp: event.data?.timestamp,
+          error: event.data?.error,
           rawData: event.data
         });
         
-        // Accept messages with the expected structure regardless of origin (for OAuth callback)
+        // Accept messages with the expected structure from OAuth callback
         if (event.data && 
             typeof event.data === 'object' && 
             event.data.timestamp && 
+            event.data.source === 'oauth-callback' &&
             (event.data.type === 'OAUTH_SUCCESS' || event.data.type === 'OAUTH_ERROR')) {
           
           messageReceived = true;
-          console.log(`✅ ${event.data.type} message received and processed`);
+          console.log(`✅ Valid ${event.data.type} message received and accepted`);
           
           // Clean up listeners and intervals
           window.removeEventListener('message', messageListener);
@@ -165,54 +174,62 @@ export class GoogleAuthService {
             clearInterval(checkClosedInterval);
           }
           
-          // Close popup
+          // Close popup after a delay
           setTimeout(() => {
             if (popup && !popup.closed) {
+              console.log('Closing popup from main window');
               popup.close();
             }
-          }, 500);
+          }, 1000);
           
           if (event.data.type === 'OAUTH_SUCCESS') {
             if (event.data.code) {
               console.log('🔄 OAuth success, exchanging code for tokens...');
               this.exchangeCodeForToken(event.data.code).then(resolve);
             } else {
-              console.error('❌ No authorization code received');
+              console.error('❌ No authorization code in success message');
               resolve({ success: false, error: 'No authorization code received' });
             }
           } else if (event.data.type === 'OAUTH_ERROR') {
-            console.error('❌ OAuth error:', event.data.error);
+            console.error('❌ OAuth error from popup:', event.data.error);
             resolve({ success: false, error: event.data.error || 'Authentication failed' });
           }
         } else {
-          console.log('📨 Ignoring message - invalid structure or type:', event.data);
+          console.log('📨 Ignoring message - invalid structure, source, or type:', {
+            hasValidStructure: !!(event.data && typeof event.data === 'object'),
+            hasTimestamp: !!event.data?.timestamp,
+            hasValidSource: event.data?.source === 'oauth-callback',
+            hasValidType: !!(event.data?.type === 'OAUTH_SUCCESS' || event.data?.type === 'OAUTH_ERROR'),
+            actualData: event.data
+          });
         }
       };
 
       // Add message listener
       window.addEventListener('message', messageListener);
+      console.log('👂 Message listener added, waiting for popup response...');
 
       // Check if popup was closed manually
       checkClosedInterval = setInterval(() => {
         if (popup.closed) {
-          console.log('⚠️ Popup was closed manually');
+          console.log('⚠️ Popup was closed (manually or automatically)');
           clearInterval(checkClosedInterval);
           window.removeEventListener('message', messageListener);
           
           if (!messageReceived) {
-            console.log('❌ Authentication cancelled by user');
+            console.log('❌ No message received before popup closed - treating as cancellation');
             resolve({ 
               success: false, 
-              error: 'Authentication was cancelled. Please try again and complete the Google authorization process.' 
+              error: 'Authentication was cancelled. The popup closed before authentication could complete. Please try again.' 
             });
           }
         }
-      }, 500);
+      }, 250); // Check more frequently
 
       // Timeout after 5 minutes
       setTimeout(() => {
         if (!messageReceived) {
-          console.log('⏰ Authentication timeout');
+          console.log('⏰ Authentication timeout - no response after 5 minutes');
           clearInterval(checkClosedInterval);
           window.removeEventListener('message', messageListener);
           if (popup && !popup.closed) {
