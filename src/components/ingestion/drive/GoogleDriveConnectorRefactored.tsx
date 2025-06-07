@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -37,11 +36,11 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
   const [downloadedFiles, setDownloadedFiles] = useState<File[]>([]);
   const { toast } = useToast();
 
-  // Create auth service with FIXED redirect URI as specified
+  // Create auth service with DYNAMIC redirect URI based on current origin
   const authService = new GoogleAuthService({
     clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
     scopes: ['https://www.googleapis.com/auth/drive.readonly'],
-    redirectUri: 'https://transact-ai-nexus.lovable.app/oauth/callback' // FIXED as requested
+    redirectUri: `${window.location.origin}/oauth/callback` // DYNAMIC based on current origin
   }, 'drive_auth_tokens');
 
   // Check for stored tokens on mount and maintain connection
@@ -309,6 +308,9 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
         <div className="text-center space-y-2">
           <h3 className="text-lg font-medium">Connect Google Drive</h3>
           <p className="text-sm text-muted-foreground">Access files from your Google Drive</p>
+          <p className="text-xs text-yellow-600 bg-yellow-50 p-2 rounded">
+            Using dynamic redirect URI: {window.location.origin}/oauth/callback
+          </p>
         </div>
         <Button onClick={() => setShowAuthDialog(true)} className="gap-2">
           <svg className="w-4 h-4" viewBox="0 0 24 24">

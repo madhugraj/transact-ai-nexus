@@ -36,11 +36,11 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   const [hasLoadedInitialEmails, setHasLoadedInitialEmails] = useState(false);
   const { toast } = useToast();
 
-  // Use FIXED redirect URI as specified
+  // Use DYNAMIC redirect URI based on current origin
   const authService = new GoogleAuthService({
     clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
     scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
-    redirectUri: 'https://transact-ai-nexus.lovable.app/oauth/callback' // FIXED as requested
+    redirectUri: `${window.location.origin}/oauth/callback` // DYNAMIC based on current origin
   }, 'gmail_auth_tokens');
 
   // Check for stored tokens on mount and maintain connection
@@ -201,7 +201,10 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
 
   if (!isConnected) {
     return (
-      <>
+      <div className="space-y-4">
+        <div className="text-xs text-yellow-600 bg-yellow-50 p-2 rounded">
+          Using dynamic redirect URI: {window.location.origin}/oauth/callback
+        </div>
         <Button onClick={() => setShowAuthDialog(true)} className="w-full">
           Connect to Gmail
         </Button>
@@ -217,7 +220,7 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
           onDisconnect={handleDisconnect}
           error={authError}
         />
-      </>
+      </div>
     );
   }
 
