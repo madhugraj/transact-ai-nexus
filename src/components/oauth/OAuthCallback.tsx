@@ -19,18 +19,7 @@ const OAuthCallback = () => {
     
     // Send the result back to the parent window
     if (window.opener && !window.opener.closed) {
-      let targetOrigin = '*'; // Use wildcard for cross-origin compatibility
-      
-      // Try to get the opener's origin safely
-      try {
-        if (window.opener.location && window.opener.location.origin) {
-          targetOrigin = window.opener.location.origin;
-          console.log('Detected opener origin:', targetOrigin);
-        }
-      } catch (e) {
-        console.log('Could not access opener origin due to CORS, using wildcard');
-        targetOrigin = '*';
-      }
+      console.log('Opener window found, sending message...');
       
       if (code) {
         console.log('OAuth success, sending code to parent');
@@ -41,10 +30,10 @@ const OAuthCallback = () => {
         };
         
         console.log('Message to send:', message);
-        console.log('Target origin:', targetOrigin);
         
         try {
-          window.opener.postMessage(message, targetOrigin);
+          // Use wildcard origin to handle cross-origin issues
+          window.opener.postMessage(message, '*');
           console.log('Successfully sent message to opener');
         } catch (e) {
           console.error('Failed to send message:', e);
@@ -70,7 +59,7 @@ const OAuthCallback = () => {
         console.log('Error message to send:', message);
         
         try {
-          window.opener.postMessage(message, targetOrigin);
+          window.opener.postMessage(message, '*');
           console.log('Successfully sent error message to opener');
         } catch (e) {
           console.error('Failed to send error message:', e);

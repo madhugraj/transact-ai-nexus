@@ -1,4 +1,3 @@
-
 export interface AuthConfig {
   clientId: string;
   scopes: string[];
@@ -74,10 +73,11 @@ export class GoogleAuthService {
     return hasTokens;
   }
 
-  // Get the correct redirect URI - ALWAYS use the specified domain
+  // Get the correct redirect URI - ALWAYS use the current domain
   private getRedirectUri(): string {
-    const redirectUri = 'https://transact-ai-nexus.lovable.app/oauth/callback';
-    console.log('Using fixed redirect URI:', redirectUri);
+    const currentOrigin = window.location.origin;
+    const redirectUri = `${currentOrigin}/oauth/callback`;
+    console.log('Using dynamic redirect URI:', redirectUri);
     return redirectUri;
   }
 
@@ -137,7 +137,7 @@ export class GoogleAuthService {
           timestamp: event.data?.timestamp
         });
         
-        // Validate message structure (don't restrict by origin due to cross-origin issues)
+        // Accept messages from any origin since we're dealing with cross-origin issues
         if (event.data && typeof event.data === 'object' && event.data.timestamp) {
           if (event.data.type === 'OAUTH_SUCCESS') {
             messageReceived = true;
@@ -224,7 +224,7 @@ export class GoogleAuthService {
       console.log('Exchanging authorization code for access token...');
       const { supabase } = await import('@/integrations/supabase/client');
       
-      // Use the same redirect URI as in createAuthUrl for consistency
+      // Use the current domain's redirect URI for consistency
       const redirectUri = this.getRedirectUri();
       
       const { data, error } = await supabase.functions.invoke('google-auth', {

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -35,11 +36,11 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
   const [downloadedFiles, setDownloadedFiles] = useState<File[]>([]);
   const { toast } = useToast();
 
-  // Create auth service with FIXED redirect URI
+  // Create auth service with DYNAMIC redirect URI
   const authService = new GoogleAuthService({
     clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
     scopes: ['https://www.googleapis.com/auth/drive.readonly'],
-    redirectUri: 'https://transact-ai-nexus.lovable.app/oauth/callback'
+    redirectUri: `${window.location.origin}/oauth/callback` // Dynamic based on current domain
   }, 'drive_auth_tokens');
 
   // Check for stored tokens on mount and maintain connection
