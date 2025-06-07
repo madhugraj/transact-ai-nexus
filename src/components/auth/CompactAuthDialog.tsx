@@ -2,7 +2,7 @@
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
 
 interface CompactAuthDialogProps {
   isOpen: boolean;
@@ -27,6 +27,9 @@ const CompactAuthDialog: React.FC<CompactAuthDialogProps> = ({
   onDisconnect,
   error
 }) => {
+  const isRedirectUriError = error && error.includes('redirect_uri_mismatch');
+  const currentDomain = window.location.origin;
+  
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
@@ -47,19 +50,49 @@ const CompactAuthDialog: React.FC<CompactAuthDialogProps> = ({
           </p>
           
           {error && (
-            <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">
-              {error}
+            <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md space-y-2">
+              <p className="font-medium">Authentication Error:</p>
+              <p>{error}</p>
+              
+              {isRedirectUriError && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded text-blue-800">
+                  <p className="font-medium mb-2">🔧 Setup Required:</p>
+                  <p className="text-xs mb-2">
+                    You need to add this redirect URI to your Google Cloud Console:
+                  </p>
+                  <code className="block p-2 bg-white border rounded text-xs break-all">
+                    {currentDomain}/oauth/callback
+                  </code>
+                  <div className="mt-2">
+                    <a 
+                      href="https://console.cloud.google.com/apis/credentials" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 underline"
+                    >
+                      Open Google Cloud Console <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                  <p className="text-xs mt-2">
+                    1. Select your OAuth 2.0 client<br/>
+                    2. Add the above URI to "Authorized redirect URIs"<br/>
+                    3. Save and try again
+                  </p>
+                </div>
+              )}
             </div>
           )}
           
           {!isConnected ? (
             <div className="space-y-3">
-              <p className="text-xs text-muted-foreground">
-                Note: You may see a warning that the app is unverified. Click "Advanced" → "Go to transact-ai-nexus.lovable.app (unsafe)" to continue.
-              </p>
+              {!isRedirectUriError && (
+                <p className="text-xs text-muted-foreground">
+                  Note: You may see a warning that the app is unverified. Click "Advanced" → "Go to {window.location.hostname} (unsafe)" to continue.
+                </p>
+              )}
               <Button
                 onClick={onConnect}
-                disabled={isConnecting}
+                disabled={isConnecting || isRedirectUriError}
                 className="w-full"
               >
                 {isConnecting ? (

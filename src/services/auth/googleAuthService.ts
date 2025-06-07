@@ -1,3 +1,4 @@
+
 export interface AuthConfig {
   clientId: string;
   scopes: string[];
@@ -75,9 +76,15 @@ export class GoogleAuthService {
 
   // Get the correct redirect URI - Use current origin consistently
   private getRedirectUri(): string {
-    const redirectUri = `${window.location.origin}/oauth/callback`;
-    console.log('Using redirect URI:', redirectUri);
-    console.log('Current origin:', window.location.origin);
+    const currentOrigin = window.location.origin;
+    const redirectUri = `${currentOrigin}/oauth/callback`;
+    
+    console.log('🔧 Redirect URI Configuration:', {
+      currentOrigin,
+      redirectUri,
+      configuredClientId: this.config.clientId
+    });
+    
     return redirectUri;
   }
 
@@ -86,7 +93,7 @@ export class GoogleAuthService {
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     const redirectUri = this.getRedirectUri();
     
-    console.log('Creating auth URL with config:', {
+    console.log('🔧 Creating auth URL with config:', {
       clientId: this.config.clientId,
       redirectUri: redirectUri,
       scopes: this.config.scopes.join(' '),
@@ -101,14 +108,22 @@ export class GoogleAuthService {
     authUrl.searchParams.set('redirect_uri', redirectUri);
     
     const finalUrl = authUrl.toString();
-    console.log('Generated auth URL (truncated):', finalUrl.substring(0, 100) + '...');
+    console.log('🔧 Generated full auth URL:', finalUrl);
     
     return finalUrl;
   }
 
   // Popup-based authentication
   async authenticateWithPopup(): Promise<AuthResult> {
-    console.log('Starting popup authentication...');
+    console.log('🚀 Starting popup authentication...');
+    
+    // Log current environment details for debugging
+    console.log('🔧 Environment Details:', {
+      currentOrigin: window.location.origin,
+      hostname: window.location.hostname,
+      protocol: window.location.protocol,
+      port: window.location.port
+    });
     
     return new Promise((resolve) => {
       const authUrl = this.createAuthUrl();
@@ -120,8 +135,11 @@ export class GoogleAuthService {
       );
 
       if (!popup) {
-        console.error('Popup was blocked by browser');
-        resolve({ success: false, error: 'Popup was blocked. Please allow popups for this site.' });
+        console.error('❌ Popup was blocked by browser');
+        resolve({ 
+          success: false, 
+          error: 'Popup was blocked. Please allow popups for this site and try again.' 
+        });
         return;
       }
 
@@ -130,7 +148,7 @@ export class GoogleAuthService {
 
       // Listen for messages from the popup - use wildcard origin for cross-origin popup communication
       const messageListener = (event: MessageEvent) => {
-        console.log('Received message event:', {
+        console.log('📨 Received message event:', {
           origin: event.origin,
           type: event.data?.type,
           hasCode: !!event.data?.code,
@@ -141,7 +159,7 @@ export class GoogleAuthService {
         if (event.data && typeof event.data === 'object' && event.data.timestamp) {
           if (event.data.type === 'OAUTH_SUCCESS') {
             messageReceived = true;
-            console.log('OAuth success message received');
+            console.log('✅ OAuth success message received');
             
             // Clean up listeners and intervals
             window.removeEventListener('message', messageListener);
@@ -157,15 +175,15 @@ export class GoogleAuthService {
             }, 100);
             
             if (event.data.code) {
-              console.log('OAuth success, exchanging code for tokens...');
+              console.log('🔄 OAuth success, exchanging code for tokens...');
               this.exchangeCodeForToken(event.data.code).then(resolve);
             } else {
-              console.error('No authorization code received');
+              console.error('❌ No authorization code received');
               resolve({ success: false, error: 'No authorization code received' });
             }
           } else if (event.data.type === 'OAUTH_ERROR') {
             messageReceived = true;
-            console.log('OAuth error message received');
+            console.log('❌ OAuth error message received');
             
             // Clean up listeners and intervals
             window.removeEventListener('message', messageListener);
@@ -180,7 +198,7 @@ export class GoogleAuthService {
               }
             }, 100);
             
-            console.error('OAuth error:', event.data.error);
+            console.error('❌ OAuth error:', event.data.error);
             resolve({ success: false, error: event.data.error || 'Authentication failed' });
           }
         }
@@ -192,13 +210,16 @@ export class GoogleAuthService {
       // Check if popup was closed manually
       checkClosedInterval = setInterval(() => {
         if (popup.closed) {
-          console.log('Popup was closed manually');
+          console.log('⚠️ Popup was closed manually');
           clearInterval(checkClosedInterval);
           window.removeEventListener('message', messageListener);
           
           if (!messageReceived) {
-            console.log('Authentication cancelled by user');
-            resolve({ success: false, error: 'Authentication was cancelled' });
+            console.log('❌ Authentication cancelled by user');
+            resolve({ 
+              success: false, 
+              error: 'Authentication was cancelled. Please try again and complete the Google authorization process.' 
+            });
           }
         }
       }, 1000);
@@ -206,13 +227,16 @@ export class GoogleAuthService {
       // Timeout after 5 minutes
       setTimeout(() => {
         if (!messageReceived) {
-          console.log('Authentication timeout');
+          console.log('⏰ Authentication timeout');
           clearInterval(checkClosedInterval);
           window.removeEventListener('message', messageListener);
           if (popup && !popup.closed) {
             popup.close();
           }
-          resolve({ success: false, error: 'Authentication timeout' });
+          resolve({ 
+            success: false, 
+            error: 'Authentication timeout. Please try again and complete the process more quickly.' 
+          });
         }
       }, 5 * 60 * 1000);
     });
@@ -221,11 +245,17 @@ export class GoogleAuthService {
   // Exchange auth code for tokens
   private async exchangeCodeForToken(authCode: string): Promise<AuthResult> {
     try {
-      console.log('Exchanging authorization code for access token...');
+      console.log('🔄 Exchanging authorization code for access token...');
       const { supabase } = await import('@/integrations/supabase/client');
       
       // Use the current domain's redirect URI for consistency
       const redirectUri = this.getRedirectUri();
+      
+      console.log('🔧 Token exchange request details:', {
+        hasAuthCode: !!authCode,
+        redirectUri,
+        scopes: this.config.scopes.join(' ')
+      });
       
       const { data, error } = await supabase.functions.invoke('google-auth', {
         body: {
@@ -236,11 +266,11 @@ export class GoogleAuthService {
       });
 
       if (error) {
-        console.error('Token exchange error:', error);
+        console.error('❌ Token exchange error:', error);
         throw error;
       }
 
-      console.log('Token exchange response:', { 
+      console.log('📊 Token exchange response:', { 
         success: data?.success, 
         hasAccessToken: !!data?.accessToken,
         hasRefreshToken: !!data?.refreshToken 
@@ -257,7 +287,7 @@ export class GoogleAuthService {
         throw new Error(data.error);
       }
     } catch (error) {
-      console.error('Token exchange failed:', error);
+      console.error('❌ Token exchange failed:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Token exchange failed'
