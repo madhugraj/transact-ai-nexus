@@ -2,11 +2,53 @@
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
+export interface AgentInfo {
+  id: string;
+  name: string;
+  description: string;
+}
+
 export function useAgentProcessing() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingComplete, setProcessingComplete] = useState(false);
   const [processingResults, setProcessingResults] = useState<any>(null);
+  const [activeAgent, setActiveAgent] = useState<string | null>(null);
+  const [agentsHistory, setAgentsHistory] = useState<Array<{
+    id: string;
+    status: 'pending' | 'active' | 'complete' | 'error';
+    timestamp: Date;
+  }>>([]);
+  
   const { toast } = useToast();
+
+  // Define available agents
+  const agents: AgentInfo[] = [
+    {
+      id: 'DataInput',
+      name: 'Data Input Agent',
+      description: 'Handles file input and validation'
+    },
+    {
+      id: 'OCRExtraction',
+      name: 'OCR Extraction Agent',
+      description: 'Extracts text from images and scanned documents'
+    },
+    {
+      id: 'PDFTableExtraction',
+      name: 'PDF Table Extraction Agent',
+      description: 'Extracts tables from PDF documents'
+    },
+    {
+      id: 'DynamicTableDetection',
+      name: 'Dynamic Table Detection Agent',
+      description: 'Detects and extracts tables dynamically'
+    },
+    {
+      id: 'DisplayAgent',
+      name: 'Display Agent',
+      description: 'Formats and displays extracted data'
+    }
+  ];
 
   const startProcessing = async (files: File[]) => {
     console.log('🚀 useAgentProcessing: Starting processing for', files.length, 'files');
@@ -53,18 +95,30 @@ export function useAgentProcessing() {
     }
   };
 
+  const processFiles = async (files: any[], options?: any) => {
+    // Convert to File[] if needed
+    const fileObjects = files.map(f => f.file || f);
+    return startProcessing(fileObjects);
+  };
+
   const resetProcessing = () => {
     console.log('🔄 useAgentProcessing: Resetting processing state');
     setIsProcessing(false);
     setProcessingComplete(false);
     setProcessingResults(null);
+    setActiveAgent(null);
+    setAgentsHistory([]);
   };
 
   return {
     isProcessing,
     processingComplete,
     processingResults,
+    activeAgent,
+    agentsHistory,
+    agents,
     startProcessing,
+    processFiles,
     resetProcessing
   };
 }

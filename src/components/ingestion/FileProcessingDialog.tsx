@@ -10,29 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Settings, TableIcon, FileText, Layers, Sparkles, Database, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AgentProcessingInterface } from '../processing/agent-processing/AgentProcessingInterface';
-
-// Post-processing action for uploaded files
-export type PostProcessAction = 'table_extraction' | 'insights' | 'summary' | 'combine_data' | 'push_to_db' | 'po_processing';
-
-// File processing options
-export interface ProcessingOptions {
-  tableFormat?: {
-    hasHeaders: boolean;
-    headerRow?: number;
-    skipRows?: number;
-    delimiter?: string;
-  };
-  dataProcessing?: {
-    normalizeData: boolean;
-    removeEmptyRows: boolean;
-    detectTypes: boolean;
-  };
-  databaseOptions?: {
-    connection: string;
-    tableName: string;
-    createIfNotExists: boolean;
-  };
-}
+import { PostProcessAction, ProcessingOptions } from '@/types/processing';
 
 // Defines file status used in the component
 type FileStatus = 'idle' | 'uploading' | 'success' | 'error';
@@ -94,7 +72,7 @@ export const FileProcessingDialog: React.FC<FileProcessingDialogProps> = ({
       );
       
       if (hasPOFiles) {
-        setCurrentAction('po_processing');
+        setCurrentAction('po_processing' as PostProcessAction);
       } else if (hasDocuments && !hasDataFiles) {
         setCurrentAction('table_extraction');
       } else if (hasDataFiles) {
@@ -111,7 +89,6 @@ export const FileProcessingDialog: React.FC<FileProcessingDialogProps> = ({
       case 'summary': return 'Document Summary';
       case 'combine_data': return 'Combine Data';
       case 'push_to_db': return 'Push to Database';
-      case 'po_processing': return 'PO Processing';
       default: return action;
     }
   };
@@ -165,7 +142,7 @@ export const FileProcessingDialog: React.FC<FileProcessingDialogProps> = ({
                   "border rounded-lg p-3 cursor-pointer transition-all",
                   currentAction === 'po_processing' ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
                 )}
-                onClick={() => setCurrentAction('po_processing')}
+                onClick={() => setCurrentAction('po_processing' as PostProcessAction)}
               >
                 <div className="flex items-center space-x-2">
                   <FileText className="h-5 w-5" />
@@ -312,3 +289,6 @@ export const FileProcessingDialog: React.FC<FileProcessingDialogProps> = ({
     </Dialog>
   );
 };
+
+// Re-export types for compatibility
+export type { PostProcessAction, ProcessingOptions };

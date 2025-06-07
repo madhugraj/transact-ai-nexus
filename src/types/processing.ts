@@ -5,7 +5,8 @@ export type PostProcessAction =
   | 'combine_data'
   | 'push_to_db'
   | 'insights'
-  | 'summary';
+  | 'summary'
+  | 'po_processing';
 
 // Processing options interface
 export interface ProcessingOptions {
