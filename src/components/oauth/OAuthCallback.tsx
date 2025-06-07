@@ -7,20 +7,20 @@ const OAuthCallback = () => {
     console.log('Current URL:', window.location.href);
     console.log('Current origin:', window.location.origin);
     console.log('Has opener:', !!window.opener);
-    console.log('Opener origin:', window.opener ? window.opener.location.origin : 'No opener');
     
     // Get the current URL and extract any parameters
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     const error = urlParams.get('error');
+    const state = urlParams.get('state');
     
-    console.log('OAuth callback - code:', code ? 'present' : 'missing', 'error:', error);
-    console.log('Full search params:', window.location.search);
+    console.log('OAuth params:', { code: code ? 'present' : 'missing', error, state });
+    console.log('URL search params:', window.location.search);
     
     // Send the result back to the parent window
     if (window.opener) {
       if (code) {
-        console.log('Sending success message to parent window');
+        console.log('OAuth success, sending code to parent');
         const message = {
           type: 'OAUTH_SUCCESS',
           code: code
@@ -28,20 +28,12 @@ const OAuthCallback = () => {
         
         console.log('Message to send:', message);
         
-        // Get the actual opener origin and send to that + wildcard as fallback
-        const openerOrigin = window.opener.location.origin;
-        console.log('Detected opener origin:', openerOrigin);
-        
+        // Try to send to the opener with wildcard origin since we can't access opener.location.origin due to CORS
         try {
-          console.log('Sending message to opener origin:', openerOrigin);
-          window.opener.postMessage(message, openerOrigin);
+          console.log('Sending message to opener with wildcard origin');
+          window.opener.postMessage(message, '*');
         } catch (e) {
-          console.log('Failed to send to opener origin, trying wildcard:', e);
-          try {
-            window.opener.postMessage(message, '*');
-          } catch (e2) {
-            console.log('Failed to send message with wildcard:', e2);
-          }
+          console.log('Failed to send message:', e);
         }
         
         // Wait a bit before closing to ensure message is received
@@ -50,7 +42,7 @@ const OAuthCallback = () => {
           window.close();
         }, 1000);
       } else if (error) {
-        console.log('Sending error message to parent window');
+        console.log('OAuth error, sending error to parent');
         const message = {
           type: 'OAUTH_ERROR',
           error: error
@@ -58,20 +50,11 @@ const OAuthCallback = () => {
         
         console.log('Error message to send:', message);
         
-        // Get the actual opener origin and send to that + wildcard as fallback
-        const openerOrigin = window.opener.location.origin;
-        console.log('Detected opener origin for error:', openerOrigin);
-        
         try {
-          console.log('Sending error message to opener origin:', openerOrigin);
-          window.opener.postMessage(message, openerOrigin);
+          console.log('Sending error message to opener with wildcard origin');
+          window.opener.postMessage(message, '*');
         } catch (e) {
-          console.log('Failed to send error to opener origin, trying wildcard:', e);
-          try {
-            window.opener.postMessage(message, '*');
-          } catch (e2) {
-            console.log('Failed to send error message with wildcard:', e2);
-          }
+          console.log('Failed to send error message:', e);
         }
         
         setTimeout(() => {

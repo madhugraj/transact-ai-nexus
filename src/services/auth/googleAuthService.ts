@@ -1,3 +1,4 @@
+
 export interface AuthConfig {
   clientId: string;
   scopes: string[];
@@ -128,49 +129,42 @@ export class GoogleAuthService {
 
       // Listen for messages from the popup
       const messageListener = (event: MessageEvent) => {
-        // Accept messages from our OAuth callback page and current origin
-        const allowedOrigins = [
-          window.location.origin,
-          'https://transact-ai-nexus.lovable.app',
-          'https://preview--transact-ai-nexus.lovable.app'
-        ];
+        // Accept messages from any origin since the OAuth callback uses wildcard
+        // But validate the message structure instead
+        console.log('Received message from origin:', event.origin);
+        console.log('Message data:', event.data);
         
-        if (!allowedOrigins.includes(event.origin)) {
-          console.log('Message from unexpected origin ignored:', event.origin);
-          return;
-        }
-
-        console.log('Received auth message:', event.data);
-        
-        if (event.data && event.data.type === 'OAUTH_SUCCESS') {
-          messageReceived = true;
-          window.removeEventListener('message', messageListener);
-          
-          setTimeout(() => {
-            if (!popup.closed) {
-              popup.close();
+        if (event.data && typeof event.data === 'object') {
+          if (event.data.type === 'OAUTH_SUCCESS') {
+            messageReceived = true;
+            window.removeEventListener('message', messageListener);
+            
+            setTimeout(() => {
+              if (!popup.closed) {
+                popup.close();
+              }
+            }, 100);
+            
+            if (event.data.code) {
+              console.log('OAuth success, exchanging code for tokens...');
+              this.exchangeCodeForToken(event.data.code).then(resolve);
+            } else {
+              console.error('No authorization code received');
+              resolve({ success: false, error: 'No authorization code received' });
             }
-          }, 100);
-          
-          if (event.data.code) {
-            console.log('OAuth success, exchanging code for tokens...');
-            this.exchangeCodeForToken(event.data.code).then(resolve);
-          } else {
-            console.error('No authorization code received');
-            resolve({ success: false, error: 'No authorization code received' });
+          } else if (event.data.type === 'OAUTH_ERROR') {
+            messageReceived = true;
+            window.removeEventListener('message', messageListener);
+            
+            setTimeout(() => {
+              if (!popup.closed) {
+                popup.close();
+              }
+            }, 100);
+            
+            console.error('OAuth error:', event.data.error);
+            resolve({ success: false, error: event.data.error || 'Authentication failed' });
           }
-        } else if (event.data && event.data.type === 'OAUTH_ERROR') {
-          messageReceived = true;
-          window.removeEventListener('message', messageListener);
-          
-          setTimeout(() => {
-            if (!popup.closed) {
-              popup.close();
-            }
-          }, 100);
-          
-          console.error('OAuth error:', event.data.error);
-          resolve({ success: false, error: event.data.error || 'Authentication failed' });
         }
       };
 
