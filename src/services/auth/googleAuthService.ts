@@ -1,5 +1,4 @@
 
-
 export interface AuthConfig {
   clientId: string;
   scopes: string[];
@@ -141,34 +140,39 @@ export class GoogleAuthService {
       let messageReceived = false;
       let checkClosedInterval: NodeJS.Timeout;
 
-      // Listen for messages from the popup - use wildcard origin for cross-origin popup communication
+      // Listen for messages from the popup - improved message handling
       const messageListener = (event: MessageEvent) => {
         console.log('📨 Received message event:', {
           origin: event.origin,
           type: event.data?.type,
           hasCode: !!event.data?.code,
-          timestamp: event.data?.timestamp
+          timestamp: event.data?.timestamp,
+          rawData: event.data
         });
         
-        // Accept messages with the expected structure, regardless of origin for popup communication
-        if (event.data && typeof event.data === 'object' && event.data.timestamp) {
-          if (event.data.type === 'OAUTH_SUCCESS') {
-            messageReceived = true;
-            console.log('✅ OAuth success message received');
-            
-            // Clean up listeners and intervals
-            window.removeEventListener('message', messageListener);
-            if (checkClosedInterval) {
-              clearInterval(checkClosedInterval);
+        // Accept messages with the expected structure and validate timestamp
+        if (event.data && 
+            typeof event.data === 'object' && 
+            event.data.timestamp && 
+            (event.data.type === 'OAUTH_SUCCESS' || event.data.type === 'OAUTH_ERROR')) {
+          
+          messageReceived = true;
+          console.log(`✅ ${event.data.type} message received and processed`);
+          
+          // Clean up listeners and intervals
+          window.removeEventListener('message', messageListener);
+          if (checkClosedInterval) {
+            clearInterval(checkClosedInterval);
+          }
+          
+          // Close popup
+          setTimeout(() => {
+            if (popup && !popup.closed) {
+              popup.close();
             }
-            
-            // Close popup
-            setTimeout(() => {
-              if (popup && !popup.closed) {
-                popup.close();
-              }
-            }, 100);
-            
+          }, 500);
+          
+          if (event.data.type === 'OAUTH_SUCCESS') {
             if (event.data.code) {
               console.log('🔄 OAuth success, exchanging code for tokens...');
               this.exchangeCodeForToken(event.data.code).then(resolve);
@@ -177,32 +181,18 @@ export class GoogleAuthService {
               resolve({ success: false, error: 'No authorization code received' });
             }
           } else if (event.data.type === 'OAUTH_ERROR') {
-            messageReceived = true;
-            console.log('❌ OAuth error message received');
-            
-            // Clean up listeners and intervals
-            window.removeEventListener('message', messageListener);
-            if (checkClosedInterval) {
-              clearInterval(checkClosedInterval);
-            }
-            
-            // Close popup
-            setTimeout(() => {
-              if (popup && !popup.closed) {
-                popup.close();
-              }
-            }, 100);
-            
             console.error('❌ OAuth error:', event.data.error);
             resolve({ success: false, error: event.data.error || 'Authentication failed' });
           }
+        } else {
+          console.log('📨 Ignoring message - invalid structure or type:', event.data);
         }
       };
 
       // Add message listener
       window.addEventListener('message', messageListener);
 
-      // Check if popup was closed manually
+      // Check if popup was closed manually with improved timing
       checkClosedInterval = setInterval(() => {
         if (popup.closed) {
           console.log('⚠️ Popup was closed manually');
@@ -217,7 +207,7 @@ export class GoogleAuthService {
             });
           }
         }
-      }, 1000);
+      }, 500); // Check more frequently
 
       // Timeout after 5 minutes
       setTimeout(() => {
@@ -243,7 +233,7 @@ export class GoogleAuthService {
       console.log('🔄 Exchanging authorization code for access token...');
       const { supabase } = await import('@/integrations/supabase/client');
       
-      // Use the current domain's redirect URI for consistency
+      // Use the FIXED redirect URI for consistency
       const redirectUri = this.getRedirectUri();
       
       console.log('🔧 Token exchange request details:', {
