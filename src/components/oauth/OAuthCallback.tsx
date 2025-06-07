@@ -28,22 +28,21 @@ const OAuthCallback = () => {
         
         console.log('Message to send:', message);
         
-        // Send to multiple possible origins to ensure delivery
-        const origins = [
-          window.opener.location.origin,
-          'https://transact-ai-nexus.lovable.app',
-          'https://preview--transact-ai-nexus.lovable.app',
-          '*'
-        ];
+        // Get the actual opener origin and send to that + wildcard as fallback
+        const openerOrigin = window.opener.location.origin;
+        console.log('Detected opener origin:', openerOrigin);
         
-        origins.forEach(origin => {
+        try {
+          console.log('Sending message to opener origin:', openerOrigin);
+          window.opener.postMessage(message, openerOrigin);
+        } catch (e) {
+          console.log('Failed to send to opener origin, trying wildcard:', e);
           try {
-            console.log('Sending message to origin:', origin);
-            window.opener.postMessage(message, origin);
-          } catch (e) {
-            console.log('Failed to send message to origin:', origin, e);
+            window.opener.postMessage(message, '*');
+          } catch (e2) {
+            console.log('Failed to send message with wildcard:', e2);
           }
-        });
+        }
         
         // Wait a bit before closing to ensure message is received
         setTimeout(() => {
@@ -59,22 +58,21 @@ const OAuthCallback = () => {
         
         console.log('Error message to send:', message);
         
-        // Send to multiple possible origins
-        const origins = [
-          window.opener.location.origin,
-          'https://transact-ai-nexus.lovable.app',
-          'https://preview--transact-ai-nexus.lovable.app',
-          '*'
-        ];
+        // Get the actual opener origin and send to that + wildcard as fallback
+        const openerOrigin = window.opener.location.origin;
+        console.log('Detected opener origin for error:', openerOrigin);
         
-        origins.forEach(origin => {
+        try {
+          console.log('Sending error message to opener origin:', openerOrigin);
+          window.opener.postMessage(message, openerOrigin);
+        } catch (e) {
+          console.log('Failed to send error to opener origin, trying wildcard:', e);
           try {
-            console.log('Sending error message to origin:', origin);
-            window.opener.postMessage(message, origin);
-          } catch (e) {
-            console.log('Failed to send error message to origin:', origin, e);
+            window.opener.postMessage(message, '*');
+          } catch (e2) {
+            console.log('Failed to send error message with wildcard:', e2);
           }
-        });
+        }
         
         setTimeout(() => {
           console.log('Attempting to close popup window (error case)');
