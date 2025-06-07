@@ -4,7 +4,15 @@ import { fileToBase64 } from '@/services/api/gemini/fileUtils';
 export class PODataExtractionAgent {
   async process(file: File): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
-      console.log(`📊 PODataExtractionAgent: Processing file ${file.name} with Gemini AI`);
+      console.log(`📊 PODataExtractionAgent: Processing file ${file.name} (${file.size} bytes) with Gemini AI`);
+      
+      // Validate file first
+      if (!this.validateFile(file)) {
+        return {
+          success: false,
+          error: 'Invalid file: File is empty, too large, or corrupted'
+        };
+      }
       
       // Check if it's a PDF file
       if (file.type === 'application/pdf') {
@@ -18,12 +26,12 @@ export class PODataExtractionAgent {
           // Try direct PDF processing with Gemini first
           const extractedData = await this.extractPODataWithGemini(base64Data, file.type, file.name);
           
-          if (extractedData.success) {
+          if (extractedData.success && this.hasValidData(extractedData.data)) {
             console.log(`✅ PODataExtractionAgent: Direct PDF processing successful for ${file.name}`);
             return extractedData;
           }
           
-          console.log(`⚠️ PODataExtractionAgent: Direct PDF processing failed, trying image conversion for ${file.name}`);
+          console.log(`⚠️ PODataExtractionAgent: Direct PDF processing failed or returned invalid data, trying image conversion for ${file.name}`);
         } catch (error) {
           console.error(`❌ PODataExtractionAgent: Direct PDF processing error for ${file.name}:`, error);
         }
@@ -35,7 +43,7 @@ export class PODataExtractionAgent {
           console.error(`❌ PODataExtractionAgent: All PDF processing methods failed for ${file.name}`);
           return { 
             success: false, 
-            error: 'Unable to process PDF file. The file may be corrupted or password-protected.' 
+            error: 'Unable to process PDF file. The file may be corrupted, password-protected, or invalid.' 
           };
         }
         
@@ -80,6 +88,45 @@ export class PODataExtractionAgent {
         error: error instanceof Error ? error.message : 'Data extraction failed'
       };
     }
+  }
+
+  private validateFile(file: File): boolean {
+    console.log(`🔍 PODataExtractionAgent: Validating file ${file.name}: size=${file.size}, type=${file.type}`);
+    
+    // Check if file exists and has content
+    if (!file || file.size === 0) {
+      console.error(`❌ File is empty or doesn't exist`);
+      return false;
+    }
+    
+    // Check file size (max 50MB)
+    if (file.size > 50 * 1024 * 1024) {
+      console.error(`❌ File too large: ${file.size} bytes`);
+      return false;
+    }
+    
+    // Check file type
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowedTypes.includes(file.type)) {
+      console.error(`❌ Invalid file type: ${file.type}`);
+      return false;
+    }
+    
+    console.log(`✅ File validation passed`);
+    return true;
+  }
+
+  private hasValidData(data: any): boolean {
+    if (!data || typeof data !== 'object') return false;
+    
+    // Check if we have at least some meaningful data
+    const hasAnyData = data.po_number || 
+                      data.vendor_code || 
+                      data.bill_to_address ||
+                      data.terms_conditions ||
+                      (data.description && Array.isArray(data.description) && data.description.length > 0);
+    
+    return hasAnyData;
   }
   
   private async convertPdfToImage(file: File): Promise<{ base64: string; mimeType: string } | null> {
@@ -164,53 +211,54 @@ export class PODataExtractionAgent {
   private async extractPODataWithGemini(base64Data: string, mimeType: string, fileName: string): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
       const prompt = `
-You are an expert document analysis AI. Analyze this document and extract Purchase Order information.
+You are an expert document analysis AI specializing in Purchase Order extraction.
 
 CRITICAL INSTRUCTIONS:
-1. This document may be a Purchase Order - examine it very carefully
-2. Extract ANY relevant business information you can find
-3. For PO number: Look for ANY number that could identify this document (PO#, Order#, Doc#, Reference#, etc.)
-4. Be flexible with data extraction - some fields may be missing or unclear
-5. Return meaningful data even if the document format is unusual
+1. Analyze this document thoroughly - it should contain Purchase Order information
+2. Extract ALL available business data, even if some fields are missing
+3. Look for ANY identifying numbers (PO#, Order#, Doc#, Reference#, Invoice#, etc.)
+4. Be very flexible and generous in your interpretation
+5. Focus on extracting meaningful structured data
 
-EXTRACTION REQUIREMENTS:
-- PO Number: ANY identifying number (can be alphanumeric)
-- Dates: Convert to YYYY-MM-DD format when possible
-- Vendor: Any company/supplier information
-- Line Items: Extract tabular data with items, quantities, prices
-- Addresses: Extract any address information found
-- Terms: Payment terms, delivery terms, conditions
+DETAILED EXTRACTION GUIDE:
+- PO NUMBER: Look for ANY document reference number, order number, or identifier
+- DATES: Convert to YYYY-MM-DD format, look for order dates, delivery dates
+- VENDOR: Extract supplier/vendor company name and details
+- ADDRESSES: Extract billing and shipping addresses
+- LINE ITEMS: Extract all items with quantities, prices, descriptions
+- TERMS: Payment terms, delivery conditions, special instructions
 
-REQUIRED JSON FORMAT:
+REQUIRED JSON FORMAT (return ONLY this JSON):
 {
-  "po_number": "any identifying number found",
+  "po_number": "document identifier found",
   "po_date": "YYYY-MM-DD or null",
-  "vendor_code": "vendor identifier or null", 
-  "gstn": "tax number if found or null",
-  "project": "project name/code or null",
-  "bill_to_address": "billing address or null",
-  "ship_to": "shipping address or null", 
-  "del_start_date": "delivery start date or null",
-  "del_end_date": "delivery end date or null",
-  "terms_conditions": "payment/delivery terms or null",
+  "vendor_code": "vendor/supplier name or code",
+  "gstn": "tax/GST number if found",
+  "project": "project name/reference",
+  "bill_to_address": "complete billing address",
+  "ship_to": "complete shipping address",
+  "del_start_date": "delivery start date YYYY-MM-DD",
+  "del_end_date": "delivery end date YYYY-MM-DD", 
+  "terms_conditions": "payment terms and conditions",
   "description": [
     {
       "item": "item description",
       "quantity": 1,
-      "unit_price": 0,
-      "total": 0
+      "unit_price": 100,
+      "total": 100
     }
   ]
 }
 
-IMPORTANT NOTES:
-- If you cannot find a specific PO number, extract ANY document reference number
-- Extract company names, addresses, and contact information
-- Look for ANY structured data or tables
-- Don't return all null values unless the document is completely unreadable
-- Be generous in your interpretation of what constitutes relevant data
+EXTRACTION STRATEGY:
+- If you find a document number like "PO_25260168" extract "25260168" as po_number
+- If you find company names, put them in vendor_code
+- Extract addresses even if partial
+- Look for tables with items, quantities, and prices
+- Include ANY structured data you can identify
+- Don't return all null values unless document is completely unreadable
 
-Return ONLY valid JSON with the extracted data.
+Return ONLY the JSON object with extracted data.
 `;
 
       console.log(`🤖 PODataExtractionAgent: Sending request to Gemini for ${fileName}`);
@@ -309,47 +357,13 @@ Return ONLY valid JSON with the extracted data.
         throw new Error("Invalid data structure from Gemini");
       }
       
-      // Check if we got any meaningful data
-      const hasData = parsedData.po_number || 
-                     parsedData.vendor_code || 
-                     parsedData.bill_to_address ||
-                     parsedData.terms_conditions ||
-                     (parsedData.description && Array.isArray(parsedData.description) && parsedData.description.length > 0);
-      
-      if (!hasData) {
-        console.warn(`⚠️ PODataExtractionAgent: Limited data extracted for ${fileName}`);
-        
-        // Try to extract at least something meaningful
-        if (responseText.length > 50) {
-          // If we have a substantial response, create a basic structure
-          parsedData = {
-            po_number: `DOC_${Date.now()}`, // Generate a fallback document ID
-            po_date: null,
-            vendor_code: null,
-            gstn: null,
-            project: null,
-            bill_to_address: null,
-            ship_to: null,
-            del_start_date: null,
-            del_end_date: null,
-            terms_conditions: `Extracted text: ${responseText.substring(0, 200)}...`,
-            description: []
-          };
-        } else {
-          return {
-            success: false,
-            error: 'Could not extract meaningful data from document'
-          };
-        }
-      }
-      
       console.log(`✅ PODataExtractionAgent: Successfully parsed data for ${fileName}:`, parsedData);
       
       return {
         success: true,
         data: {
           ...parsedData,
-          extraction_confidence: hasData ? 'high' : 'low'
+          extraction_confidence: this.hasValidData(parsedData) ? 'high' : 'low'
         }
       };
     } catch (error) {

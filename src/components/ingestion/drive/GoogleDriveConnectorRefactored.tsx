@@ -8,6 +8,7 @@ import CompactAuthDialog from '@/components/auth/CompactAuthDialog';
 import ConnectionStatus from './ConnectionStatus';
 import FileBrowser from './FileBrowser';
 import ProcessingSection from './ProcessingSection';
+import { FileConverter } from '@/services/gmail/fileConverter';
 
 interface GoogleDriveFile {
   id: string;
@@ -200,7 +201,7 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
   const downloadSelectedFiles = async () => {
     if (selectedFiles.length === 0) return;
 
-    console.log('Downloading selected files:', selectedFiles.length);
+    console.log('🔽 Downloading selected files:', selectedFiles.length);
     setIsLoading(true);
     
     try {
@@ -208,7 +209,7 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
       
       for (const file of selectedFiles) {
         try {
-          console.log('Downloading file:', file.name);
+          console.log('🔽 Downloading file:', file.name, 'Type:', file.mimeType);
           const { data, error } = await supabase.functions.invoke('google-drive', {
             body: {
               accessToken,
@@ -218,24 +219,45 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
           });
 
           if (error) {
-            console.error('Error downloading file:', file.name, error);
+            console.error('❌ Error downloading file:', file.name, error);
             throw error;
           }
 
-          const blob = new Blob([data]);
-          const downloadedFile = new File([blob], file.name, { 
-            type: file.mimeType.includes('google-apps') ? 'application/pdf' : file.mimeType 
-          });
+          console.log('📦 Received file data:', typeof data, 'Size:', data?.length || 'unknown');
+
+          // Use the improved file converter
+          let downloadedFile: File;
+          
+          if (file.mimeType.includes('google-apps')) {
+            // For Google Workspace files, they're exported as PDF
+            downloadedFile = FileConverter.createFileFromCloudStorage(
+              data, 
+              file.name.endsWith('.pdf') ? file.name : `${file.name}.pdf`, 
+              'application/pdf'
+            );
+          } else {
+            // For regular files, preserve original type
+            downloadedFile = FileConverter.createFileFromCloudStorage(
+              data, 
+              file.name, 
+              file.mimeType
+            );
+          }
           
           downloadedFiles.push(downloadedFile);
-          console.log('Successfully downloaded:', file.name);
+          console.log('✅ Successfully processed file:', downloadedFile.name, 'Size:', downloadedFile.size);
         } catch (fileError) {
-          console.error(`Error downloading ${file.name}:`, fileError);
+          console.error(`❌ Error processing ${file.name}:`, fileError);
+          toast({
+            title: "File Download Error",
+            description: `Failed to download ${file.name}: ${fileError.message}`,
+            variant: "destructive"
+          });
         }
       }
       
       if (downloadedFiles.length > 0) {
-        console.log('All files downloaded successfully:', downloadedFiles.length);
+        console.log('✅ All files processed successfully:', downloadedFiles.length);
         setDownloadedFiles(downloadedFiles);
         onFilesSelected(downloadedFiles);
         
@@ -243,9 +265,15 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
           title: "Success",
           description: `${downloadedFiles.length} files imported successfully`
         });
+      } else {
+        toast({
+          title: "No Files Imported",
+          description: "All file downloads failed. Please try again.",
+          variant: "destructive"
+        });
       }
     } catch (error) {
-      console.error('Import failed:', error);
+      console.error('❌ Import failed:', error);
       toast({
         title: "Import failed",
         description: "Failed to import files",

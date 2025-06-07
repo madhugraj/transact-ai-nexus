@@ -2,7 +2,7 @@
 export class FileConverter {
   static base64ToArrayBuffer(base64: string): ArrayBuffer {
     try {
-      console.log('Converting base64 to ArrayBuffer');
+      console.log('🔄 Converting base64 to ArrayBuffer, length:', base64.length);
       
       // Handle URL-safe base64 and fix padding if needed
       let cleanBase64 = base64.replace(/\s/g, '');
@@ -15,6 +15,8 @@ export class FileConverter {
         cleanBase64 += '=';
       }
       
+      console.log('🔄 Cleaned base64 length:', cleanBase64.length);
+      
       const binaryString = atob(cleanBase64);
       const bytes = new Uint8Array(binaryString.length);
       
@@ -22,9 +24,10 @@ export class FileConverter {
         bytes[i] = binaryString.charCodeAt(i);
       }
       
+      console.log('✅ ArrayBuffer created, byte length:', bytes.buffer.byteLength);
       return bytes.buffer;
     } catch (error) {
-      console.error('Base64 decode error:', error);
+      console.error('❌ Base64 decode error:', error);
       throw new Error(`Failed to decode base64 data: ${error.message}`);
     }
   }
@@ -34,8 +37,56 @@ export class FileConverter {
     filename: string, 
     mimeType: string
   ): File {
-    const binaryData = this.base64ToArrayBuffer(attachmentData);
-    const blob = new Blob([binaryData], { type: mimeType });
-    return new File([blob], filename, { type: mimeType });
+    console.log('🔄 Creating file from attachment:', { filename, mimeType, dataLength: attachmentData.length });
+    
+    const binaryData = this.createFileFromCloudStorage(attachmentData, filename, mimeType);
+    console.log('✅ File created successfully:', filename);
+    return binaryData;
+  }
+
+  static createFileFromCloudStorage(
+    data: string,
+    filename: string,
+    mimeType: string
+  ): File {
+    try {
+      console.log('🔄 Creating file from cloud storage data:', { filename, mimeType, dataType: typeof data });
+      
+      let fileData: ArrayBuffer;
+      
+      // Check if data is already a Blob or ArrayBuffer
+      if (data instanceof ArrayBuffer) {
+        console.log('📦 Data is ArrayBuffer');
+        fileData = data;
+      } else if (typeof data === 'string') {
+        console.log('📦 Data is string, converting from base64');
+        // Remove data URL prefix if present
+        const cleanData = data.replace(/^data:[^;]+;base64,/, '');
+        fileData = this.base64ToArrayBuffer(cleanData);
+      } else {
+        console.log('📦 Data is unknown type, treating as binary');
+        // Convert to ArrayBuffer if it's raw binary data
+        const uint8Array = new Uint8Array(data);
+        fileData = uint8Array.buffer;
+      }
+      
+      const blob = new Blob([fileData], { type: mimeType });
+      const file = new File([blob], filename, { 
+        type: mimeType,
+        lastModified: Date.now()
+      });
+      
+      console.log('✅ File created from cloud storage:', {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: file.lastModified
+      });
+      
+      return file;
+    } catch (error) {
+      console.error('❌ Error creating file from cloud storage:', error);
+      throw new Error(`Failed to create file: ${error.message}`);
+    }
   }
 }
