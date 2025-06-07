@@ -74,19 +74,11 @@ export class GoogleAuthService {
     return hasTokens;
   }
 
-  // Get the correct redirect URI - Use multiple fallbacks
+  // Get the correct redirect URI - Use current origin consistently
   private getRedirectUri(): string {
-    // Try multiple possible redirect URIs that should work
-    const possibleOrigins = [
-      window.location.origin,
-      'https://transact-ai-nexus.lovable.app',
-      'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com'
-    ];
-    
-    // Use the current origin as primary, but log all options
     const redirectUri = `${window.location.origin}/oauth/callback`;
     console.log('Using redirect URI:', redirectUri);
-    console.log('Possible origins:', possibleOrigins);
+    console.log('Current origin:', window.location.origin);
     return redirectUri;
   }
 
@@ -141,12 +133,18 @@ export class GoogleAuthService {
       const messageListener = (event: MessageEvent) => {
         console.log('Received message event:', {
           origin: event.origin,
+          currentOrigin: window.location.origin,
           type: event.data?.type,
           hasCode: !!event.data?.code,
           timestamp: event.data?.timestamp
         });
         
-        // Accept messages from any origin since we're dealing with cross-origin issues
+        // Only accept messages from the same origin for security
+        if (event.origin !== window.location.origin) {
+          console.log('Ignoring message from different origin:', event.origin);
+          return;
+        }
+        
         if (event.data && typeof event.data === 'object' && event.data.timestamp) {
           if (event.data.type === 'OAUTH_SUCCESS') {
             messageReceived = true;

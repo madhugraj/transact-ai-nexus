@@ -32,11 +32,22 @@ const OAuthCallback = () => {
         console.log('Message to send:', message);
         
         try {
-          // Use wildcard origin to handle cross-origin issues
-          window.opener.postMessage(message, '*');
+          // Get the correct target origin - should be the same as current origin
+          const targetOrigin = window.location.origin;
+          console.log('Sending message to origin:', targetOrigin);
+          
+          window.opener.postMessage(message, targetOrigin);
           console.log('Successfully sent message to opener');
         } catch (e) {
           console.error('Failed to send message:', e);
+          
+          // Fallback: try with wildcard origin as last resort
+          try {
+            window.opener.postMessage(message, '*');
+            console.log('Successfully sent message with wildcard origin');
+          } catch (fallbackError) {
+            console.error('Fallback postMessage also failed:', fallbackError);
+          }
         }
         
         // Wait a bit before closing to ensure message is received
@@ -59,10 +70,19 @@ const OAuthCallback = () => {
         console.log('Error message to send:', message);
         
         try {
-          window.opener.postMessage(message, '*');
+          const targetOrigin = window.location.origin;
+          window.opener.postMessage(message, targetOrigin);
           console.log('Successfully sent error message to opener');
         } catch (e) {
           console.error('Failed to send error message:', e);
+          
+          // Fallback
+          try {
+            window.opener.postMessage(message, '*');
+            console.log('Successfully sent error message with wildcard origin');
+          } catch (fallbackError) {
+            console.error('Fallback error postMessage also failed:', fallbackError);
+          }
         }
         
         setTimeout(() => {
