@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -60,7 +61,7 @@ const CompactAuthDialog: React.FC<CompactAuthDialogProps> = ({
                     You need to add this EXACT redirect URI to your Google Cloud Console:
                   </p>
                   <code className="block p-2 bg-white border rounded text-xs break-all">
-                    {window.location.origin}/oauth/callback
+                    https://transact-ai-nexus.lovable.app/oauth/callback
                   </code>
                   <div className="mt-2">
                     <a 
@@ -86,7 +87,7 @@ const CompactAuthDialog: React.FC<CompactAuthDialogProps> = ({
             <div className="space-y-3">
               {!isRedirectUriError && (
                 <p className="text-xs text-muted-foreground">
-                  Note: You may see a warning that the app is unverified. Click "Advanced" → "Go to {window.location.hostname} (unsafe)" to continue.
+                  Note: You may see a warning that the app is unverified. Click "Advanced" → "Go to transact-ai-nexus.lovable.app (unsafe)" to continue.
                 </p>
               )}
               <Button
@@ -121,3 +122,4 @@ const CompactAuthDialog: React.FC<CompactAuthDialogProps> = ({
 };
 
 export default CompactAuthDialog;
+
