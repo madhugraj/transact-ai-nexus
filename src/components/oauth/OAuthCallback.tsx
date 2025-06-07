@@ -31,24 +31,15 @@ const OAuthCallback = () => {
         
         console.log('Message to send:', message);
         
-        // Send message with the specific origin that opened this popup
+        // Always use wildcard origin for cross-domain popup communication
         try {
-          // Try to send to the specific opener origin first
-          const openerOrigin = window.opener.location.origin;
-          window.opener.postMessage(message, openerOrigin);
-          console.log('Successfully sent message to opener with origin:', openerOrigin);
-        } catch (e) {
-          console.log('Failed to send to specific origin, trying wildcard:', e);
-          // Fallback to wildcard for cross-origin popup communication
-          try {
-            window.opener.postMessage(message, '*');
-            console.log('Successfully sent message to opener with wildcard origin');
-          } catch (fallbackError) {
-            console.error('Failed to send message with wildcard:', fallbackError);
-          }
+          window.opener.postMessage(message, '*');
+          console.log('Successfully sent message to opener with wildcard origin');
+        } catch (error) {
+          console.error('Failed to send message:', error);
         }
         
-        // Wait a bit longer before closing to ensure message is received
+        // Wait a bit before closing to ensure message is received
         setTimeout(() => {
           console.log('Attempting to close popup window');
           try {
@@ -56,7 +47,7 @@ const OAuthCallback = () => {
           } catch (e) {
             console.log('Could not close window automatically:', e);
           }
-        }, 2000); // Increased timeout
+        }, 1500);
       } else if (error) {
         console.log('OAuth error, sending error to parent');
         const message = {
@@ -68,17 +59,10 @@ const OAuthCallback = () => {
         console.log('Error message to send:', message);
         
         try {
-          const openerOrigin = window.opener.location.origin;
-          window.opener.postMessage(message, openerOrigin);
-          console.log('Successfully sent error message to opener');
-        } catch (e) {
-          console.log('Failed to send to specific origin, trying wildcard:', e);
-          try {
-            window.opener.postMessage(message, '*');
-            console.log('Successfully sent error message with wildcard');
-          } catch (fallbackError) {
-            console.error('Failed to send error message:', fallbackError);
-          }
+          window.opener.postMessage(message, '*');
+          console.log('Successfully sent error message with wildcard');
+        } catch (error) {
+          console.error('Failed to send error message:', error);
         }
         
         setTimeout(() => {
@@ -88,10 +72,9 @@ const OAuthCallback = () => {
           } catch (e) {
             console.log('Could not close window automatically:', e);
           }
-        }, 2000);
+        }, 1500);
       } else {
         console.log('No code or error found in URL parameters');
-        console.log('Will attempt to close popup after delay');
         setTimeout(() => {
           console.log('Closing popup - no auth data found');
           try {
@@ -99,7 +82,7 @@ const OAuthCallback = () => {
           } catch (e) {
             console.log('Could not close window automatically:', e);
           }
-        }, 3000); // Longer delay for manual inspection
+        }, 2000);
       }
     } else {
       console.log('No opener window found or opener is closed, redirecting to main app');

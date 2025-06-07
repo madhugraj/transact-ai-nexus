@@ -140,7 +140,7 @@ export class GoogleAuthService {
       let messageReceived = false;
       let checkClosedInterval: NodeJS.Timeout;
 
-      // Listen for messages from the popup - improved message handling
+      // Listen for messages from the popup - accept from any origin for OAuth callback
       const messageListener = (event: MessageEvent) => {
         console.log('📨 Received message event:', {
           origin: event.origin,
@@ -150,7 +150,7 @@ export class GoogleAuthService {
           rawData: event.data
         });
         
-        // Accept messages with the expected structure and validate timestamp
+        // Accept messages with the expected structure regardless of origin (for OAuth callback)
         if (event.data && 
             typeof event.data === 'object' && 
             event.data.timestamp && 
@@ -192,7 +192,7 @@ export class GoogleAuthService {
       // Add message listener
       window.addEventListener('message', messageListener);
 
-      // Check if popup was closed manually with improved timing
+      // Check if popup was closed manually
       checkClosedInterval = setInterval(() => {
         if (popup.closed) {
           console.log('⚠️ Popup was closed manually');
@@ -207,7 +207,7 @@ export class GoogleAuthService {
             });
           }
         }
-      }, 500); // Check more frequently
+      }, 500);
 
       // Timeout after 5 minutes
       setTimeout(() => {
