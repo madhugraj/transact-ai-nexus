@@ -1,278 +1,109 @@
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DocumentPreview from '../../ingestion/DocumentPreview';
-import ExtractedTablePreview from '../../ingestion/ExtractedTablePreview';
-import GeminiInsightsPanel from '../GeminiInsightsPanel';
-import { saveProcessedTables } from '@/utils/documentStorage';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 
-interface ProcessingResultsProps {
-  processingResults: any;
-  hasFileToPreview: boolean;
-  getFileUrl: () => string | null;
-  files: any[];
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { CheckCircle, XCircle, AlertTriangle, FileText } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface ProcessingResult {
+  fileName: string;
+  isPO: boolean;
+  status: 'success' | 'error' | 'skipped';
+  error?: string;
+  reason?: string;
+  extractedData?: any;
+  dbRecord?: any;
 }
 
-export const ProcessingResults = ({ 
-  processingResults, 
-  hasFileToPreview, 
-  getFileUrl,
-  files 
-}: ProcessingResultsProps) => {
-  const [displayFormat, setDisplayFormat] = useState<'table' | 'json'>('table');
-  const { toast } = useToast();
-  
-  // Make sure tables data is in the right format
-  const tablesData = processingResults?.tables 
-    ? Array.isArray(processingResults.tables) 
-      ? processingResults.tables 
-      : [processingResults.tables]
-    : [];
-    
-  // Save extracted tables to Supabase and localStorage
-  useEffect(() => {
-    const saveToSupabase = async () => {
-      let dataToSave = [];
-      
-      // Check for tables array
-      if (tablesData.length > 0) {
-        console.log("Saving extracted tables to Supabase:", tablesData);
-        dataToSave = tablesData.map(table => ({
-          title: table.title || 'Extracted Table',
-          headers: table.headers,
-          rows: table.rows,
-          confidence: table.confidence || 0.9,
-          file_id: processingResults?.fileId
-        }));
-      }
-      
-      // Check for tableData in processingResults
-      if (processingResults?.tableData && processingResults.tableData.headers) {
-        console.log("Saving table data to Supabase:", processingResults.tableData);
-        dataToSave.push({
-          title: 'Extracted Table Data',
-          headers: processingResults.tableData.headers,
-          rows: processingResults.tableData.rows,
-          confidence: processingResults.tableData.metadata?.confidence || 0.9,
-          file_id: processingResults?.fileId
-        });
-      }
-      
-      // Check for extractedTables in processingResults
-      if (processingResults?.extractedTables && processingResults.extractedTables.length > 0) {
-        console.log("Saving extracted tables array to Supabase:", processingResults.extractedTables);
-        const extractedTableData = processingResults.extractedTables.map(table => ({
-          title: table.title || 'Extracted Table',
-          headers: table.headers,
-          rows: table.rows,
-          confidence: table.confidence || 0.9,
-          file_id: processingResults?.fileId
-        }));
-        dataToSave = [...dataToSave, ...extractedTableData];
-      }
-      
-      // Insert data into Supabase if we have any
-      if (dataToSave.length > 0) {
-        try {
-          const { data, error } = await supabase
-            .from('extracted_tables')
-            .insert(dataToSave)
-            .select();
-            
-          if (error) {
-            console.error("Error saving to Supabase:", error);
-            toast({
-              title: "Error saving tables",
-              description: "Could not save tables to database. Using local storage instead.",
-              variant: "destructive",
-            });
-            
-            // Save to localStorage as fallback
-            fallbackToLocalStorage();
-          } else {
-            console.log("Tables saved to Supabase successfully:", data);
-            
-            // Still save to localStorage for redundancy
-            fallbackToLocalStorage();
-            
-            // Dispatch event to notify components that new tables are processed
-            window.dispatchEvent(new CustomEvent('documentProcessed'));
-          }
-        } catch (error) {
-          console.error("Exception saving to Supabase:", error);
-          toast({
-            title: "Error saving tables",
-            description: "Could not save tables to database. Using local storage instead.",
-            variant: "destructive",
-          });
-          
-          // Save to localStorage as fallback
-          fallbackToLocalStorage();
-        }
-      }
-    };
-    
-    // Function to save to localStorage as fallback
-    const fallbackToLocalStorage = () => {
-      // Store tables in localStorage for AI Assistant
-      if (tablesData.length > 0) {
-        try {
-          console.log("Saving extracted tables to localStorage:", tablesData);
-          saveProcessedTables(tablesData, processingResults?.processingId);
-        } catch (error) {
-          console.error("Error saving processed tables to localStorage:", error);
-        }
-      }
-      
-      // Check for tableData in processingResults and save if available
-      if (processingResults?.tableData) {
-        try {
-          console.log("Saving table data to localStorage:", processingResults.tableData);
-          const tableDataToSave = {
-            id: `table-data-${Date.now()}`,
-            title: 'Extracted Table Data',
-            name: 'Extracted Table Data',
-            headers: processingResults.tableData.headers,
-            rows: processingResults.tableData.rows,
-            type: 'table',
-            extractedAt: new Date().toISOString()
-          };
-          
-          saveProcessedTables([tableDataToSave], processingResults?.processingId);
-        } catch (error) {
-          console.error("Error saving table data to localStorage:", error);
-        }
-      }
-      
-      // Check for extractedTables in processingResults and save if available
-      if (processingResults?.extractedTables && processingResults.extractedTables.length > 0) {
-        try {
-          console.log("Saving extracted tables array to localStorage:", processingResults.extractedTables);
-          saveProcessedTables(processingResults.extractedTables, processingResults?.processingId);
-        } catch (error) {
-          console.error("Error saving extracted tables array to localStorage:", error);
-        }
-      }
-      
-      // Dispatch event to notify components that new tables are processed
-      window.dispatchEvent(new CustomEvent('documentProcessed'));
-    };
-    
-    // Run the save operation if we have processing results
-    if (processingResults) {
-      saveToSupabase();
+interface ProcessingResultsProps {
+  results: ProcessingResult[];
+}
+
+export const ProcessingResults: React.FC<ProcessingResultsProps> = ({ results }) => {
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'success':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'error':
+        return <XCircle className="h-4 w-4 text-red-500" />;
+      case 'skipped':
+        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+      default:
+        return <FileText className="h-4 w-4 text-gray-500" />;
     }
-  }, [processingResults, toast]);
-  
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'success':
+        return <Badge variant="outline" className="text-green-600 border-green-200">Success</Badge>;
+      case 'error':
+        return <Badge variant="outline" className="text-red-600 border-red-200">Error</Badge>;
+      case 'skipped':
+        return <Badge variant="outline" className="text-yellow-600 border-yellow-200">Skipped</Badge>;
+      default:
+        return <Badge variant="outline">Unknown</Badge>;
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <Tabs defaultValue="results" className="w-full">
-        <TabsList>
-          <TabsTrigger value="results">Results</TabsTrigger>
-          <TabsTrigger value="original">Original Document</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="results" className="border rounded-md p-4">
-          {tablesData.length > 0 ? (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Extracted Table Data</h3>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant={displayFormat === 'table' ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setDisplayFormat('table')}
-                  >
-                    Table View
-                  </Button>
-                  <Button
-                    variant={displayFormat === 'json' ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setDisplayFormat('json')}
-                  >
-                    Response (Structured)
-                  </Button>
+      <h3 className="text-lg font-medium">Processing Results</h3>
+      
+      <div className="grid gap-3">
+        {results.map((result, index) => (
+          <Card key={index} className={cn(
+            "border-l-4",
+            result.status === 'success' && "border-l-green-500",
+            result.status === 'error' && "border-l-red-500",
+            result.status === 'skipped' && "border-l-yellow-500"
+          )}>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  {getStatusIcon(result.status)}
+                  <span className="truncate">{result.fileName}</span>
                 </div>
-              </div>
-              
-              {tablesData.map((tableData: any, index: number) => (
-                <div key={index} className="border rounded p-2">
-                  <ExtractedTablePreview
-                    initialData={{
-                      headers: tableData.headers,
-                      rows: tableData.rows
-                    }}
-                    displayFormat={displayFormat}
-                  />
+                {getStatusBadge(result.status)}
+              </CardTitle>
+            </CardHeader>
+            
+            <CardContent className="pt-0">
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">PO Detected:</span>
+                  <span className={cn(
+                    result.isPO ? "text-green-600" : "text-gray-600"
+                  )}>
+                    {result.isPO ? 'Yes' : 'No'}
+                  </span>
                 </div>
-              ))}
-            </div>
-          ) : processingResults?.tableData ? (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Extracted Table Data</h3>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant={displayFormat === 'table' ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setDisplayFormat('table')}
-                  >
-                    Table View
-                  </Button>
-                  <Button
-                    variant={displayFormat === 'json' ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setDisplayFormat('json')}
-                  >
-                    Response (Structured)
-                  </Button>
-                </div>
+                
+                {result.error && (
+                  <div className="text-red-600 text-xs bg-red-50 p-2 rounded">
+                    <strong>Error:</strong> {result.error}
+                  </div>
+                )}
+                
+                {result.reason && (
+                  <div className="text-yellow-600 text-xs bg-yellow-50 p-2 rounded">
+                    <strong>Reason:</strong> {result.reason}
+                  </div>
+                )}
+                
+                {result.extractedData && (
+                  <div className="text-green-600 text-xs bg-green-50 p-2 rounded">
+                    <strong>Data Extracted:</strong> PO Number: {result.extractedData.po_number || 'N/A'}
+                    {result.extractedData.vendor_code && (
+                      <span>, Vendor: {result.extractedData.vendor_code}</span>
+                    )}
+                  </div>
+                )}
               </div>
-              
-              <div className="border rounded p-2">
-                <ExtractedTablePreview
-                  initialData={{
-                    headers: processingResults.tableData.headers,
-                    rows: processingResults.tableData.rows
-                  }}
-                  displayFormat={displayFormat}
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="text-center p-6">
-              <p className="text-muted-foreground">No table data was extracted from this document.</p>
-            </div>
-          )}
-          
-          {/* Display Gemini insights if available */}
-          {processingResults?.insights && (
-            <GeminiInsightsPanel 
-              insights={processingResults.insights} 
-              processingId={processingResults.processingId}
-            />
-          )}
-        </TabsContent>
-        
-        <TabsContent value="original" className="border rounded-md p-4">
-          {hasFileToPreview ? (
-            <DocumentPreview 
-              fileUrl={getFileUrl()} 
-              fileName={files.length > 0 ? files[0].name : undefined}
-              fileType={files.length > 0 ? files[0].type : undefined}
-              height="500px"
-            />
-          ) : (
-            <div className="p-8 text-center text-muted-foreground">
-              <p>No document preview available</p>
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 };
-
-export default ProcessingResults;

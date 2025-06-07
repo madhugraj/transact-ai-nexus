@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -10,9 +9,10 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Settings, TableIcon, FileText, Layers, Sparkles, Database, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AgentProcessingInterface } from '../processing/agent-processing/AgentProcessingInterface';
 
 // Post-processing action for uploaded files
-export type PostProcessAction = 'table_extraction' | 'insights' | 'summary' | 'combine_data' | 'push_to_db';
+export type PostProcessAction = 'table_extraction' | 'insights' | 'summary' | 'combine_data' | 'push_to_db' | 'po_processing';
 
 // File processing options
 export interface ProcessingOptions {
@@ -45,6 +45,7 @@ interface UploadedFile {
   progress: number;
   error?: string;
   processed?: boolean;
+  backendId?: string;
 }
 
 interface FileProcessingDialogProps {
@@ -57,6 +58,8 @@ interface FileProcessingDialogProps {
   processingOptions: ProcessingOptions;
   setProcessingOptions: React.Dispatch<React.SetStateAction<ProcessingOptions>>;
   onProcess: () => void;
+  isDocumentFile: (file: File) => boolean;
+  isDataFile: (file: File) => boolean;
 }
 
 export const FileProcessingDialog: React.FC<FileProcessingDialogProps> = ({
@@ -68,18 +71,38 @@ export const FileProcessingDialog: React.FC<FileProcessingDialogProps> = ({
   setCurrentAction,
   processingOptions,
   setProcessingOptions,
-  onProcess
+  onProcess,
+  isDocumentFile,
+  isDataFile
 }) => {
-  // Determine if file is a document (PDF/image) or data file (CSV/Excel)
-  const isDocumentFile = (file: File) => {
-    return file.type === 'application/pdf' || file.type.startsWith('image/');
-  };
-
-  // Determine if file is a data file (CSV/Excel)
-  const isDataFile = (file: File) => {
-    return file.type.includes('excel') || file.type.includes('spreadsheet') || file.type === 'text/csv';
-  };
+  // Get selected files
+  const selectedFiles = files.filter(file => selectedFileIds.includes(file.id));
+  const selectedFileObjects = selectedFiles.map(f => f.file);
   
+  // Auto-detect processing type based on file types
+  React.useEffect(() => {
+    if (selectedFiles.length > 0) {
+      const hasDocuments = selectedFiles.some(f => isDocumentFile(f.file));
+      const hasDataFiles = selectedFiles.some(f => isDataFile(f.file));
+      
+      // Check if files look like POs (PDF/images with PO-related names)
+      const hasPOFiles = selectedFiles.some(f => 
+        isDocumentFile(f.file) && 
+        (f.file.name.toLowerCase().includes('po') || 
+         f.file.name.toLowerCase().includes('purchase') ||
+         f.file.name.toLowerCase().includes('order'))
+      );
+      
+      if (hasPOFiles) {
+        setCurrentAction('po_processing');
+      } else if (hasDocuments && !hasDataFiles) {
+        setCurrentAction('table_extraction');
+      } else if (hasDataFiles) {
+        setCurrentAction('table_extraction');
+      }
+    }
+  }, [selectedFiles, isDocumentFile, isDataFile, setCurrentAction]);
+
   // Helper to get friendly name for actions
   const getActionName = (action: PostProcessAction): string => {
     switch (action) {
@@ -88,489 +111,203 @@ export const FileProcessingDialog: React.FC<FileProcessingDialogProps> = ({
       case 'summary': return 'Document Summary';
       case 'combine_data': return 'Combine Data';
       case 'push_to_db': return 'Push to Database';
+      case 'po_processing': return 'PO Processing';
       default: return action;
     }
   };
 
-  // Render specific options for table extraction
-  const renderTableExtractionSettings = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label>Table Headers</Label>
-          <Select 
-            value={processingOptions.tableFormat?.hasHeaders ? "yes" : "no"}
-            onValueChange={(val) => setProcessingOptions(prev => ({
-              ...prev,
-              tableFormat: {
-                ...prev.tableFormat,
-                hasHeaders: val === "yes"
-              }
-            }))}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="yes">First row is header</SelectItem>
-              <SelectItem value="no">No headers in table</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        
-        {processingOptions.tableFormat?.hasHeaders && (
-          <div>
-            <Label>Header Row</Label>
-            <Input 
-              type="number" 
-              min="1" 
-              value={processingOptions.tableFormat.headerRow}
-              onChange={(e) => setProcessingOptions(prev => ({
-                ...prev,
-                tableFormat: {
-                  ...prev.tableFormat,
-                  headerRow: parseInt(e.target.value)
-                }
-              }))}
-            />
-          </div>
-        )}
-      </div>
-      
-      <div className="space-y-2">
-        <Label>Skip Rows</Label>
-        <Input 
-          type="number" 
-          min="0"
-          value={processingOptions.tableFormat?.skipRows}
-          onChange={(e) => setProcessingOptions(prev => ({
-            ...prev,
-            tableFormat: {
-              ...prev.tableFormat,
-              skipRows: parseInt(e.target.value)
-            }
-          }))}
-        />
-        <p className="text-xs text-muted-foreground">
-          Number of rows to skip from the top of the document
-        </p>
-      </div>
-      
-      <div className="flex items-center space-x-2">
-        <Checkbox 
-          id="normalize-data"
-          checked={processingOptions.dataProcessing?.normalizeData}
-          onCheckedChange={(checked) => setProcessingOptions(prev => ({
-            ...prev,
-            dataProcessing: {
-              ...prev.dataProcessing,
-              normalizeData: checked === true
-            }
-          }))}
-        />
-        <label htmlFor="normalize-data" className="text-sm">
-          Normalize extracted data
-        </label>
-      </div>
-      
-      <div className="flex items-center space-x-2">
-        <Checkbox 
-          id="detect-types"
-          checked={processingOptions.dataProcessing?.detectTypes}
-          onCheckedChange={(checked) => setProcessingOptions(prev => ({
-            ...prev,
-            dataProcessing: {
-              ...prev.dataProcessing,
-              detectTypes: checked === true
-            }
-          }))}
-        />
-        <label htmlFor="detect-types" className="text-sm">
-          Auto-detect data types
-        </label>
-      </div>
-    </div>
-  );
-
-  // Render specific options for data combining
-  const renderDataCombiningSettings = () => (
-    <div className="space-y-4">
-      <div>
-        <Label>Combine Method</Label>
-        <Select defaultValue="append">
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="append">Append (stack vertically)</SelectItem>
-            <SelectItem value="merge">Merge on common columns</SelectItem>
-            <SelectItem value="union">Union (distinct rows)</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      
-      <div className="space-y-2">
-        <Label>Match Columns</Label>
-        <Select defaultValue="auto">
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="auto">Auto-detect columns</SelectItem>
-            <SelectItem value="name">Match by column name</SelectItem>
-            <SelectItem value="position">Match by position</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      
-      <div className="flex items-center space-x-2">
-        <Checkbox id="remove-empty-rows" defaultChecked />
-        <label htmlFor="remove-empty-rows" className="text-sm">
-          Remove empty rows
-        </label>
-      </div>
-      
-      <div className="flex items-center space-x-2">
-        <Checkbox id="normalize-combined-data" defaultChecked />
-        <label htmlFor="normalize-combined-data" className="text-sm">
-          Normalize column names across files
-        </label>
-      </div>
-    </div>
-  );
-
-  // Render specific options for database push
-  const renderDatabasePushSettings = () => (
-    <div className="space-y-4">
-      <div>
-        <Label>Database Connection</Label>
-        <Select 
-          value={processingOptions.databaseOptions?.connection}
-          onValueChange={(val) => setProcessingOptions(prev => ({
-            ...prev,
-            databaseOptions: {
-              ...prev.databaseOptions,
-              connection: val
-            }
-          }))}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ERP Database">ERP Database (PostgreSQL)</SelectItem>
-            <SelectItem value="SAP HANA">SAP HANA</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      
-      <div className="space-y-2">
-        <Label>Table Name</Label>
-        <Input 
-          placeholder="Enter table name" 
-          value={processingOptions.databaseOptions?.tableName}
-          onChange={(e) => setProcessingOptions(prev => ({
-            ...prev,
-            databaseOptions: {
-              ...prev.databaseOptions,
-              tableName: e.target.value
-            }
-          }))}
-        />
-        <p className="text-xs text-muted-foreground">
-          Name of the table to store the data
-        </p>
-      </div>
-      
-      <div className="flex items-center space-x-2">
-        <Checkbox 
-          id="create-table"
-          checked={processingOptions.databaseOptions?.createIfNotExists}
-          onCheckedChange={(checked) => setProcessingOptions(prev => ({
-            ...prev,
-            databaseOptions: {
-              ...prev.databaseOptions,
-              createIfNotExists: checked === true
-            }
-          }))}
-        />
-        <label htmlFor="create-table" className="text-sm">
-          Create table if it doesn't exist
-        </label>
-      </div>
-      
-      <div className="space-y-2">
-        <Label>Insert Method</Label>
-        <Select defaultValue="insert">
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="insert">Insert new rows</SelectItem>
-            <SelectItem value="upsert">Upsert (update if exists)</SelectItem>
-            <SelectItem value="replace">Replace table contents</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-    </div>
-  );
-
-  // Render specific options for insights
-  const renderInsightSettings = () => (
-    <div className="space-y-4">
-      <div>
-        <Label>Analysis Type</Label>
-        <Select defaultValue="standard">
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="standard">Standard Analysis</SelectItem>
-            <SelectItem value="financial">Financial Analysis</SelectItem>
-            <SelectItem value="detailed">Detailed Breakdown</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      
-      <div className="space-y-2">
-        <Label>Key Metrics</Label>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="flex items-center space-x-2">
-            <Checkbox id="metric-amounts" defaultChecked />
-            <label htmlFor="metric-amounts" className="text-sm">Amount Analysis</label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox id="metric-dates" defaultChecked />
-            <label htmlFor="metric-dates" className="text-sm">Date Patterns</label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox id="metric-vendors" defaultChecked />
-            <label htmlFor="metric-vendors" className="text-sm">Vendor Analysis</label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox id="metric-category" defaultChecked />
-            <label htmlFor="metric-category" className="text-sm">Category Detection</label>
-          </div>
-        </div>
-      </div>
-      
-      <div className="space-y-2">
-        <Label>Visualization Options</Label>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="flex items-center space-x-2">
-            <Checkbox id="viz-charts" defaultChecked />
-            <label htmlFor="viz-charts" className="text-sm">Generate Charts</label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox id="viz-summary" defaultChecked />
-            <label htmlFor="viz-summary" className="text-sm">Summary Tables</label>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Render specific options for document summary
-  const renderDocumentSummarySettings = () => (
-    <div className="space-y-4">
-      <div>
-        <Label>Summary Type</Label>
-        <Select defaultValue="comprehensive">
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="brief">Brief Overview</SelectItem>
-            <SelectItem value="comprehensive">Comprehensive</SelectItem>
-            <SelectItem value="financial">Financial Focus</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      
-      <div className="space-y-2">
-        <Label>Include Elements</Label>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="flex items-center space-x-2">
-            <Checkbox id="elem-metadata" defaultChecked />
-            <label htmlFor="elem-metadata" className="text-sm">Document Metadata</label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox id="elem-entities" defaultChecked />
-            <label htmlFor="elem-entities" className="text-sm">Named Entities</label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox id="elem-tables" defaultChecked />
-            <label htmlFor="elem-tables" className="text-sm">Tables</label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox id="elem-amounts" defaultChecked />
-            <label htmlFor="elem-amounts" className="text-sm">Monetary Amounts</label>
-          </div>
-        </div>
-      </div>
-      
-      <div className="flex items-center space-x-2">
-        <Checkbox id="extract-key-terms" defaultChecked />
-        <label htmlFor="extract-key-terms" className="text-sm">
-          Extract key terms and concepts
-        </label>
-      </div>
-    </div>
-  );
-
-  // Render appropriate settings based on current action
-  const renderActionSettings = () => {
-    switch (currentAction) {
-      case 'table_extraction':
-        return renderTableExtractionSettings();
-      case 'combine_data':
-        return renderDataCombiningSettings();
-      case 'push_to_db':
-        return renderDatabasePushSettings();
-      case 'insights':
-        return renderInsightSettings();
-      case 'summary':
-        return renderDocumentSummarySettings();
-      default:
-        return null;
+  const handleProcessClick = () => {
+    if (currentAction === 'po_processing') {
+      // For PO processing, we don't need the regular process flow
+      // The AgentProcessingInterface will handle it
+      return;
+    } else {
+      // For other processing types, use the regular flow
+      onProcess();
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Process Files</DialogTitle>
           <DialogDescription>
-            {selectedFileIds.length} file(s) selected for processing
+            Choose how to process your {selectedFiles.length} selected file(s)
           </DialogDescription>
         </DialogHeader>
-        
-        <div className="py-4">
-          <div className="space-y-4">
-            <div>
-              <Label className="mb-2 block">Select Action</Label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {selectedFileIds.length > 0 && isDocumentFile(files.find(f => f.id === selectedFileIds[0])?.file as File) && (
-                  <>
-                    <div
-                      className={cn(
-                        "flex flex-col items-center justify-center p-3 rounded-md border cursor-pointer hover:bg-muted/50",
-                        currentAction === 'table_extraction' && "border-primary bg-primary/5"
-                      )}
-                      onClick={() => setCurrentAction('table_extraction')}
-                    >
-                      <TableIcon className="h-8 w-8 mb-2 text-primary" />
-                      <span className="text-sm font-medium">Table Extraction</span>
-                    </div>
-                    <div
-                      className={cn(
-                        "flex flex-col items-center justify-center p-3 rounded-md border cursor-pointer hover:bg-muted/50",
-                        currentAction === 'summary' && "border-primary bg-primary/5"
-                      )}
-                      onClick={() => setCurrentAction('summary')}
-                    >
-                      <FileText className="h-8 w-8 mb-2 text-orange-500" />
-                      <span className="text-sm font-medium">Document Summary</span>
-                    </div>
-                  </>
-                )}
 
-                {selectedFileIds.length > 0 && isDataFile(files.find(f => f.id === selectedFileIds[0])?.file as File) && selectedFileIds.length > 1 && (
-                  <div
-                    className={cn(
-                      "flex flex-col items-center justify-center p-3 rounded-md border cursor-pointer hover:bg-muted/50",
-                      currentAction === 'combine_data' && "border-primary bg-primary/5"
-                    )}
-                    onClick={() => setCurrentAction('combine_data')}
-                  >
-                    <Layers className="h-8 w-8 mb-2 text-blue-500" />
-                    <span className="text-sm font-medium">Combine Data</span>
-                  </div>
+        <div className="space-y-6">
+          {/* Action Selection */}
+          <div className="space-y-3">
+            <Label className="text-base font-medium">Processing Action</Label>
+            <div className="grid grid-cols-2 gap-3">
+              {/* Table Extraction */}
+              <div 
+                className={cn(
+                  "border rounded-lg p-3 cursor-pointer transition-all",
+                  currentAction === 'table_extraction' ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
                 )}
-
-                <div
-                  className={cn(
-                    "flex flex-col items-center justify-center p-3 rounded-md border cursor-pointer hover:bg-muted/50",
-                    currentAction === 'insights' && "border-primary bg-primary/5"
-                  )}
-                  onClick={() => setCurrentAction('insights')}
-                >
-                  <Sparkles className="h-8 w-8 mb-2 text-yellow-500" />
-                  <span className="text-sm font-medium">Generate Insights</span>
+                onClick={() => setCurrentAction('table_extraction')}
+              >
+                <div className="flex items-center space-x-2">
+                  <TableIcon className="h-5 w-5" />
+                  <span className="font-medium">Table Extraction</span>
                 </div>
-                
-                <div
-                  className={cn(
-                    "flex flex-col items-center justify-center p-3 rounded-md border cursor-pointer hover:bg-muted/50",
-                    currentAction === 'push_to_db' && "border-primary bg-primary/5"
-                  )}
-                  onClick={() => setCurrentAction('push_to_db')}
-                >
-                  <Database className="h-8 w-8 mb-2 text-green-500" />
-                  <span className="text-sm font-medium">Push to Database</span>
-                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Extract structured data from documents
+                </p>
               </div>
-            </div>
-            
-            <Separator className="my-4" />
-            
-            {/* Action-specific settings */}
-            <Tabs defaultValue="settings">
-              <TabsList>
-                <TabsTrigger value="settings">Settings</TabsTrigger>
-                <TabsTrigger value="preview">Preview</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="settings" className="space-y-4 py-4">
-                {renderActionSettings()}
-              </TabsContent>
-              
-              <TabsContent value="preview">
-                <div className="p-6 text-center text-muted-foreground border rounded-md flex flex-col items-center justify-center h-40 mt-2">
-                  <Settings className="h-8 w-8 mb-2 opacity-50" />
-                  <p>Preview will be generated after processing begins</p>
+
+              {/* PO Processing */}
+              <div 
+                className={cn(
+                  "border rounded-lg p-3 cursor-pointer transition-all",
+                  currentAction === 'po_processing' ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                )}
+                onClick={() => setCurrentAction('po_processing')}
+              >
+                <div className="flex items-center space-x-2">
+                  <FileText className="h-5 w-5" />
+                  <span className="font-medium">PO Processing</span>
                 </div>
-              </TabsContent>
-            </Tabs>
-            
-            {/* Next Steps Workflow */}
-            <div className="bg-muted p-4 rounded-md mt-4">
-              <h4 className="text-sm font-medium mb-2">Processing Workflow</h4>
-              <div className="flex items-center text-sm">
-                <div className="flex flex-col items-center">
-                  <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center">
-                    1
-                  </div>
-                  <span className="text-xs mt-1">Process</span>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Extract and process Purchase Order data
+                </p>
+              </div>
+
+              {/* Other actions... */}
+              <div 
+                className={cn(
+                  "border rounded-lg p-3 cursor-pointer transition-all",
+                  currentAction === 'insights' ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                )}
+                onClick={() => setCurrentAction('insights')}
+              >
+                <div className="flex items-center space-x-2">
+                  <Sparkles className="h-5 w-5" />
+                  <span className="font-medium">Generate Insights</span>
                 </div>
-                <ArrowRight className="h-4 w-4 mx-2 text-muted-foreground" />
-                <div className="flex flex-col items-center">
-                  <div className="w-8 h-8 rounded-full bg-muted-foreground/20 text-muted-foreground flex items-center justify-center">
-                    2
-                  </div>
-                  <span className="text-xs mt-1">Dashboard</span>
+                <p className="text-xs text-muted-foreground mt-1">
+                  AI-powered data analysis
+                </p>
+              </div>
+
+              <div 
+                className={cn(
+                  "border rounded-lg p-3 cursor-pointer transition-all",
+                  currentAction === 'push_to_db' ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                )}
+                onClick={() => setCurrentAction('push_to_db')}
+              >
+                <div className="flex items-center space-x-2">
+                  <Database className="h-5 w-5" />
+                  <span className="font-medium">Push to Database</span>
                 </div>
-                <ArrowRight className="h-4 w-4 mx-2 text-muted-foreground" />
-                <div className="flex flex-col items-center">
-                  <div className="w-8 h-8 rounded-full bg-muted-foreground/20 text-muted-foreground flex items-center justify-center">
-                    3
-                  </div>
-                  <span className="text-xs mt-1">AI Assistant</span>
-                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Store data in database
+                </p>
               </div>
             </div>
           </div>
+
+          {/* PO Processing Interface */}
+          {currentAction === 'po_processing' && (
+            <div className="space-y-4">
+              <Separator />
+              <AgentProcessingInterface 
+                files={selectedFileObjects}
+                title="Purchase Order Processing"
+                description="AI agents will detect and extract PO data from your documents"
+              />
+            </div>
+          )}
+
+          {/* Regular Processing Options for other actions */}
+          {currentAction !== 'po_processing' && (
+            <>
+              <Separator />
+              
+              {/* Processing Options */}
+              <div className="space-y-4">
+                <Label className="text-base font-medium">Processing Options</Label>
+                
+                {currentAction === 'table_extraction' && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Table Headers</Label>
+                        <Select 
+                          value={processingOptions.tableFormat?.hasHeaders ? "yes" : "no"}
+                          onValueChange={(val) => setProcessingOptions(prev => ({
+                            ...prev,
+                            tableFormat: {
+                              ...prev.tableFormat,
+                              hasHeaders: val === "yes"
+                            }
+                          }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="yes">First row is header</SelectItem>
+                            <SelectItem value="no">No headers in table</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      {processingOptions.tableFormat?.hasHeaders && (
+                        <div>
+                          <Label>Header Row</Label>
+                          <Input 
+                            type="number" 
+                            min="1" 
+                            value={processingOptions.tableFormat.headerRow || 1}
+                            onChange={(e) => setProcessingOptions(prev => ({
+                              ...prev,
+                              tableFormat: {
+                                ...prev.tableFormat,
+                                headerRow: parseInt(e.target.value)
+                              }
+                            }))}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="normalize-data"
+                        checked={processingOptions.dataProcessing?.normalizeData || false}
+                        onCheckedChange={(checked) => setProcessingOptions(prev => ({
+                          ...prev,
+                          dataProcessing: {
+                            ...prev.dataProcessing,
+                            normalizeData: checked === true
+                          }
+                        }))}
+                      />
+                      <label htmlFor="normalize-data" className="text-sm">
+                        Normalize extracted data
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleProcessClick} className="gap-2">
+                  <ArrowRight className="h-4 w-4" />
+                  Start {getActionName(currentAction)}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </div>
-        
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={onProcess}>
-            Start Processing
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
