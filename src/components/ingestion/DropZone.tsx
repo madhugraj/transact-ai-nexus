@@ -15,7 +15,14 @@ const DropZone = ({ onFilesSelected }: DropZoneProps) => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = e.target.files;
     if (selectedFiles) {
-      onFilesSelected(Array.from(selectedFiles));
+      const fileArray = Array.from(selectedFiles);
+      console.log("📁 DropZone: files selected via input:", fileArray.length);
+      console.log("📋 DropZone: file details:", fileArray.map(f => ({ 
+        name: f.name, 
+        size: f.size, 
+        type: f.type 
+      })));
+      onFilesSelected(fileArray);
     }
   };
 
@@ -24,7 +31,14 @@ const DropZone = ({ onFilesSelected }: DropZoneProps) => {
     setIsDragOver(false);
     
     if (e.dataTransfer.files) {
-      onFilesSelected(Array.from(e.dataTransfer.files));
+      const fileArray = Array.from(e.dataTransfer.files);
+      console.log("🎯 DropZone: files dropped:", fileArray.length);
+      console.log("📋 DropZone: dropped file details:", fileArray.map(f => ({ 
+        name: f.name, 
+        size: f.size, 
+        type: f.type 
+      })));
+      onFilesSelected(fileArray);
     }
   };
 
@@ -64,7 +78,10 @@ const DropZone = ({ onFilesSelected }: DropZoneProps) => {
               variant="default" 
               size="lg"
               className="px-6 transition-all duration-300 hover:scale-105"
-              onClick={() => document.getElementById('file-upload')?.click()}
+              onClick={() => {
+                console.log("🔘 DropZone: select files button clicked");
+                document.getElementById('file-upload')?.click();
+              }}
             >
               <Upload className="mr-2 h-3 w-3" />
               Select Files
@@ -73,7 +90,10 @@ const DropZone = ({ onFilesSelected }: DropZoneProps) => {
               variant="outline"
               size="lg"
               className="px-6 transition-all duration-300 hover:scale-105"
-              onClick={() => document.getElementById('folder-upload')?.click()}
+              onClick={() => {
+                console.log("🔘 DropZone: select folder button clicked");
+                document.getElementById('folder-upload')?.click();
+              }}
             >
               <Upload className="mr-2 h-3 w-3" />
               Select Folder
@@ -91,9 +111,8 @@ const DropZone = ({ onFilesSelected }: DropZoneProps) => {
               type="file"
               multiple
               className="hidden"
-              // For folder selection - using attributes properly
-              webkitdirectory={true} // Fixed: using boolean instead of string
-              directory={true} // Fixed: using boolean instead of string
+              webkitdirectory={true}
+              directory={true}
               onChange={handleFileChange}
             />
           </div>

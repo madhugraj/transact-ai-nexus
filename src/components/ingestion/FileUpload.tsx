@@ -41,19 +41,24 @@ const FileUpload = ({ onUploadComplete, onFilesSelected }: FileUploadProps) => {
 
   // Handle when files are added
   const handleFilesSelected = (newFiles: File[]) => {
-    console.log("FileUpload: files selected", newFiles.length);
+    console.log("🔄 FileUpload: files selected", newFiles.length);
+    console.log("📁 FileUpload: file details:", newFiles.map(f => ({ 
+      name: f.name, 
+      size: f.size, 
+      type: f.type 
+    })));
     
     if (newFiles && newFiles.length > 0) {
       addFiles(newFiles);
+      console.log("✅ FileUpload: files added to state");
       
       if (onFilesSelected) {
-        console.log("FileUpload: notifying parent component about selected files");
+        console.log("📤 FileUpload: notifying parent component about selected files");
         onFilesSelected(newFiles);
       }
   
       if (autoSync) {
-        // Auto upload files if sync is enabled
-        console.log("FileUpload: auto uploading files");
+        console.log("🔄 FileUpload: auto uploading files");
         setTimeout(() => {
           uploadAllFiles();
         }, 500);
@@ -62,7 +67,7 @@ const FileUpload = ({ onUploadComplete, onFilesSelected }: FileUploadProps) => {
   };
   
   const handleCloudFilesSelected = (newFiles: File[]) => {
-    console.log("FileUpload: cloud files selected", newFiles.length);
+    console.log("☁️ FileUpload: cloud files selected", newFiles.length);
     
     if (newFiles && newFiles.length > 0) {
       addFiles(newFiles);
@@ -80,6 +85,7 @@ const FileUpload = ({ onUploadComplete, onFilesSelected }: FileUploadProps) => {
 
   // Handle processing a single file
   const handleProcessFile = (fileId: string) => {
+    console.log("🔧 FileUpload: processing single file:", fileId);
     selectFilesForProcessing([fileId]);
     setShowProcessingDialog(true);
   };
@@ -98,7 +104,10 @@ const FileUpload = ({ onUploadComplete, onFilesSelected }: FileUploadProps) => {
       <FileUploadActions
         files={files}
         uploadAllFiles={uploadAllFiles}
-        handleProcessFiles={() => setShowProcessingDialog(true)}
+        handleProcessFiles={() => {
+          console.log("🔧 FileUpload: starting bulk file processing");
+          setShowProcessingDialog(true);
+        }}
         selectFilesForProcessing={selectFilesForProcessing}
         selectByType={selectByType}
         setShowProcessingDialog={setShowProcessingDialog}
@@ -118,6 +127,7 @@ const FileUpload = ({ onUploadComplete, onFilesSelected }: FileUploadProps) => {
           processingOptions={processingOptions}
           setProcessingOptions={setProcessingOptions}
           onProcess={() => {
+            console.log("🚀 FileUpload: starting file processing workflow");
             processFiles();
             setShowProcessingDialog(false);
             setShowWorkflow(true);
