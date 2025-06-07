@@ -2,9 +2,9 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { POProcessor } from './processing/POProcessor';
 import ProcessingStats from './processing/ProcessingStats';
 import { Loader, Play, X } from 'lucide-react';
+import { useAgentProcessing } from '@/hooks/useAgentProcessing';
 
 interface ProcessingSectionProps {
   downloadedFiles: File[];
@@ -13,51 +13,35 @@ interface ProcessingSectionProps {
 }
 
 const ProcessingSection = ({ downloadedFiles, onProcessingComplete, onClose }: ProcessingSectionProps) => {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [processingResults, setProcessingResults] = useState<any[]>([]);
   const { toast } = useToast();
+  const {
+    isProcessing,
+    processingComplete,
+    processingResults,
+    startProcessing
+  } = useAgentProcessing();
 
   if (downloadedFiles.length === 0) return null;
 
   const processPOFiles = async () => {
     console.log(`🚀 Starting to process ${downloadedFiles.length} files...`);
-    setIsProcessing(true);
-    setProcessingResults([]);
-
+    
     try {
-      const processor = new POProcessor();
-      console.log(`📝 Processing files:`, downloadedFiles.map(f => f.name));
+      toast({
+        title: "Processing Started",
+        description: `Processing ${downloadedFiles.length} PO file(s)...`,
+      });
+
+      // Use the agent processing system directly
+      await startProcessing(downloadedFiles);
       
-      const results = await processor.processFiles(downloadedFiles);
-      console.log(`📊 Processing results:`, results);
-      
-      setProcessingResults(results);
-      
-      const successCount = results.filter(r => r.status === 'success').length;
-      const errorCount = results.filter(r => r.status === 'error').length;
-      const skippedCount = results.filter(r => r.status === 'skipped').length;
-      
-      console.log(`📈 Processing summary: ${successCount} success, ${errorCount} errors, ${skippedCount} skipped`);
-      
-      if (successCount > 0) {
+      if (processingResults) {
+        console.log(`📊 Processing results:`, processingResults);
+        onProcessingComplete(processingResults);
+        
         toast({
           title: "Processing Complete",
-          description: `Successfully processed ${successCount} PO files. ${errorCount > 0 ? `${errorCount} errors. ` : ''}${skippedCount > 0 ? `${skippedCount} files skipped.` : ''}`,
-          variant: errorCount > successCount ? "destructive" : "default"
-        });
-        
-        // Call the completion callback
-        onProcessingComplete(results);
-      } else if (errorCount > 0) {
-        toast({
-          title: "Processing Failed",
-          description: `${errorCount} files failed to process. ${skippedCount > 0 ? `${skippedCount} files were not POs.` : ''}`,
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "No PO Files Found",
-          description: `${skippedCount} files were analyzed but none were identified as Purchase Orders.`,
+          description: `Successfully processed ${downloadedFiles.length} file(s)`,
         });
       }
 
@@ -68,8 +52,6 @@ const ProcessingSection = ({ downloadedFiles, onProcessingComplete, onClose }: P
         description: error instanceof Error ? error.message : "Failed to process files",
         variant: "destructive"
       });
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -107,7 +89,10 @@ const ProcessingSection = ({ downloadedFiles, onProcessingComplete, onClose }: P
         </div>
       </div>
 
-      <ProcessingStats results={processingResults} isProcessing={isProcessing} />
+      <ProcessingStats 
+        results={processingResults ? [processingResults] : []} 
+        isProcessing={isProcessing} 
+      />
     </div>
   );
 };

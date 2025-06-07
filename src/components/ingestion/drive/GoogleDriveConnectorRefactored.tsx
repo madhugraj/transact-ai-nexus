@@ -260,9 +260,15 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
         setDownloadedFiles(downloadedFiles);
         onFilesSelected(downloadedFiles);
         
+        // Auto-start processing after successful download
+        setTimeout(() => {
+          console.log('🚀 Auto-starting processing after download...');
+          // The ProcessingSection will handle the actual processing
+        }, 500);
+        
         toast({
           title: "Success",
-          description: `${downloadedFiles.length} files imported successfully`
+          description: `${downloadedFiles.length} files imported successfully and ready for processing`
         });
       } else {
         toast({
