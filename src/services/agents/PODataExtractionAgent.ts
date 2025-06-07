@@ -8,21 +8,35 @@ export class PODataExtractionAgent {
       
       // Check if it's a PDF file
       if (file.type === 'application/pdf') {
-        console.log(`📄 PODataExtractionAgent: Converting PDF to images for ${file.name}`);
+        console.log(`📄 PODataExtractionAgent: Processing PDF file ${file.name}`);
+        
+        // First, try to convert PDF to base64 and send directly to Gemini
+        try {
+          const base64Data = await fileToBase64(file);
+          console.log(`📊 PODataExtractionAgent: PDF converted to base64, size: ${base64Data.length} chars`);
+          
+          // Try direct PDF processing with Gemini first
+          const extractedData = await this.extractPODataWithGemini(base64Data, file.type, file.name);
+          
+          if (extractedData.success) {
+            console.log(`✅ PODataExtractionAgent: Direct PDF processing successful for ${file.name}`);
+            return extractedData;
+          }
+          
+          console.log(`⚠️ PODataExtractionAgent: Direct PDF processing failed, trying image conversion for ${file.name}`);
+        } catch (error) {
+          console.error(`❌ PODataExtractionAgent: Direct PDF processing error for ${file.name}:`, error);
+        }
+        
+        // Fallback: Try PDF to image conversion
         const imageData = await this.convertPdfToImage(file);
         
         if (!imageData) {
-          console.log(`📄 PODataExtractionAgent: PDF conversion failed, trying direct upload to Gemini for ${file.name}`);
-          // Fallback: try sending PDF directly to Gemini
-          const base64Data = await fileToBase64(file);
-          const extractedData = await this.extractPODataWithGemini(base64Data, file.type, file.name);
-          
-          if (!extractedData.success) {
-            console.error(`❌ PODataExtractionAgent: Both image conversion and direct PDF processing failed for ${file.name}`);
-            return { success: false, error: 'Failed to process PDF file' };
-          }
-          
-          return extractedData;
+          console.error(`❌ PODataExtractionAgent: All PDF processing methods failed for ${file.name}`);
+          return { 
+            success: false, 
+            error: 'Unable to process PDF file. The file may be corrupted or password-protected.' 
+          };
         }
         
         // Extract PO data using Gemini AI with converted image
@@ -42,7 +56,7 @@ export class PODataExtractionAgent {
       } else {
         // For image files, convert directly to base64
         const base64Data = await fileToBase64(file);
-        console.log(`📊 PODataExtractionAgent: File converted to base64`);
+        console.log(`📊 PODataExtractionAgent: Image file converted to base64`);
         
         // Extract PO data using Gemini AI
         const extractedData = await this.extractPODataWithGemini(base64Data, file.type, file.name);
@@ -80,53 +94,67 @@ export class PODataExtractionAgent {
       
       const arrayBuffer = await file.arrayBuffer();
       
-      // Add validation for PDF structure
+      // Enhanced validation for PDF structure
       if (arrayBuffer.byteLength < 100) {
         console.error(`❌ PODataExtractionAgent: PDF file too small: ${arrayBuffer.byteLength} bytes`);
         return null;
       }
       
-      // Check for PDF header
-      const header = new Uint8Array(arrayBuffer.slice(0, 5));
+      // Check for PDF header with more flexible matching
+      const header = new Uint8Array(arrayBuffer.slice(0, 10));
       const headerString = String.fromCharCode(...header);
-      if (!headerString.startsWith('%PDF')) {
+      if (!headerString.includes('%PDF')) {
         console.error(`❌ PODataExtractionAgent: Invalid PDF header: ${headerString}`);
         return null;
       }
       
-      const pdf = await pdfjsLib.getDocument({ 
-        data: arrayBuffer,
-        verbosity: 0, // Reduce console noise
-        stopAtErrors: false // Continue processing even with minor errors
-      }).promise;
-      
-      console.log(`📄 PODataExtractionAgent: PDF loaded with ${pdf.numPages} pages`);
-      
-      // Get the first page
-      const page = await pdf.getPage(1);
-      const viewport = page.getViewport({ scale: 3.0 }); // Higher scale for better quality
-      
-      // Create canvas
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d')!;
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
-      
-      // Render page to canvas
-      await page.render({
-        canvasContext: context,
-        viewport: viewport
-      }).promise;
-      
-      // Convert canvas to base64
-      const base64 = canvas.toDataURL('image/png').split(',')[1];
-      
-      console.log(`✅ PODataExtractionAgent: Successfully converted PDF to image for ${file.name}`);
-      
-      return {
-        base64,
-        mimeType: 'image/png'
-      };
+      try {
+        const pdf = await pdfjsLib.getDocument({ 
+          data: arrayBuffer,
+          verbosity: 0, // Reduce console noise
+          stopAtErrors: false, // Continue processing even with minor errors
+          isEvalSupported: false, // Disable eval for security
+          disableFontFace: true, // Disable font loading
+          disableRange: false,
+          disableStream: false
+        }).promise;
+        
+        console.log(`📄 PODataExtractionAgent: PDF loaded with ${pdf.numPages} pages`);
+        
+        if (pdf.numPages === 0) {
+          console.error(`❌ PODataExtractionAgent: PDF has no pages`);
+          return null;
+        }
+        
+        // Get the first page
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 2.0 }); // Higher scale for better quality
+        
+        // Create canvas
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d')!;
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        
+        // Render page to canvas
+        await page.render({
+          canvasContext: context,
+          viewport: viewport
+        }).promise;
+        
+        // Convert canvas to base64
+        const base64 = canvas.toDataURL('image/png').split(',')[1];
+        
+        console.log(`✅ PODataExtractionAgent: Successfully converted PDF to image for ${file.name}`);
+        
+        return {
+          base64,
+          mimeType: 'image/png'
+        };
+      } catch (pdfError) {
+        console.error(`❌ PODataExtractionAgent: PDF.js processing error:`, pdfError);
+        return null;
+      }
     } catch (error) {
       console.error(`❌ PODataExtractionAgent: PDF conversion error for ${file.name}:`, error);
       return null;
@@ -136,64 +164,66 @@ export class PODataExtractionAgent {
   private async extractPODataWithGemini(base64Data: string, mimeType: string, fileName: string): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
       const prompt = `
-You are an expert OCR and data extraction AI. Please analyze this Purchase Order document and extract ALL the relevant information.
+You are an expert document analysis AI. Analyze this document and extract Purchase Order information.
 
 CRITICAL INSTRUCTIONS:
-1. This is a Purchase Order document - examine it very carefully
-2. Look for ANY text, numbers, or structured data in the image
-3. Extract EVERY piece of information you can find, even if fields are unclear
-4. For PO number: Look for ANY numbers that could be a PO number - check headers, footers, anywhere
-5. Convert dates to YYYY-MM-DD format when possible
-6. For line items: Extract ANY tabular data you see
-7. If text is unclear, make your best interpretation
-8. NEVER return all null values unless the image is completely blank
+1. This document may be a Purchase Order - examine it very carefully
+2. Extract ANY relevant business information you can find
+3. For PO number: Look for ANY number that could identify this document (PO#, Order#, Doc#, Reference#, etc.)
+4. Be flexible with data extraction - some fields may be missing or unclear
+5. Return meaningful data even if the document format is unusual
 
-ENHANCED EXTRACTION PATTERNS:
-- PO Number patterns: "PO", "P.O.", "Purchase Order", "Order No", "Doc No", ANY prominent number
-- Look for company names, addresses, contact information
-- Find ANY tabular data with items, quantities, prices
-- Extract dates from anywhere in the document
-- Look for terms like "Net 30", "Payment Terms", etc.
+EXTRACTION REQUIREMENTS:
+- PO Number: ANY identifying number (can be alphanumeric)
+- Dates: Convert to YYYY-MM-DD format when possible
+- Vendor: Any company/supplier information
+- Line Items: Extract tabular data with items, quantities, prices
+- Addresses: Extract any address information found
+- Terms: Payment terms, delivery terms, conditions
 
-REQUIRED JSON FORMAT - Return this structure with extracted data:
+REQUIRED JSON FORMAT:
 {
-  "po_number": "extract ANY number that could be PO number - be liberal in interpretation",
-  "po_date": "date in YYYY-MM-DD format if found, otherwise null",
-  "vendor_code": "any vendor/supplier identifier or null",
-  "gstn": "GST/tax number if found or null",
-  "project": "project name/code if found or null",
-  "bill_to_address": "full billing/company address or null",
-  "ship_to": "shipping address if different or null",
-  "del_start_date": "delivery start date if found or null",
-  "del_end_date": "delivery end date if found or null",
-  "terms_conditions": "payment terms or any conditions found or null",
+  "po_number": "any identifying number found",
+  "po_date": "YYYY-MM-DD or null",
+  "vendor_code": "vendor identifier or null", 
+  "gstn": "tax number if found or null",
+  "project": "project name/code or null",
+  "bill_to_address": "billing address or null",
+  "ship_to": "shipping address or null", 
+  "del_start_date": "delivery start date or null",
+  "del_end_date": "delivery end date or null",
+  "terms_conditions": "payment/delivery terms or null",
   "description": [
     {
-      "item": "item/service description",
-      "quantity": number_or_1_if_unclear,
-      "unit_price": number_or_0_if_unclear,
-      "total": number_or_0_if_unclear
+      "item": "item description",
+      "quantity": 1,
+      "unit_price": 0,
+      "total": 0
     }
   ]
 }
 
-IMPORTANT: 
-- If you see ANY text or data, extract it
-- Don't return all nulls unless image is truly blank
-- Be generous in your interpretation of what could be relevant data
-- Extract company names, contact info, any structured data you see
+IMPORTANT NOTES:
+- If you cannot find a specific PO number, extract ANY document reference number
+- Extract company names, addresses, and contact information
+- Look for ANY structured data or tables
+- Don't return all null values unless the document is completely unreadable
+- Be generous in your interpretation of what constitutes relevant data
 
-Return ONLY valid JSON with extracted data.
+Return ONLY valid JSON with the extracted data.
 `;
 
-      console.log(`🤖 PODataExtractionAgent: Sending enhanced request to Gemini for ${fileName}`);
+      console.log(`🤖 PODataExtractionAgent: Sending request to Gemini for ${fileName}`);
       
       // Use Gemini API key from environment or localStorage
       const apiKey = typeof window !== 'undefined' 
         ? localStorage.getItem('GEMINI_API_KEY') || 'AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk'
         : 'AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk';
 
-      // Call the Gemini API with enhanced parameters
+      // Clean base64 data
+      const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, '');
+
+      // Call the Gemini API
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
         {
@@ -207,14 +237,14 @@ Return ONLY valid JSON with extracted data.
                   {
                     inline_data: {
                       mime_type: mimeType,
-                      data: base64Data.replace(/^data:image\/\w+;base64,/, '')
+                      data: cleanBase64
                     }
                   }
                 ]
               }
             ],
             generationConfig: {
-              temperature: 0.2, // Slightly higher for more flexible interpretation
+              temperature: 0.1,
               maxOutputTokens: 4096,
               topP: 0.8,
               topK: 40
@@ -225,6 +255,7 @@ Return ONLY valid JSON with extracted data.
       
       if (!response.ok) {
         const errorText = await response.text();
+        console.error(`❌ PODataExtractionAgent: Gemini API error:`, errorText);
         throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
       }
       
@@ -237,16 +268,16 @@ Return ONLY valid JSON with extracted data.
         throw new Error("Empty response from Gemini API");
       }
       
-      // Extract JSON from response text - try multiple approaches
+      // Extract JSON from response text
       let parsedData;
       
-      // First try: direct JSON parsing
       try {
+        // Try direct JSON parsing first
         parsedData = JSON.parse(responseText.trim());
       } catch (e) {
         console.log(`🔄 PODataExtractionAgent: Direct JSON parse failed, trying extraction methods...`);
         
-        // Second try: extract JSON from code blocks
+        // Try extracting JSON from code blocks
         const codeBlockMatch = responseText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
         if (codeBlockMatch) {
           try {
@@ -256,7 +287,7 @@ Return ONLY valid JSON with extracted data.
           }
         }
         
-        // Third try: find JSON object with regex
+        // Try finding JSON object with regex
         if (!parsedData) {
           const jsonMatch = responseText.match(/\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}/);
           if (jsonMatch) {
@@ -273,29 +304,43 @@ Return ONLY valid JSON with extracted data.
         }
       }
       
-      // Validate that we have some data
+      // Validate that we have some meaningful data
       if (!parsedData || typeof parsedData !== 'object') {
         throw new Error("Invalid data structure from Gemini");
       }
       
-      // Enhanced validation - check if we got meaningful data
+      // Check if we got any meaningful data
       const hasData = parsedData.po_number || 
                      parsedData.vendor_code || 
                      parsedData.bill_to_address ||
                      parsedData.terms_conditions ||
-                     (parsedData.description && parsedData.description.length > 0);
+                     (parsedData.description && Array.isArray(parsedData.description) && parsedData.description.length > 0);
       
       if (!hasData) {
-        console.warn(`⚠️ PODataExtractionAgent: Gemini returned mostly empty data for ${fileName}. Response:`, parsedData);
-        // Still return success but with a warning
-        return {
-          success: true,
-          data: {
-            ...parsedData,
-            extraction_confidence: 'low',
-            extraction_note: 'Limited data extracted from document'
-          }
-        };
+        console.warn(`⚠️ PODataExtractionAgent: Limited data extracted for ${fileName}`);
+        
+        // Try to extract at least something meaningful
+        if (responseText.length > 50) {
+          // If we have a substantial response, create a basic structure
+          parsedData = {
+            po_number: `DOC_${Date.now()}`, // Generate a fallback document ID
+            po_date: null,
+            vendor_code: null,
+            gstn: null,
+            project: null,
+            bill_to_address: null,
+            ship_to: null,
+            del_start_date: null,
+            del_end_date: null,
+            terms_conditions: `Extracted text: ${responseText.substring(0, 200)}...`,
+            description: []
+          };
+        } else {
+          return {
+            success: false,
+            error: 'Could not extract meaningful data from document'
+          };
+        }
       }
       
       console.log(`✅ PODataExtractionAgent: Successfully parsed data for ${fileName}:`, parsedData);
@@ -304,7 +349,7 @@ Return ONLY valid JSON with extracted data.
         success: true,
         data: {
           ...parsedData,
-          extraction_confidence: 'high'
+          extraction_confidence: hasData ? 'high' : 'low'
         }
       };
     } catch (error) {

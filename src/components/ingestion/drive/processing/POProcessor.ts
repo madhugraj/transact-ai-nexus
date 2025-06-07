@@ -63,11 +63,6 @@ export class POProcessor {
         const extractedData = extractionResult.data;
         console.log(`📊 POProcessor: Extracted data for ${file.name}:`, extractedData);
 
-        // Enhanced validation - allow processing even with limited data
-        if (!extractedData.po_number && !extractedData.bill_to_address && !extractedData.vendor_code) {
-          console.warn(`⚠️ POProcessor: Limited data extracted for ${file.name}, but continuing with processing`);
-        }
-
         // Step 3: Store in database
         console.log(`💾 POProcessor: Storing data for: ${file.name}`);
         const dbResult = await this.storeInDatabase(file.name, extractedData);
@@ -95,25 +90,36 @@ export class POProcessor {
       console.log(`💾 POProcessor: Preparing to store data for ${fileName}`);
       console.log(`💾 POProcessor: Data to store:`, extractedData);
       
-      // Handle PO number - be more flexible
+      // Handle PO number with improved logic
       let poNumber = extractedData.po_number;
+      
       if (typeof poNumber === 'string') {
-        // Try to extract number from string
+        // Try to extract number from string, but also accept alphanumeric
         const numberMatch = poNumber.match(/\d+/);
         if (numberMatch) {
           poNumber = parseInt(numberMatch[0], 10);
         } else {
-          console.warn(`⚠️ POProcessor: Could not extract number from PO number: ${poNumber}, using timestamp as fallback`);
-          poNumber = Date.now(); // Use timestamp as fallback
+          // If no numbers found, generate a hash-based number from the string
+          let hash = 0;
+          for (let i = 0; i < poNumber.length; i++) {
+            const char = poNumber.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
+          }
+          poNumber = Math.abs(hash);
+          console.log(`⚠️ POProcessor: Generated numeric PO number from string: ${poNumber}`);
         }
-      } else if (!poNumber) {
-        console.warn(`⚠️ POProcessor: No PO number found, using timestamp as fallback`);
-        poNumber = Date.now(); // Use timestamp as fallback
-      }
-      
-      if (isNaN(poNumber)) {
-        console.warn(`⚠️ POProcessor: Invalid PO number, using timestamp as fallback`);
-        poNumber = Date.now();
+      } else if (!poNumber || isNaN(poNumber)) {
+        // Generate a unique number based on filename and timestamp
+        let hash = 0;
+        const str = fileName + Date.now().toString();
+        for (let i = 0; i < str.length; i++) {
+          const char = str.charCodeAt(i);
+          hash = ((hash << 5) - hash) + char;
+          hash = hash & hash;
+        }
+        poNumber = Math.abs(hash);
+        console.log(`⚠️ POProcessor: Generated unique PO number: ${poNumber} for ${fileName}`);
       }
 
       const poRecord = {
