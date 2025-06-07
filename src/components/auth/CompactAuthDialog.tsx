@@ -55,7 +55,7 @@ const CompactAuthDialog: React.FC<CompactAuthDialogProps> = ({
           {!isConnected ? (
             <div className="space-y-3">
               <p className="text-xs text-muted-foreground">
-                Note: You may see a warning that the app is unverified. Click "Advanced" → "Go to {window.location.hostname} (unsafe)" to continue.
+                Note: You may see a warning that the app is unverified. Click "Advanced" → "Go to transact-ai-nexus.lovable.app (unsafe)" to continue.
               </p>
               <Button
                 onClick={onConnect}
