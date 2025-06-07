@@ -18,59 +18,87 @@ const OAuthCallback = () => {
     console.log('URL search params:', window.location.search);
     
     // Send the result back to the parent window
-    if (window.opener) {
+    if (window.opener && !window.opener.closed) {
+      let targetOrigin = '*'; // Use wildcard for cross-origin compatibility
+      
+      // Try to get the opener's origin safely
+      try {
+        if (window.opener.location && window.opener.location.origin) {
+          targetOrigin = window.opener.location.origin;
+          console.log('Detected opener origin:', targetOrigin);
+        }
+      } catch (e) {
+        console.log('Could not access opener origin due to CORS, using wildcard');
+        targetOrigin = '*';
+      }
+      
       if (code) {
         console.log('OAuth success, sending code to parent');
         const message = {
           type: 'OAUTH_SUCCESS',
-          code: code
+          code: code,
+          timestamp: Date.now()
         };
         
         console.log('Message to send:', message);
+        console.log('Target origin:', targetOrigin);
         
-        // Try to send to the opener with wildcard origin since we can't access opener.location.origin due to CORS
         try {
-          console.log('Sending message to opener with wildcard origin');
-          window.opener.postMessage(message, '*');
+          window.opener.postMessage(message, targetOrigin);
+          console.log('Successfully sent message to opener');
         } catch (e) {
-          console.log('Failed to send message:', e);
+          console.error('Failed to send message:', e);
         }
         
         // Wait a bit before closing to ensure message is received
         setTimeout(() => {
           console.log('Attempting to close popup window');
-          window.close();
+          try {
+            window.close();
+          } catch (e) {
+            console.log('Could not close window automatically:', e);
+          }
         }, 1000);
       } else if (error) {
         console.log('OAuth error, sending error to parent');
         const message = {
           type: 'OAUTH_ERROR',
-          error: error
+          error: error,
+          timestamp: Date.now()
         };
         
         console.log('Error message to send:', message);
         
         try {
-          console.log('Sending error message to opener with wildcard origin');
-          window.opener.postMessage(message, '*');
+          window.opener.postMessage(message, targetOrigin);
+          console.log('Successfully sent error message to opener');
         } catch (e) {
-          console.log('Failed to send error message:', e);
+          console.error('Failed to send error message:', e);
         }
         
         setTimeout(() => {
           console.log('Attempting to close popup window (error case)');
-          window.close();
+          try {
+            window.close();
+          } catch (e) {
+            console.log('Could not close window automatically:', e);
+          }
         }, 1000);
       } else {
         console.log('No code or error found in URL parameters');
         console.log('Will attempt to close popup after delay');
         setTimeout(() => {
           console.log('Closing popup - no auth data found');
-          window.close();
+          try {
+            window.close();
+          } catch (e) {
+            console.log('Could not close window automatically:', e);
+          }
         }, 2000);
       }
     } else {
-      console.log('No opener window found, redirecting to main app');
+      console.log('No opener window found or opener is closed, redirecting to main app');
+      // If no opener, redirect to the main app
       window.location.href = '/';
     }
   }, []);
@@ -87,6 +115,8 @@ const OAuthCallback = () => {
         <div className="mt-4 text-xs text-gray-400">
           <p>Debug info (check console for details):</p>
           <p>URL: {window.location.href}</p>
+          <p>Origin: {window.location.origin}</p>
+          <p>Has opener: {window.opener ? 'Yes' : 'No'}</p>
         </div>
       </div>
     </div>
