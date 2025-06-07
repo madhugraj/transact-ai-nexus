@@ -36,11 +36,11 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
   const [downloadedFiles, setDownloadedFiles] = useState<File[]>([]);
   const { toast } = useToast();
 
-  // Create auth service with FIXED redirect URI as specified
+  // Create auth service with dynamic redirect URI based on current domain
   const authService = new GoogleAuthService({
     clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
     scopes: ['https://www.googleapis.com/auth/drive.readonly'],
-    redirectUri: 'https://transact-ai-nexus.lovable.app/oauth/callback' // FIXED as requested
+    redirectUri: `${window.location.origin}/oauth/callback` // Dynamic based on current domain
   }, 'drive_auth_tokens');
 
   // Check for stored tokens on mount and maintain connection

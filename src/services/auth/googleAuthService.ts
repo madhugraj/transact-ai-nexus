@@ -1,3 +1,4 @@
+
 export interface AuthConfig {
   clientId: string;
   scopes: string[];
@@ -73,21 +74,22 @@ export class GoogleAuthService {
     return hasTokens;
   }
 
-  // Get the correct redirect URI - Use FIXED domain as specified
+  // Get the correct redirect URI - Use current domain for OAuth callback
   private getRedirectUri(): string {
-    const redirectUri = 'https://transact-ai-nexus.lovable.app/oauth/callback';
+    // Use the current domain for the redirect URI
+    const redirectUri = `${window.location.origin}/oauth/callback`;
     
-    console.log('🔧 Using FIXED Redirect URI:', redirectUri);
+    console.log('🔧 Using Dynamic Redirect URI:', redirectUri);
     
     return redirectUri;
   }
 
-  // Create auth URL for popup with FIXED redirect URI
+  // Create auth URL for popup with dynamic redirect URI
   createAuthUrl(): string {
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     const redirectUri = this.getRedirectUri();
     
-    console.log('🔧 Creating auth URL with FIXED config:', {
+    console.log('🔧 Creating auth URL with dynamic config:', {
       clientId: this.config.clientId,
       redirectUri: redirectUri,
       scopes: this.config.scopes.join(' ')
@@ -101,7 +103,7 @@ export class GoogleAuthService {
     authUrl.searchParams.set('redirect_uri', redirectUri);
     
     const finalUrl = authUrl.toString();
-    console.log('🔧 Generated auth URL with FIXED domain:', finalUrl);
+    console.log('🔧 Generated auth URL with current domain:', finalUrl);
     
     return finalUrl;
   }
