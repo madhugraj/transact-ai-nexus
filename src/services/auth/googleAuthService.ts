@@ -1,4 +1,3 @@
-
 export interface AuthConfig {
   clientId: string;
   scopes: string[];
@@ -159,6 +158,7 @@ export class GoogleAuthService {
         });
         
         // Accept messages with the expected structure from OAuth callback
+        // Be more permissive with origin checking to handle different development environments
         if (event.data && 
             typeof event.data === 'object' && 
             event.data.timestamp && 
