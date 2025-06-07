@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Folder, Download, Eye } from 'lucide-react';
+import { FileText, Folder, Download } from 'lucide-react';
 import POFilePreview from './POFilePreview';
 
 interface GoogleDriveFile {
@@ -55,11 +55,22 @@ const FileBrowser: React.FC<FileBrowserProps> = ({
            name.includes('procurement');
   };
 
-  const handleDownloadPOFile = (file: GoogleDriveFile) => {
+  const handleDownloadPOFile = async (file: GoogleDriveFile) => {
     console.log('📥 Downloading PO file from FileBrowser:', file.name);
+    console.log('📥 File details being processed:', {
+      id: file.id,
+      name: file.name,
+      mimeType: file.mimeType,
+      size: file.size,
+      webViewLink: file.webViewLink
+    });
+    
+    // Select the file first
     onFileToggle(file);
-    // Auto-trigger import if this is the only selected file
+    
+    // Wait a moment for state update, then trigger import
     setTimeout(() => {
+      console.log('📥 Triggering import for PO file:', file.name);
       onImportFiles();
     }, 100);
   };

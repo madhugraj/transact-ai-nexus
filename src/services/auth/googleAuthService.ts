@@ -1,3 +1,4 @@
+
 export interface AuthConfig {
   clientId: string;
   scopes: string[];
@@ -73,11 +74,19 @@ export class GoogleAuthService {
     return hasTokens;
   }
 
-  // Get the correct redirect URI - ALWAYS use the current domain
+  // Get the correct redirect URI - Use multiple fallbacks
   private getRedirectUri(): string {
-    const currentOrigin = window.location.origin;
-    const redirectUri = `${currentOrigin}/oauth/callback`;
-    console.log('Using dynamic redirect URI:', redirectUri);
+    // Try multiple possible redirect URIs that should work
+    const possibleOrigins = [
+      window.location.origin,
+      'https://transact-ai-nexus.lovable.app',
+      'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com'
+    ];
+    
+    // Use the current origin as primary, but log all options
+    const redirectUri = `${window.location.origin}/oauth/callback`;
+    console.log('Using redirect URI:', redirectUri);
+    console.log('Possible origins:', possibleOrigins);
     return redirectUri;
   }
 

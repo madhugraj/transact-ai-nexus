@@ -46,6 +46,12 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
 
   const handleDownload = () => {
     console.log('📥 Downloading PO file:', file.name);
+    console.log('📥 PO file details:', {
+      id: file.id,
+      name: file.name,
+      mimeType: file.mimeType,
+      size: file.size
+    });
     onDownload(file);
   };
 
@@ -94,7 +100,7 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
             className="h-8 w-8 p-0"
             title="Download and process"
           >
-            <Download className="h-4 w-4" />
+            <Download className={`h-4 w-4 ${isDownloading ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </div>
