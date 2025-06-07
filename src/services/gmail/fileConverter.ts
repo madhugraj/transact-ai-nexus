@@ -28,7 +28,7 @@ export class FileConverter {
       return bytes.buffer;
     } catch (error) {
       console.error('❌ Base64 decode error:', error);
-      throw new Error(`Failed to decode base64 data: ${error.message}`);
+      throw new Error(`Failed to decode base64 data: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -45,7 +45,7 @@ export class FileConverter {
   }
 
   static createFileFromCloudStorage(
-    data: string,
+    data: string | ArrayBuffer | Uint8Array,
     filename: string,
     mimeType: string
   ): File {
@@ -58,6 +58,9 @@ export class FileConverter {
       if (data instanceof ArrayBuffer) {
         console.log('📦 Data is ArrayBuffer');
         fileData = data;
+      } else if (data instanceof Uint8Array) {
+        console.log('📦 Data is Uint8Array');
+        fileData = data.buffer;
       } else if (typeof data === 'string') {
         console.log('📦 Data is string, converting from base64');
         // Remove data URL prefix if present
@@ -66,7 +69,7 @@ export class FileConverter {
       } else {
         console.log('📦 Data is unknown type, treating as binary');
         // Convert to ArrayBuffer if it's raw binary data
-        const uint8Array = new Uint8Array(data);
+        const uint8Array = new Uint8Array(data as any);
         fileData = uint8Array.buffer;
       }
       
@@ -86,7 +89,7 @@ export class FileConverter {
       return file;
     } catch (error) {
       console.error('❌ Error creating file from cloud storage:', error);
-      throw new Error(`Failed to create file: ${error.message}`);
+      throw new Error(`Failed to create file: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }
