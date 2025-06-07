@@ -28,7 +28,6 @@ const CompactAuthDialog: React.FC<CompactAuthDialogProps> = ({
   error
 }) => {
   const isRedirectUriError = error && error.includes('redirect_uri_mismatch');
-  const currentDomain = window.location.origin;
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -58,10 +57,10 @@ const CompactAuthDialog: React.FC<CompactAuthDialogProps> = ({
                 <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded text-blue-800">
                   <p className="font-medium mb-2">🔧 Setup Required:</p>
                   <p className="text-xs mb-2">
-                    You need to add this redirect URI to your Google Cloud Console:
+                    You need to add this EXACT redirect URI to your Google Cloud Console:
                   </p>
                   <code className="block p-2 bg-white border rounded text-xs break-all">
-                    {currentDomain}/oauth/callback
+                    https://transact-ai-nexus.lovable.app/oauth/callback
                   </code>
                   <div className="mt-2">
                     <a 
@@ -87,7 +86,7 @@ const CompactAuthDialog: React.FC<CompactAuthDialogProps> = ({
             <div className="space-y-3">
               {!isRedirectUriError && (
                 <p className="text-xs text-muted-foreground">
-                  Note: You may see a warning that the app is unverified. Click "Advanced" → "Go to {window.location.hostname} (unsafe)" to continue.
+                  Note: You may see a warning that the app is unverified. Click "Advanced" → "Go to transact-ai-nexus.lovable.app (unsafe)" to continue.
                 </p>
               )}
               <Button

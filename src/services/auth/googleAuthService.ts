@@ -1,4 +1,3 @@
-
 export interface AuthConfig {
   clientId: string;
   scopes: string[];
@@ -74,30 +73,24 @@ export class GoogleAuthService {
     return hasTokens;
   }
 
-  // Get the correct redirect URI - Use current origin consistently
+  // Get the correct redirect URI - Use FIXED domain as specified
   private getRedirectUri(): string {
-    const currentOrigin = window.location.origin;
-    const redirectUri = `${currentOrigin}/oauth/callback`;
+    const redirectUri = 'https://transact-ai-nexus.lovable.app/oauth/callback';
     
-    console.log('🔧 Redirect URI Configuration:', {
-      currentOrigin,
-      redirectUri,
-      configuredClientId: this.config.clientId
-    });
+    console.log('🔧 Using FIXED Redirect URI:', redirectUri);
     
     return redirectUri;
   }
 
-  // Create auth URL for popup with correct redirect URI
+  // Create auth URL for popup with FIXED redirect URI
   createAuthUrl(): string {
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     const redirectUri = this.getRedirectUri();
     
-    console.log('🔧 Creating auth URL with config:', {
+    console.log('🔧 Creating auth URL with FIXED config:', {
       clientId: this.config.clientId,
       redirectUri: redirectUri,
-      scopes: this.config.scopes.join(' '),
-      currentOrigin: window.location.origin
+      scopes: this.config.scopes.join(' ')
     });
     
     authUrl.searchParams.set('client_id', this.config.clientId);
@@ -108,7 +101,7 @@ export class GoogleAuthService {
     authUrl.searchParams.set('redirect_uri', redirectUri);
     
     const finalUrl = authUrl.toString();
-    console.log('🔧 Generated full auth URL:', finalUrl);
+    console.log('🔧 Generated auth URL with FIXED domain:', finalUrl);
     
     return finalUrl;
   }
