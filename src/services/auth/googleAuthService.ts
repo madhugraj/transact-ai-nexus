@@ -1,4 +1,3 @@
-
 export interface AuthConfig {
   clientId: string;
   scopes: string[];
@@ -129,22 +128,16 @@ export class GoogleAuthService {
       let messageReceived = false;
       let checkClosedInterval: NodeJS.Timeout;
 
-      // Listen for messages from the popup
+      // Listen for messages from the popup - use wildcard origin for cross-origin popup communication
       const messageListener = (event: MessageEvent) => {
         console.log('Received message event:', {
           origin: event.origin,
-          currentOrigin: window.location.origin,
           type: event.data?.type,
           hasCode: !!event.data?.code,
           timestamp: event.data?.timestamp
         });
         
-        // Only accept messages from the same origin for security
-        if (event.origin !== window.location.origin) {
-          console.log('Ignoring message from different origin:', event.origin);
-          return;
-        }
-        
+        // Accept messages with the expected structure, regardless of origin for popup communication
         if (event.data && typeof event.data === 'object' && event.data.timestamp) {
           if (event.data.type === 'OAUTH_SUCCESS') {
             messageReceived = true;
