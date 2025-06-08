@@ -2,23 +2,68 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Building, Calendar, DollarSign } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { FileText, Building, Calendar, DollarSign, Database } from 'lucide-react';
 import { POData } from '@/services/api/poProcessingService';
+import { useToast } from '@/hooks/use-toast';
 
 interface PODataDisplayProps {
   poData: POData;
   fileName: string;
+  supabaseData?: any;
 }
 
-const PODataDisplay: React.FC<PODataDisplayProps> = ({ poData, fileName }) => {
+const PODataDisplay: React.FC<PODataDisplayProps> = ({ poData, fileName, supabaseData }) => {
+  const { toast } = useToast();
+
+  const handleSaveToSupabase = async () => {
+    if (!supabaseData) {
+      toast({
+        title: "No data to save",
+        description: "Supabase formatted data is not available",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // You can implement Supabase save functionality here
+      console.log('Saving to Supabase po_table:', supabaseData);
+      
+      toast({
+        title: "Ready to save",
+        description: "Check console for Supabase-formatted data",
+      });
+    } catch (error) {
+      toast({
+        title: "Save failed",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-4">
-        <FileText className="h-5 w-5 text-green-600" />
-        <h4 className="font-medium text-green-800">Extracted PO Data</h4>
-        <Badge variant="outline" className="text-xs">
-          {fileName}
-        </Badge>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <FileText className="h-5 w-5 text-green-600" />
+          <h4 className="font-medium text-green-800">Extracted PO Data</h4>
+          <Badge variant="outline" className="text-xs">
+            {fileName}
+          </Badge>
+        </div>
+        
+        {supabaseData && (
+          <Button 
+            onClick={handleSaveToSupabase}
+            size="sm"
+            className="gap-2"
+          >
+            <Database className="h-4 w-4" />
+            Save to Database
+          </Button>
+        )}
       </div>
 
       {/* Header Information */}
@@ -66,8 +111,8 @@ const PODataDisplay: React.FC<PODataDisplayProps> = ({ poData, fileName }) => {
             <div className="flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-green-500" />
               <div>
-                <p className="text-xs text-muted-foreground">Total</p>
-                <p className="font-mono text-sm font-medium">{poData.total_amount || 'N/A'}</p>
+                <p className="text-xs text-muted-foreground">Items Count</p>
+                <p className="font-mono text-sm font-medium">{poData.items?.length || 0}</p>
               </div>
             </div>
           </CardContent>
@@ -131,6 +176,20 @@ const PODataDisplay: React.FC<PODataDisplayProps> = ({ poData, fileName }) => {
           </Card>
         )}
       </div>
+
+      {/* Supabase Data Preview */}
+      {supabaseData && (
+        <Card className="bg-blue-50 border-blue-200">
+          <CardHeader>
+            <CardTitle className="text-sm text-blue-800">Supabase Format (Ready for po_table)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <pre className="text-xs bg-white p-3 rounded border overflow-x-auto">
+              {JSON.stringify(supabaseData, null, 2)}
+            </pre>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

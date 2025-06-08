@@ -33,6 +33,7 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingResult, setProcessingResult] = useState<any>(null);
+  const [supabaseData, setSupabaseData] = useState<any>(null);
   const { toast } = useToast();
 
   // Create auth service instance to get access token consistently
@@ -107,6 +108,7 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
 
       if (result.success && result.data) {
         setProcessingResult(result.data);
+        setSupabaseData(result.supabaseData);
         toast({
           title: "Processing Complete",
           description: `Successfully extracted PO data from ${file.name}`,
@@ -219,9 +221,9 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
             </div>
 
             {/* Processing Results */}
-            <div className="border rounded-lg p-4 bg-muted/5">
+            <div className="border rounded-lg p-4 bg-muted/5 overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-medium">AI Processing</h3>
+                <h3 className="font-medium">AI Processing Results</h3>
                 <Button
                   onClick={handleProcessSingle}
                   disabled={isProcessing}
@@ -243,11 +245,16 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
               </div>
 
               {processingResult ? (
-                <PODataDisplay poData={processingResult} fileName={file.name} />
+                <PODataDisplay 
+                  poData={processingResult} 
+                  fileName={file.name}
+                  supabaseData={supabaseData}
+                />
               ) : (
                 <div className="text-center text-muted-foreground py-8">
                   <Brain className="h-12 w-12 mx-auto mb-2 text-muted-foreground/50" />
-                  <p>Click "Process with Gemini" to extract PO data</p>
+                  <p className="text-sm">Click "Process with Gemini" to extract PO data</p>
+                  <p className="text-xs mt-1">Results will be formatted for Supabase po_table</p>
                 </div>
               )}
             </div>

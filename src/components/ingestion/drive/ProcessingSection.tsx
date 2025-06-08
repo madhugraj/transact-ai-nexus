@@ -47,6 +47,7 @@ const ProcessingSection = ({ downloadedFiles, onProcessingComplete, onClose }: P
               fileSize: file.size,
               status: 'success',
               data: extractionResult.data,
+              supabaseData: extractionResult.supabaseData,
               processingTime: Date.now()
             });
             console.log(`✅ Successfully processed: ${file.name}`);
@@ -70,9 +71,11 @@ const ProcessingSection = ({ downloadedFiles, onProcessingComplete, onClose }: P
           });
           console.error(`❌ Error processing ${file.name}:`, error);
         }
+
+        // Update results incrementally so user can see progress
+        setProcessingResults([...results]);
       }
 
-      setProcessingResults(results);
       onProcessingComplete(results);
       
       const successCount = results.filter(r => r.status === 'success').length;
@@ -80,7 +83,7 @@ const ProcessingSection = ({ downloadedFiles, onProcessingComplete, onClose }: P
       
       toast({
         title: "Processing Complete",
-        description: `Processed ${successCount} files successfully. ${errorCount > 0 ? `${errorCount} errors.` : ''}`,
+        description: `Successfully processed ${successCount} files. ${errorCount > 0 ? `${errorCount} errors.` : ''}`,
         variant: errorCount > 0 ? "destructive" : "default"
       });
 
@@ -140,7 +143,7 @@ const ProcessingSection = ({ downloadedFiles, onProcessingComplete, onClose }: P
       {/* Display Processing Results */}
       {processingResults.length > 0 && (
         <div className="space-y-4">
-          <h3 className="font-medium text-sm">Processing Results</h3>
+          <h3 className="font-medium text-sm">Processing Results ({processingResults.length})</h3>
           {processingResults.map((result, index) => (
             <div key={index} className="border rounded-lg p-4 bg-card">
               <div className="flex items-center justify-between mb-3">
@@ -160,7 +163,11 @@ const ProcessingSection = ({ downloadedFiles, onProcessingComplete, onClose }: P
               </div>
 
               {result.status === 'success' && result.data && (
-                <PODataDisplay poData={result.data} fileName={result.fileName} />
+                <PODataDisplay 
+                  poData={result.data} 
+                  fileName={result.fileName}
+                  supabaseData={result.supabaseData}
+                />
               )}
 
               {result.status === 'error' && result.error && (

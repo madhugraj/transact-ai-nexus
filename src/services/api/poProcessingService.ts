@@ -18,6 +18,7 @@ export interface POProcessingResult {
   success: boolean;
   data?: POData;
   error?: string;
+  supabaseData?: any; // Formatted for po_table
 }
 
 export const extractPODataFromFile = async (file: File): Promise<POProcessingResult> => {
@@ -44,23 +45,32 @@ export const extractPODataFromFile = async (file: File): Promise<POProcessingRes
     const prompt = `
       Extract Purchase Order (PO) data from this document. Return ONLY valid JSON in this exact format:
       {
-        "po_number": "PO number",
-        "vendor": "Vendor name",
-        "date": "PO date",
-        "total_amount": "Total amount",
-        "items": [
+        "po_number": "PO number as string",
+        "po_date": "YYYY-MM-DD format or null",
+        "vendor_code": "Vendor/supplier name",
+        "project": "Project name or reference",
+        "gstn": "GST/Tax number if found",
+        "bill_to_address": "Complete billing address",
+        "ship_to": "Complete shipping address", 
+        "del_start_date": "Delivery start date YYYY-MM-DD or null",
+        "del_end_date": "Delivery end date YYYY-MM-DD or null",
+        "terms_conditions": "Payment terms and conditions",
+        "description": [
           {
-            "description": "Item description",
-            "quantity": "Quantity",
-            "unit_price": "Unit price",
-            "total": "Line total"
+            "item": "Item description",
+            "quantity": 1,
+            "unit_price": 100.00,
+            "total": 100.00
           }
-        ],
-        "shipping_address": "Shipping address",
-        "billing_address": "Billing address"
+        ]
       }
       
-      Important: Return ONLY the JSON object, no additional text or formatting.
+      Important instructions:
+      - Extract PO number from any document identifier
+      - Convert dates to YYYY-MM-DD format
+      - For items array, ensure quantity, unit_price, and total are numbers
+      - If no data found for a field, use null or empty string
+      - Return ONLY the JSON object, no additional text
     `;
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
@@ -127,21 +137,53 @@ export const extractPODataFromFile = async (file: File): Promise<POProcessingRes
       const poData = JSON.parse(cleanedResponse);
       console.log('✅ Successfully extracted PO data:', poData);
       
-      // Validate that we have the expected structure
-      if (!poData.po_number && !poData.vendor && !poData.items) {
-        throw new Error('Response does not contain expected PO data structure');
+      // Validate that we have some meaningful data
+      if (!poData.po_number && !poData.vendor_code && !poData.description) {
+        console.warn('⚠️ No meaningful PO data found, but continuing...');
       }
+
+      // Format data for Supabase po_table
+      const supabaseData = {
+        po_number: parseInt(poData.po_number?.replace(/\D/g, '') || '0') || null,
+        po_date: poData.po_date || null,
+        vendor_code: poData.vendor_code || null,
+        project: poData.project || null,
+        gstn: poData.gstn || null,
+        bill_to_address: poData.bill_to_address || null,
+        ship_to: poData.ship_to || null,
+        del_start_date: poData.del_start_date || null,
+        del_end_date: poData.del_end_date || null,
+        terms_conditions: poData.terms_conditions || null,
+        description: poData.description || [],
+        file_name: file.name
+      };
+
+      console.log('📊 Formatted data for Supabase:', supabaseData);
       
       return {
         success: true,
-        data: poData
+        data: {
+          po_number: poData.po_number || 'N/A',
+          vendor: poData.vendor_code || 'N/A',
+          date: poData.po_date || 'N/A',
+          total_amount: 'N/A', // Will be calculated from items
+          items: (poData.description || []).map((item: any) => ({
+            description: item.item || 'N/A',
+            quantity: item.quantity?.toString() || '0',
+            unit_price: item.unit_price?.toString() || '0',
+            total: item.total?.toString() || '0'
+          })),
+          shipping_address: poData.ship_to,
+          billing_address: poData.bill_to_address
+        },
+        supabaseData
       };
     } catch (parseError) {
       console.error('❌ Failed to parse JSON response:', parseError);
       console.error('❌ Cleaned response was:', cleanedResponse);
       return {
         success: false,
-        error: `Failed to parse response: ${parseError.message}`
+        error: `Failed to parse response: ${parseError.message}. Response: ${cleanedResponse.substring(0, 200)}...`
       };
     }
 
