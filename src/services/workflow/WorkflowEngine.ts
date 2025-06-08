@@ -1,4 +1,3 @@
-
 import { WorkflowConfig, WorkflowExecution, WorkflowStep, WorkflowStepResult } from '@/types/workflow';
 import { EmailProcessingService } from '@/services/email/emailProcessingUtils';
 import { GoogleAuthService } from '@/services/auth/googleAuthService';
@@ -267,10 +266,9 @@ export class WorkflowEngine {
     console.log('📧 Processing email source...', config);
     
     try {
-      // Check if user is authenticated - using a basic check since isAuthenticated might not exist
-      try {
-        await this.googleAuthService.getAccessToken();
-      } catch (error) {
+      // Check if user has valid tokens stored
+      const hasTokens = this.googleAuthService.hasValidTokens();
+      if (!hasTokens) {
         throw new Error('Gmail authentication required. Please connect your Gmail account first.');
       }
       
@@ -290,10 +288,9 @@ export class WorkflowEngine {
     console.log('📁 Processing drive source...', config);
     
     try {
-      // Check if user is authenticated - using a basic check since isAuthenticated might not exist
-      try {
-        await this.googleAuthService.getAccessToken();
-      } catch (error) {
+      // Check if user has valid tokens stored
+      const hasTokens = this.googleAuthService.hasValidTokens();
+      if (!hasTokens) {
         throw new Error('Google Drive authentication required. Please connect your Google Drive account first.');
       }
       
