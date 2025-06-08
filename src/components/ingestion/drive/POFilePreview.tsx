@@ -38,11 +38,11 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
   const [processingError, setProcessingError] = useState<string>('');
   const { toast } = useToast();
 
-  // Create auth service instance with FIXED redirect URI
+  // Create auth service instance with current domain redirect URI
   const authService = new GoogleAuthService({
     clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
     scopes: ['https://www.googleapis.com/auth/drive.readonly'],
-    redirectUri: 'https://lovable.app/oauth/callback'  // Fixed redirect URI
+    redirectUri: `${window.location.origin}/oauth/callback`  // Use current domain
   }, 'drive_auth_tokens');
 
   const handlePreview = () => {
