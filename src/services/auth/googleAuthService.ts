@@ -1,4 +1,3 @@
-
 export interface AuthConfig {
   clientId: string;
   scopes: string[];
@@ -12,6 +11,12 @@ export interface AuthResult {
   error?: string;
 }
 
+interface StoredTokens {
+  accessToken?: string;
+  refreshToken?: string;
+  timestamp?: number;
+}
+
 export class GoogleAuthService {
   private config: AuthConfig;
   private storageKey: string;
@@ -22,7 +27,7 @@ export class GoogleAuthService {
   }
 
   // Get stored tokens
-  getStoredTokens(): { accessToken?: string; refreshToken?: string } {
+  getStoredTokens(): StoredTokens {
     try {
       const stored = localStorage.getItem(this.storageKey);
       if (!stored) return {};
@@ -66,7 +71,7 @@ export class GoogleAuthService {
     }
   }
 
-  // Enhanced token validity check
+  // Simplified token validity check
   hasValidTokens(): boolean {
     const tokens = this.getStoredTokens();
     const hasTokens = !!tokens.accessToken;
@@ -136,7 +141,6 @@ export class GoogleAuthService {
     authUrl.searchParams.set('prompt', 'consent');
     authUrl.searchParams.set('redirect_uri', redirectUri);
     
-    // Add state parameter for additional security
     authUrl.searchParams.set('state', Math.random().toString(36).substring(2, 15));
     
     const finalUrl = authUrl.toString();
@@ -174,31 +178,26 @@ export class GoogleAuthService {
       let messageReceived = false;
       let checkClosedInterval: NodeJS.Timeout;
 
-      // Listen for messages from the popup
       const messageListener = (event: MessageEvent) => {
         console.log('📨 Message received:', {
           origin: event.origin,
           data: event.data
         });
         
-        // Check if this is our OAuth response
         if (event.data && typeof event.data === 'object') {
           if (event.data.type === 'OAUTH_SUCCESS' && event.data.code) {
             messageReceived = true;
             console.log('✅ OAuth success message received');
             
-            // Clean up
             window.removeEventListener('message', messageListener);
             if (checkClosedInterval) {
               clearInterval(checkClosedInterval);
             }
             
-            // Close popup
             if (popup && !popup.closed) {
               popup.close();
             }
             
-            // Exchange code for tokens
             this.exchangeCodeForTokens(event.data.code).then((tokenResult) => {
               if (tokenResult.success) {
                 resolve(tokenResult);
@@ -213,13 +212,11 @@ export class GoogleAuthService {
             messageReceived = true;
             console.error('❌ OAuth error:', event.data.error);
             
-            // Clean up
             window.removeEventListener('message', messageListener);
             if (checkClosedInterval) {
               clearInterval(checkClosedInterval);
             }
             
-            // Close popup
             if (popup && !popup.closed) {
               popup.close();
             }
@@ -229,11 +226,9 @@ export class GoogleAuthService {
         }
       };
 
-      // Add message listener
       window.addEventListener('message', messageListener);
       console.log('👂 Message listener added, waiting for popup response...');
 
-      // Check if popup was closed manually
       checkClosedInterval = setInterval(() => {
         if (popup.closed) {
           console.log('⚠️ Popup was closed');
@@ -250,7 +245,6 @@ export class GoogleAuthService {
         }
       }, 250);
 
-      // Timeout after 5 minutes
       setTimeout(() => {
         if (!messageReceived) {
           console.log('⏰ Authentication timeout');
@@ -275,7 +269,6 @@ export class GoogleAuthService {
       
       const redirectUri = `${window.location.origin}/oauth/callback`;
       
-      // Import supabase client
       const { supabase } = await import('@/integrations/supabase/client');
       
       const { data, error } = await supabase.functions.invoke('google-auth', {
