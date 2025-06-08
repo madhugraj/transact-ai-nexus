@@ -22,11 +22,12 @@ interface WorkflowCanvasProps {
   connections: WorkflowConnection[];
   onStepsChange: (steps: WorkflowStep[]) => void;
   onConnectionsChange: (connections: WorkflowConnection[]) => void;
+  onStepDoubleClick?: (step: WorkflowStep) => void;
   isEditable?: boolean;
 }
 
 const nodeTypes: NodeTypes = {
-  workflowStep: WorkflowNode as any,
+  workflowStep: WorkflowNode,
 };
 
 const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
@@ -34,6 +35,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   connections,
   onStepsChange,
   onConnectionsChange,
+  onStepDoubleClick,
   isEditable = false
 }) => {
   const handleStepUpdate = useCallback((updatedStep: WorkflowStep) => {
@@ -45,11 +47,12 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   const initialNodes: Node[] = steps.map((step, index) => ({
     id: step.id || index.toString(),
     type: 'workflowStep',
-    position: step.position || { x: index * 200, y: 100 },
+    position: step.position || { x: index * 300, y: 100 },
     data: { 
       step,
       isEditable,
-      onUpdate: handleStepUpdate
+      onUpdate: handleStepUpdate,
+      onStepDoubleClick
     },
   }));
 
@@ -72,15 +75,16 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     const updatedNodes = steps.map((step, index) => ({
       id: step.id || index.toString(),
       type: 'workflowStep',
-      position: step.position || { x: index * 200, y: 100 },
+      position: step.position || { x: index * 300, y: 100 },
       data: { 
         step,
         isEditable,
-        onUpdate: handleStepUpdate
+        onUpdate: handleStepUpdate,
+        onStepDoubleClick
       },
     }));
     setNodes(updatedNodes);
-  }, [steps, isEditable, handleStepUpdate, setNodes]);
+  }, [steps, isEditable, handleStepUpdate, onStepDoubleClick, setNodes]);
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -100,20 +104,59 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     [edges, connections, onConnectionsChange, isEditable, setEdges]
   );
 
+  const onNodeDragStop = useCallback(
+    (event: any, node: Node) => {
+      if (!isEditable) return;
+      
+      // Update the step position in the steps array
+      const updatedSteps = steps.map(step => 
+        step.id === node.id 
+          ? { ...step, position: node.position }
+          : step
+      );
+      onStepsChange(updatedSteps);
+    },
+    [steps, onStepsChange, isEditable]
+  );
+
   return (
-    <div className="w-full h-[600px] border rounded-lg bg-gray-50">
+    <div className="w-full h-[600px] border rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 shadow-inner">
       <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeDragStop={onNodeDragStop}
         nodeTypes={nodeTypes}
         fitView
+        fitViewOptions={{
+          padding: 0.2,
+          includeHiddenNodes: false,
+        }}
         attributionPosition="bottom-left"
+        className="workflow-canvas"
+        style={{
+          background: 'transparent',
+        }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
-        <Controls />
+        <Background 
+          variant={BackgroundVariant.Dots} 
+          gap={20} 
+          size={1} 
+          color="#e2e8f0"
+          style={{ opacity: 0.5 }}
+        />
+        <Controls 
+          className="bg-white shadow-lg border border-gray-200 rounded-lg"
+          style={{
+            button: {
+              backgroundColor: 'white',
+              border: '1px solid #e2e8f0',
+              color: '#64748b'
+            }
+          }}
+        />
       </ReactFlow>
     </div>
   );

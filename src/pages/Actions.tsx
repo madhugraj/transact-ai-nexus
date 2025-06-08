@@ -124,6 +124,7 @@ const Actions = () => {
   };
 
   const handleStepDoubleClick = (step: WorkflowStep) => {
+    console.log('Step double-clicked:', step.name);
     setSelectedStep(step);
     setShowConfigDialog(true);
   };
@@ -147,6 +148,8 @@ const Actions = () => {
         description: `${updatedStep.name} configuration has been updated.`
       });
     }
+    setShowConfigDialog(false);
+    setSelectedStep(null);
   };
 
   return (
@@ -370,7 +373,7 @@ const Actions = () => {
         <Dialog open={showWorkflowDialog} onOpenChange={setShowWorkflowDialog}>
           <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
             <DialogHeader>
-              <DialogTitle>{selectedWorkflow?.name}</DialogTitle>
+              <DialogTitle className="text-xl font-bold">{selectedWorkflow?.name}</DialogTitle>
             </DialogHeader>
             
             {selectedWorkflow && (
@@ -380,17 +383,6 @@ const Actions = () => {
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
-                      onClick={() => {
-                        // Double-click any step to configure
-                        if (selectedWorkflow.steps.length > 0) {
-                          handleStepDoubleClick(selectedWorkflow.steps[0]);
-                        }
-                      }}
-                    >
-                      <Settings className="h-4 w-4 mr-2" />
-                      Configure Steps
-                    </Button>
-                    <Button
                       onClick={() => executeWorkflow(selectedWorkflow)}
                       disabled={isExecuting}
                       className="gap-2"
@@ -406,11 +398,12 @@ const Actions = () => {
                   connections={selectedWorkflow.connections}
                   onStepsChange={handleStepsChange}
                   onConnectionsChange={handleConnectionsChange}
+                  onStepDoubleClick={handleStepDoubleClick}
                   isEditable={true}
                 />
                 
-                <div className="text-sm text-muted-foreground">
-                  💡 Tip: Double-click on any step in the workflow to configure its settings
+                <div className="text-sm text-blue-600 bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  💡 <strong>Tip:</strong> Double-click on any step or use the settings button to configure its parameters
                 </div>
               </div>
             )}
