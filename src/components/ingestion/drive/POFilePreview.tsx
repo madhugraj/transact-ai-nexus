@@ -58,12 +58,12 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
   };
 
   const handleDownload = () => {
-    console.log('📥 Downloading PO file:', file.name);
+    console.log('📥 Adding PO file to batch:', file.name);
     onDownload(file);
   };
 
   const handleProcessSingle = async () => {
-    console.log('🧠 Processing single file with Gemini:', file.name);
+    console.log('🧠 Processing single file:', file.name);
     setIsProcessing(true);
     setProcessingError('');
     setProcessingResult(null);
@@ -72,7 +72,7 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
     try {
       toast({
         title: "Processing File",
-        description: `Analyzing ${file.name} with Gemini AI...`,
+        description: `Analyzing ${file.name} for PO data...`,
       });
 
       // Get access token using the auth service
@@ -99,7 +99,7 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
       const blob = new Blob([arrayBuffer], { type: file.mimeType });
       const fileObject = new File([blob], file.name, { type: file.mimeType });
 
-      console.log('📄 File downloaded, processing with Gemini...', {
+      console.log('📄 File downloaded, processing...', {
         name: fileObject.name,
         size: fileObject.size,
         type: fileObject.type
@@ -244,7 +244,7 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
                   ) : (
                     <>
                       <Brain className="h-4 w-4" />
-                      Process with Gemini
+                      Process Document
                     </>
                   )}
                 </Button>
@@ -276,8 +276,8 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
               ) : (
                 <div className="text-center text-muted-foreground py-8">
                   <Brain className="h-12 w-12 mx-auto mb-2 text-muted-foreground/50" />
-                  <p className="text-sm">Click "Process with Gemini" to extract PO data</p>
-                  <p className="text-xs mt-1">Results will be formatted for Supabase po_table</p>
+                  <p className="text-sm">Click "Process Document" to extract PO data</p>
+                  <p className="text-xs mt-1">Results will be formatted for database storage</p>
                 </div>
               )}
             </div>

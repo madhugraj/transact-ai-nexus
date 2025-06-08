@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { FileText, Building, Calendar, DollarSign, Database } from 'lucide-react';
 import { POData } from '@/services/api/poProcessingService';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PODataDisplayProps {
   poData: POData;
@@ -27,14 +28,25 @@ const PODataDisplay: React.FC<PODataDisplayProps> = ({ poData, fileName, supabas
     }
 
     try {
-      // You can implement Supabase save functionality here
       console.log('Saving to Supabase po_table:', supabaseData);
       
+      const { data, error } = await supabase
+        .from('po_table')
+        .insert([supabaseData])
+        .select();
+
+      if (error) {
+        throw error;
+      }
+
       toast({
-        title: "Ready to save",
-        description: "Check console for Supabase-formatted data",
+        title: "Success!",
+        description: `PO data saved to database successfully`,
       });
+
+      console.log('Successfully saved to po_table:', data);
     } catch (error) {
+      console.error('Error saving to Supabase:', error);
       toast({
         title: "Save failed",
         description: error instanceof Error ? error.message : "Unknown error",
@@ -181,7 +193,7 @@ const PODataDisplay: React.FC<PODataDisplayProps> = ({ poData, fileName, supabas
       {supabaseData && (
         <Card className="bg-blue-50 border-blue-200">
           <CardHeader>
-            <CardTitle className="text-sm text-blue-800">Supabase Format (Ready for po_table)</CardTitle>
+            <CardTitle className="text-sm text-blue-800">Database Format (Ready for po_table)</CardTitle>
           </CardHeader>
           <CardContent>
             <pre className="text-xs bg-white p-3 rounded border overflow-x-auto">

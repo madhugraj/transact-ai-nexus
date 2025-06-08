@@ -28,7 +28,7 @@ const ProcessingSection = ({ downloadedFiles, onProcessingComplete, onClose }: P
     try {
       toast({
         title: "Processing Started",
-        description: `Processing ${downloadedFiles.length} PO file(s) with Gemini AI...`,
+        description: `Processing ${downloadedFiles.length} PO file(s)...`,
       });
 
       const results = [];
@@ -106,7 +106,7 @@ const ProcessingSection = ({ downloadedFiles, onProcessingComplete, onClose }: P
           <div>
             <h3 className="font-medium text-sm">Ready to Process</h3>
             <p className="text-xs text-muted-foreground">
-              {downloadedFiles.length} file{downloadedFiles.length !== 1 ? 's' : ''} ready for PO analysis with Gemini AI
+              {downloadedFiles.length} file{downloadedFiles.length !== 1 ? 's' : ''} ready for PO analysis
             </p>
           </div>
           <div className="flex gap-2">
