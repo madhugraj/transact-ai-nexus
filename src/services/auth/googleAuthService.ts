@@ -1,4 +1,3 @@
-
 export interface AuthConfig {
   clientId: string;
   scopes: string[];
@@ -252,43 +251,42 @@ export class GoogleAuthService {
     });
   }
 
-  // Exchange authorization code for access tokens
+  // Exchange authorization code for access tokens using Supabase edge function
   private async exchangeCodeForTokens(code: string): Promise<AuthResult> {
     try {
-      console.log('🔄 Exchanging code for tokens...');
+      console.log('🔄 Exchanging code for tokens using Supabase edge function...');
       
-      const tokenUrl = 'https://oauth2.googleapis.com/token';
       const redirectUri = `${window.location.origin}/oauth/callback`;
       
-      const response = await fetch(tokenUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          code: code,
-          client_id: this.config.clientId,
-          client_secret: '', // We'll need this from environment
-          redirect_uri: redirectUri,
-          grant_type: 'authorization_code',
-        }),
+      // Import supabase client
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      const { data, error } = await supabase.functions.invoke('google-auth', {
+        body: {
+          authCode: code,
+          scope: this.config.scopes.join(' '),
+          redirectUri: redirectUri
+        }
       });
 
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error('❌ Token exchange failed:', errorData);
-        throw new Error(`Token exchange failed: ${response.status} ${response.statusText}`);
+      if (error) {
+        console.error('❌ Supabase function error:', error);
+        throw new Error(`Token exchange failed: ${error.message}`);
       }
 
-      const tokenData = await response.json();
+      if (!data.success) {
+        console.error('❌ Token exchange failed:', data.error);
+        throw new Error(data.error || 'Token exchange failed');
+      }
+
       console.log('✅ Token exchange successful');
       
-      this.storeTokens(tokenData.access_token, tokenData.refresh_token);
+      this.storeTokens(data.accessToken, data.refreshToken);
       
       return {
         success: true,
-        accessToken: tokenData.access_token,
-        refreshToken: tokenData.refresh_token
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken
       };
     } catch (error) {
       console.error('❌ Error exchanging code for tokens:', error);
