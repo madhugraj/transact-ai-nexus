@@ -16,12 +16,6 @@ import {
 } from 'lucide-react';
 import { WorkflowStep } from '@/types/workflow';
 
-interface WorkflowNodeData extends Record<string, unknown> {
-  step: WorkflowStep;
-  isEditable: boolean;
-  onUpdate: (step: WorkflowStep) => void;
-}
-
 const getStepIcon = (type: string) => {
   switch (type) {
     case 'data-source':
@@ -79,8 +73,9 @@ const getStepColor = (type: string) => {
   }
 };
 
-export const WorkflowNode: React.FC<NodeProps<WorkflowNodeData>> = ({ data }) => {
-  const { step, isEditable } = data;
+export const WorkflowNode: React.FC<NodeProps> = ({ data }) => {
+  const step = data.step as WorkflowStep;
+  const isEditable = data.isEditable as boolean;
   
   return (
     <div className="relative">
