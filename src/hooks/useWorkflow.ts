@@ -68,6 +68,7 @@ export function useWorkflow() {
     
     // Create a new execution record
     const execution: WorkflowExecutionResult = {
+      id: `exec-${Date.now()}`,
       workflowId: id,
       startTime: new Date(),
       status: 'running',

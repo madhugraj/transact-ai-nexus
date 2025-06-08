@@ -267,9 +267,10 @@ export class WorkflowEngine {
     console.log('📧 Processing email source...', config);
     
     try {
-      // Check if user is authenticated
-      const isAuthenticated = await this.googleAuthService.isAuthenticated();
-      if (!isAuthenticated) {
+      // Check if user is authenticated - using a basic check since isAuthenticated might not exist
+      try {
+        await this.googleAuthService.getAccessToken();
+      } catch (error) {
         throw new Error('Gmail authentication required. Please connect your Gmail account first.');
       }
       
@@ -289,9 +290,10 @@ export class WorkflowEngine {
     console.log('📁 Processing drive source...', config);
     
     try {
-      // Check if user is authenticated
-      const isAuthenticated = await this.googleAuthService.isAuthenticated();
-      if (!isAuthenticated) {
+      // Check if user is authenticated - using a basic check since isAuthenticated might not exist
+      try {
+        await this.googleAuthService.getAccessToken();
+      } catch (error) {
         throw new Error('Google Drive authentication required. Please connect your Google Drive account first.');
       }
       

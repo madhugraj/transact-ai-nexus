@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -396,11 +395,11 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
 
   // Generate workflow steps from nodes and edges
   const generateWorkflowSteps = (): WorkflowStep[] => {
-    return nodes.map((node, index) => ({
+    return nodes.map((node) => ({
       id: node.id,
       type: node.data.type as WorkflowStepType,
       name: node.data.label as string,
-      position: index + 1,
+      position: { x: node.position.x, y: node.position.y },
       config: {
         x: node.position.x,
         y: node.position.y,
@@ -426,7 +425,8 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
       name: data.name,
       description: data.description,
       isActive: data.active,
-      steps: generateWorkflowSteps()
+      steps: generateWorkflowSteps(),
+      connections: []
     };
     
     const createdWorkflow = createWorkflow(newWorkflow);
@@ -465,6 +465,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
             {/* Sidebar with draggable nodes */}
             <div className="col-span-3 border-r pr-4 overflow-y-auto">
               <Label className="mb-2 block">Available Steps</Label>
+              
               <div 
                 onDragStart={(event) => onDragStart(event, { type: 'document-source', label: 'Document Source', description: 'Gathers documents from sources' })}
                 draggable

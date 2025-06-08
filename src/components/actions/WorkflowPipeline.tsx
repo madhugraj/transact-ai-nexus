@@ -19,31 +19,31 @@ const WorkflowPipeline: React.FC<WorkflowPipelineProps> = ({
       id: 'source',
       name: 'Document Source',
       type: 'document_source',
-      position: 1
+      position: { x: 0, y: 0 }
     },
     {
       id: 'compare',
       name: 'Document Comparison',
       type: 'document_comparison',
-      position: 2
+      position: { x: 0, y: 0 }
     },
     {
       id: 'report',
       name: 'Report Generation',
       type: 'report_generation',
-      position: 3
+      position: { x: 0, y: 0 }
     },
     {
       id: 'notify',
       name: 'Approval Notification',
       type: 'approval_notification',
-      position: 4
+      position: { x: 0, y: 0 }
     },
     {
       id: 'store',
       name: 'Database Storage',
       type: 'database_storage',
-      position: 5
+      position: { x: 0, y: 0 }
     }
   ];
   
@@ -107,11 +107,9 @@ const WorkflowPipeline: React.FC<WorkflowPipelineProps> = ({
                     {getStepIcon(step.type as string)}
                     <span className="ml-2">{step.name}</span>
                   </div>
-                  {step.position && (
-                    <div className="text-xs text-muted-foreground">
-                      Step {step.position}
-                    </div>
-                  )}
+                  <div className="text-xs text-muted-foreground">
+                    Step {index + 1}
+                  </div>
                 </div>
               </div>
             ))}

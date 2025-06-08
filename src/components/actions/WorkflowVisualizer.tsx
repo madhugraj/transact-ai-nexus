@@ -21,12 +21,12 @@ const nodeTypes = {
 const WorkflowVisualizer: React.FC<WorkflowVisualizerProps> = ({ workflow }) => {
   const { nodes, edges } = useMemo(() => {
     // Transform workflow steps to ReactFlow nodes
-    const nodes = workflow.steps.map((step) => ({
+    const nodes = workflow.steps.map((step, index) => ({
       id: step.id,
       type: 'workflowStep',
       // Use stored position if available, otherwise position nodes horizontally
       position: {
-        x: step.config.x || step.position * 300 - 200,
+        x: step.config.x || index * 300 - 200,
         y: step.config.y || 100
       },
       data: {
@@ -63,7 +63,7 @@ const WorkflowVisualizer: React.FC<WorkflowVisualizerProps> = ({ workflow }) => 
         }
         return acc;
       }
-    }, []);
+    }, [] as any[]);
 
     return { nodes, edges };
   }, [workflow]);
