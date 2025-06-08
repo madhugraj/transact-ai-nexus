@@ -16,7 +16,7 @@ import { WorkflowStep, WorkflowConnection } from '@/types/workflow';
 import { WorkflowNode } from './WorkflowNode';
 import '@xyflow/react/dist/style.css';
 
-interface WorkflowNodeData {
+interface WorkflowNodeData extends Record<string, unknown> {
   step: WorkflowStep;
   isEditable: boolean;
   onUpdate: (step: WorkflowStep) => void;

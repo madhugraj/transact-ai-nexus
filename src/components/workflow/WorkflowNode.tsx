@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { WorkflowStep } from '@/types/workflow';
 
-interface WorkflowNodeData {
+interface WorkflowNodeData extends Record<string, unknown> {
   step: WorkflowStep;
   isEditable: boolean;
   onUpdate: (step: WorkflowStep) => void;
