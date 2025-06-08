@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -88,13 +89,13 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
         
         toast({
           title: "Connected to Gmail",
-          description: "Successfully authenticated with your Gmail account. Redirecting back to workflow configuration..."
+          description: "Successfully authenticated with your Gmail account. Connection will persist across navigation."
         });
         
-        // Navigate back to workflows page after successful authentication
-        setTimeout(() => {
-          navigate('/actions');
-        }, 2000);
+        // Don't navigate away - stay on the same page to maintain workflow context
+        // setTimeout(() => {
+        //   navigate('/actions');
+        // }, 2000);
       } else {
         console.error('Authentication failed:', result.error);
         setAuthError(result.error || 'Authentication failed');
