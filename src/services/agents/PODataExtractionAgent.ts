@@ -263,10 +263,8 @@ Return ONLY the JSON object with extracted data.
 
       console.log(`🤖 PODataExtractionAgent: Sending request to Gemini for ${fileName}`);
       
-      // Use Gemini API key from environment or localStorage
-      const apiKey = typeof window !== 'undefined' 
-        ? localStorage.getItem('GEMINI_API_KEY') || 'AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk'
-        : 'AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk';
+      // Use the correct Gemini API key
+      const apiKey = 'AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk';
 
       // Clean base64 data
       const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, '');
@@ -372,6 +370,85 @@ Return ONLY the JSON object with extracted data.
         success: false,
         error: error instanceof Error ? error.message : 'Gemini processing failed'
       };
+    }
+  }
+
+  private async convertPdfToImage(file: File): Promise<{ base64: string; mimeType: string } | null> {
+    try {
+      console.log(`🔄 PODataExtractionAgent: Starting PDF to image conversion for ${file.name}`);
+      
+      // Use PDF.js to convert PDF to canvas/image
+      const pdfjsLib = await import('pdfjs-dist');
+      
+      // Set worker source
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+      
+      const arrayBuffer = await file.arrayBuffer();
+      
+      // Enhanced validation for PDF structure
+      if (arrayBuffer.byteLength < 100) {
+        console.error(`❌ PODataExtractionAgent: PDF file too small: ${arrayBuffer.byteLength} bytes`);
+        return null;
+      }
+      
+      // Check for PDF header with more flexible matching
+      const header = new Uint8Array(arrayBuffer.slice(0, 10));
+      const headerString = String.fromCharCode(...header);
+      if (!headerString.includes('%PDF')) {
+        console.error(`❌ PODataExtractionAgent: Invalid PDF header: ${headerString}`);
+        return null;
+      }
+      
+      try {
+        const pdf = await pdfjsLib.getDocument({ 
+          data: arrayBuffer,
+          verbosity: 0, // Reduce console noise
+          stopAtErrors: false, // Continue processing even with minor errors
+          isEvalSupported: false, // Disable eval for security
+          disableFontFace: true, // Disable font loading
+          disableRange: false,
+          disableStream: false
+        }).promise;
+        
+        console.log(`📄 PODataExtractionAgent: PDF loaded with ${pdf.numPages} pages`);
+        
+        if (pdf.numPages === 0) {
+          console.error(`❌ PODataExtractionAgent: PDF has no pages`);
+          return null;
+        }
+        
+        // Get the first page
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 2.0 }); // Higher scale for better quality
+        
+        // Create canvas
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d')!;
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        
+        // Render page to canvas
+        await page.render({
+          canvasContext: context,
+          viewport: viewport
+        }).promise;
+        
+        // Convert canvas to base64
+        const base64 = canvas.toDataURL('image/png').split(',')[1];
+        
+        console.log(`✅ PODataExtractionAgent: Successfully converted PDF to image for ${file.name}`);
+        
+        return {
+          base64,
+          mimeType: 'image/png'
+        };
+      } catch (pdfError) {
+        console.error(`❌ PODataExtractionAgent: PDF.js processing error:`, pdfError);
+        return null;
+      }
+    } catch (error) {
+      console.error(`❌ PODataExtractionAgent: PDF conversion error for ${file.name}:`, error);
+      return null;
     }
   }
 }

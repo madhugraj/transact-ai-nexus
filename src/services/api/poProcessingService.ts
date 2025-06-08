@@ -23,7 +23,8 @@ export interface POProcessingResult {
 
 export const extractPODataFromFile = async (file: File): Promise<POProcessingResult> => {
   try {
-    const GEMINI_API_KEY = 'AIzaSyDkF4Gb6kCEI6aNR4SzW-wgGbEE6xGQSr0';
+    // Use the correct API key from Supabase environment
+    const GEMINI_API_KEY = 'AIzaSyAe8rheF4wv2ZHJB2YboUhyyVlM2y0vmlk';
     
     if (!GEMINI_API_KEY) {
       throw new Error('Gemini API key not configured');
