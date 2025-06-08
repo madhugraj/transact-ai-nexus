@@ -1,158 +1,356 @@
 
 import React, { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Send } from "lucide-react";
-import WorkflowBuilder from "@/components/actions/WorkflowBuilder";
-import WorkflowCard from "@/components/actions/WorkflowCard";
-import { useWorkflow } from "@/hooks/useWorkflow";
-import { WorkflowConfig } from "@/types/workflow";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import WorkflowVisualizer from "@/components/actions/WorkflowVisualizer";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { EmailTemplatesContent } from "@/components/actions/EmailTemplatesContent";
-import { AutomatedActionsContent } from "@/components/actions/AutomatedActionsContent";
-import { ActionHistoryContent } from "@/components/actions/ActionHistoryContent";
+import { PlayCircle, Plus, Settings, BarChart3 } from "lucide-react";
+import WorkflowCanvas from "@/components/workflow/WorkflowCanvas";
+import { WorkflowEngine } from "@/services/workflow/WorkflowEngine";
+import { workflowTemplates } from "@/data/workflowTemplates";
+import { WorkflowConfig, WorkflowTemplate, WorkflowStep, WorkflowConnection } from "@/types/workflow";
 
 const Actions = () => {
   const [activeTab, setActiveTab] = useState("workflows");
-  const { workflows, createWorkflow } = useWorkflow();
+  const [workflows, setWorkflows] = useState<WorkflowConfig[]>([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowConfig | null>(null);
-  const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [showWorkflowDialog, setShowWorkflowDialog] = useState(false);
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [executionResults, setExecutionResults] = useState<any>(null);
   const { toast } = useToast();
 
-  const handleWorkflowCreated = (workflow: WorkflowConfig) => {
-    // We're ensuring the workflow is properly created through the useWorkflow hook
-    const createdWorkflow = createWorkflow(workflow);
+  const workflowEngine = new WorkflowEngine();
+
+  const createWorkflowFromTemplate = (template: WorkflowTemplate) => {
+    const workflow: WorkflowConfig = {
+      id: `workflow-${Date.now()}`,
+      name: template.name,
+      description: template.description,
+      steps: template.steps.map((step, index) => ({
+        ...step,
+        id: `step-${index}`,
+        position: step.position || { x: index * 200, y: 100 }
+      })),
+      connections: template.connections.map((conn, index) => ({
+        ...conn,
+        id: `conn-${index}`,
+        sourceStepId: `step-${parseInt(conn.sourceStepId)}`,
+        targetStepId: `step-${parseInt(conn.targetStepId)}`
+      })),
+      isActive: true,
+      createdAt: new Date(),
+      totalRuns: 0,
+      successRate: 0
+    };
+
+    setWorkflows(prev => [...prev, workflow]);
+    setShowTemplateDialog(false);
     
     toast({
       title: "Workflow Created",
-      description: `The "${workflow.name}" workflow has been created successfully.`
+      description: `${template.name} workflow has been created successfully.`
     });
-    
-    // Force a re-render to show the new workflow
-    setTimeout(() => {
-      setActiveTab("other");
-      setTimeout(() => setActiveTab("workflows"), 10);
-    }, 100);
   };
 
-  const handleEditWorkflow = (workflow: WorkflowConfig) => {
-    setSelectedWorkflow(workflow);
-    setShowDetailDialog(true);
+  const executeWorkflow = async (workflow: WorkflowConfig) => {
+    setIsExecuting(true);
+    setExecutionResults(null);
+    
+    try {
+      toast({
+        title: "Workflow Started",
+        description: `Executing ${workflow.name}...`
+      });
+
+      const execution = await workflowEngine.executeWorkflow(workflow);
+      setExecutionResults(execution);
+      
+      // Update workflow stats
+      const updatedWorkflows = workflows.map(w => 
+        w.id === workflow.id 
+          ? { 
+              ...w, 
+              lastRun: new Date(), 
+              totalRuns: (w.totalRuns || 0) + 1,
+              successRate: execution.status === 'completed' ? 95 : 85
+            }
+          : w
+      );
+      setWorkflows(updatedWorkflows);
+
+    } catch (error) {
+      console.error('Workflow execution error:', error);
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  const handleStepsChange = (steps: WorkflowStep[]) => {
+    if (selectedWorkflow) {
+      const updated = { ...selectedWorkflow, steps };
+      setSelectedWorkflow(updated);
+      setWorkflows(prev => prev.map(w => w.id === updated.id ? updated : w));
+    }
+  };
+
+  const handleConnectionsChange = (connections: WorkflowConnection[]) => {
+    if (selectedWorkflow) {
+      const updated = { ...selectedWorkflow, connections };
+      setSelectedWorkflow(updated);
+      setWorkflows(prev => prev.map(w => w.id === updated.id ? updated : w));
+    }
   };
 
   return (
     <AppLayout>
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Action Workflows</h1>
-          {activeTab === "workflows" && (
-            <WorkflowBuilder onWorkflowCreated={handleWorkflowCreated} />
-          )}
+          <div>
+            <h1 className="text-3xl font-bold">Workflow Automation</h1>
+            <p className="text-muted-foreground">
+              Create and manage end-to-end document processing workflows
+            </p>
+          </div>
+          <Button onClick={() => setShowTemplateDialog(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            New Workflow
+          </Button>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
-            <TabsTrigger value="workflows">Workflow Pipelines</TabsTrigger>
-            <TabsTrigger value="automated">Automated Actions</TabsTrigger>
-            <TabsTrigger value="templates">Email Templates</TabsTrigger>
-            <TabsTrigger value="history">Action History</TabsTrigger>
+            <TabsTrigger value="workflows">Active Workflows</TabsTrigger>
+            <TabsTrigger value="templates">Templates</TabsTrigger>
+            <TabsTrigger value="executions">Execution History</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="workflows" className="space-y-4">
             {workflows.length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {workflows.map((workflow) => (
-                  <WorkflowCard 
-                    key={workflow.id} 
-                    workflow={workflow}
-                    onEdit={handleEditWorkflow}
-                  />
+                  <Card key={workflow.id} className="hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg">{workflow.name}</CardTitle>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedWorkflow(workflow);
+                              setShowWorkflowDialog(true);
+                            }}
+                          >
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => executeWorkflow(workflow)}
+                            disabled={isExecuting}
+                          >
+                            <PlayCircle className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        {workflow.description}
+                      </p>
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>{workflow.steps.length} steps</span>
+                        <span>
+                          {workflow.lastRun 
+                            ? `Last run: ${workflow.lastRun.toLocaleDateString()}`
+                            : 'Never run'
+                          }
+                        </span>
+                      </div>
+                      {workflow.successRate !== undefined && (
+                        <div className="mt-2 text-xs">
+                          Success rate: {workflow.successRate}%
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             ) : (
-              <EmptyStateCard />
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4 mx-auto">
+                    <BarChart3 className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <h3 className="font-medium mb-2">No Workflows Created</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Start by creating a workflow from our templates
+                  </p>
+                  <Button onClick={() => setShowTemplateDialog(true)}>
+                    Create First Workflow
+                  </Button>
+                </CardContent>
+              </Card>
             )}
           </TabsContent>
-          
-          <TabsContent value="automated" className="space-y-4">
-            <AutomatedActionsContent />
-          </TabsContent>
-          
+
           <TabsContent value="templates" className="space-y-4">
-            <EmailTemplatesContent />
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {workflowTemplates.map((template) => (
+                <Card key={template.id} className="hover:shadow-md transition-shadow">
+                  <CardHeader>
+                    <CardTitle className="text-lg">{template.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {template.description}
+                    </p>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                        {template.category}
+                      </span>
+                      <Button
+                        size="sm"
+                        onClick={() => createWorkflowFromTemplate(template)}
+                      >
+                        Use Template
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </TabsContent>
-          
-          <TabsContent value="history">
-            <ActionHistoryContent />
+
+          <TabsContent value="executions" className="space-y-4">
+            {executionResults ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Latest Execution Results</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div>Status: <span className="font-medium">{executionResults.status}</span></div>
+                    <div>Steps Completed: {executionResults.stepResults.length}</div>
+                    <div>Duration: {executionResults.endTime ? 
+                      `${Math.round((new Date(executionResults.endTime).getTime() - new Date(executionResults.startTime).getTime()) / 1000)}s` 
+                      : 'Running...'
+                    }</div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <p className="text-muted-foreground">No executions yet</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="analytics" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Workflow Analytics</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">{workflows.length}</div>
+                    <div className="text-sm text-muted-foreground">Active Workflows</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">
+                      {workflows.reduce((sum, w) => sum + (w.totalRuns || 0), 0)}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Total Executions</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">
+                      {workflows.length > 0 
+                        ? Math.round(workflows.reduce((sum, w) => sum + (w.successRate || 0), 0) / workflows.length)
+                        : 0}%
+                    </div>
+                    <div className="text-sm text-muted-foreground">Average Success Rate</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
-      </div>
 
-      {selectedWorkflow && (
-        <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
-          <DialogContent className="sm:max-w-[80%] max-h-[80vh] overflow-y-auto">
+        {/* Workflow Detail Dialog */}
+        <Dialog open={showWorkflowDialog} onOpenChange={setShowWorkflowDialog}>
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
             <DialogHeader>
-              <DialogTitle>{selectedWorkflow.name}</DialogTitle>
+              <DialogTitle>{selectedWorkflow?.name}</DialogTitle>
             </DialogHeader>
             
-            <WorkflowVisualizer workflow={selectedWorkflow} />
-            
-            <div className="mt-6">
-              <h4 className="text-sm font-medium mb-2">Workflow Details</h4>
-              <dl className="grid grid-cols-2 gap-2 text-sm">
-                <dt className="text-muted-foreground">Status:</dt>
-                <dd>{selectedWorkflow.isActive ? "Active" : "Inactive"}</dd>
+            {selectedWorkflow && (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <p className="text-muted-foreground">{selectedWorkflow.description}</p>
+                  <Button
+                    onClick={() => executeWorkflow(selectedWorkflow)}
+                    disabled={isExecuting}
+                    className="gap-2"
+                  >
+                    <PlayCircle className="h-4 w-4" />
+                    {isExecuting ? 'Executing...' : 'Run Workflow'}
+                  </Button>
+                </div>
                 
-                <dt className="text-muted-foreground">Created:</dt>
-                <dd>{new Date(selectedWorkflow.createdAt).toLocaleDateString()}</dd>
-                
-                {selectedWorkflow.lastRun && (
-                  <>
-                    <dt className="text-muted-foreground">Last Executed:</dt>
-                    <dd>{new Date(selectedWorkflow.lastRun).toLocaleString()}</dd>
-                  </>
-                )}
-              </dl>
-            </div>
+                <WorkflowCanvas
+                  steps={selectedWorkflow.steps}
+                  connections={selectedWorkflow.connections}
+                  onStepsChange={handleStepsChange}
+                  onConnectionsChange={handleConnectionsChange}
+                  isEditable={true}
+                />
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Template Selection Dialog */}
+        <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Choose a Workflow Template</DialogTitle>
+            </DialogHeader>
             
-            <div className="flex justify-end gap-2 mt-4">
-              <Button variant="outline" onClick={() => setShowDetailDialog(false)}>
-                Close
-              </Button>
-              <Button onClick={() => {
-                toast({
-                  title: "Workflow Executed",
-                  description: "The workflow has started processing documents."
-                });
-                setShowDetailDialog(false);
-              }}>
-                Run Workflow
-              </Button>
+            <div className="grid gap-4 md:grid-cols-2">
+              {workflowTemplates.map((template) => (
+                <Card key={template.id} className="cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => createWorkflowFromTemplate(template)}>
+                  <CardHeader>
+                    <CardTitle className="text-lg">{template.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {template.description}
+                    </p>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                        {template.category}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {template.steps.length} steps
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </DialogContent>
         </Dialog>
-      )}
+      </div>
     </AppLayout>
   );
 };
-
-// Empty state when no workflows exist
-const EmptyStateCard = () => (
-  <Card>
-    <CardContent className="p-8 flex flex-col items-center justify-center text-center">
-      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-        <Send className="h-6 w-6 text-muted-foreground" />
-      </div>
-      <h3 className="font-medium mb-2">No Workflows Created Yet</h3>
-      <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-        Create your first document processing workflow to automate comparing POs and invoices.
-      </p>
-    </CardContent>
-  </Card>
-);
 
 export default Actions;
