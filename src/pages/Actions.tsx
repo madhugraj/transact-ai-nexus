@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -118,6 +117,18 @@ const Actions = () => {
         s.id === updatedStep.id ? updatedStep : s
       );
       handleStepsChange(updatedSteps);
+      
+      // Also update the workflows array to persist the changes
+      setWorkflows(prev => prev.map(w => 
+        w.id === selectedWorkflow.id 
+          ? { ...w, steps: updatedSteps }
+          : w
+      ));
+      
+      toast({
+        title: "Configuration Saved",
+        description: `${updatedStep.name} configuration has been updated.`
+      });
     }
   };
 
@@ -345,19 +356,13 @@ const Actions = () => {
                   </div>
                 </div>
                 
-                <div onDoubleClick={() => {
-                  if (selectedWorkflow.steps.length > 0) {
-                    handleStepDoubleClick(selectedWorkflow.steps[0]);
-                  }
-                }}>
-                  <WorkflowCanvas
-                    steps={selectedWorkflow.steps}
-                    connections={selectedWorkflow.connections}
-                    onStepsChange={handleStepsChange}
-                    onConnectionsChange={handleConnectionsChange}
-                    isEditable={true}
-                  />
-                </div>
+                <WorkflowCanvas
+                  steps={selectedWorkflow.steps}
+                  connections={selectedWorkflow.connections}
+                  onStepsChange={handleStepsChange}
+                  onConnectionsChange={handleConnectionsChange}
+                  isEditable={true}
+                />
                 
                 <div className="text-sm text-muted-foreground">
                   💡 Tip: Double-click on any step in the workflow to configure its settings

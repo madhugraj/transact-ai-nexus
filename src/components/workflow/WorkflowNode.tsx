@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -76,16 +75,25 @@ const getStepColor = (type: string) => {
 export const WorkflowNode: React.FC<NodeProps> = ({ data }) => {
   const step = data.step as WorkflowStep;
   const isEditable = data.isEditable as boolean;
+  const onUpdate = data.onUpdate as ((step: WorkflowStep) => void) | undefined;
+  
+  const handleDoubleClick = () => {
+    if (isEditable && onUpdate) {
+      // This will trigger the parent component to open the configuration dialog
+      // The actual configuration dialog is handled in the Actions page
+      console.log('Double-clicked step for configuration:', step.name);
+    }
+  };
   
   return (
-    <div className="relative">
+    <div className="relative" onDoubleClick={handleDoubleClick}>
       <Handle
         type="target"
         position={Position.Left}
         className="w-3 h-3 !bg-blue-500"
       />
       
-      <Card className={`w-48 ${getStepColor(step.type)} transition-all hover:shadow-md`}>
+      <Card className={`w-48 ${getStepColor(step.type)} transition-all hover:shadow-md ${isEditable ? 'cursor-pointer' : ''}`}>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
             {getStepIcon(step.type)}
@@ -112,6 +120,11 @@ export const WorkflowNode: React.FC<NodeProps> = ({ data }) => {
                     </div>
                   );
                 })}
+              </div>
+            )}
+            {isEditable && (
+              <div className="text-xs text-blue-600 mt-2">
+                Double-click to configure
               </div>
             )}
           </div>

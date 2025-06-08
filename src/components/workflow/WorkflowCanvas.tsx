@@ -36,6 +36,11 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   onConnectionsChange,
   isEditable = false
 }) => {
+  const handleStepUpdate = useCallback((updatedStep: WorkflowStep) => {
+    const newSteps = steps.map(s => s.id === updatedStep.id ? updatedStep : s);
+    onStepsChange(newSteps);
+  }, [steps, onStepsChange]);
+
   // Convert workflow steps to React Flow nodes
   const initialNodes: Node[] = steps.map((step, index) => ({
     id: step.id || index.toString(),
@@ -44,10 +49,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     data: { 
       step,
       isEditable,
-      onUpdate: (updatedStep: WorkflowStep) => {
-        const newSteps = steps.map(s => s.id === updatedStep.id ? updatedStep : s);
-        onStepsChange(newSteps);
-      }
+      onUpdate: handleStepUpdate
     },
   }));
 
@@ -64,6 +66,21 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Update nodes when steps change
+  React.useEffect(() => {
+    const updatedNodes = steps.map((step, index) => ({
+      id: step.id || index.toString(),
+      type: 'workflowStep',
+      position: step.position || { x: index * 200, y: 100 },
+      data: { 
+        step,
+        isEditable,
+        onUpdate: handleStepUpdate
+      },
+    }));
+    setNodes(updatedNodes);
+  }, [steps, isEditable, handleStepUpdate, setNodes]);
 
   const onConnect = useCallback(
     (params: Connection) => {
