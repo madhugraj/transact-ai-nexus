@@ -10,12 +10,17 @@ import {
   useEdgesState,
   addEdge,
   Connection,
-  NodeTypes,
   BackgroundVariant
 } from '@xyflow/react';
 import { WorkflowStep, WorkflowConnection } from '@/types/workflow';
 import { WorkflowNode } from './WorkflowNode';
 import '@xyflow/react/dist/style.css';
+
+interface WorkflowNodeData {
+  step: WorkflowStep;
+  isEditable: boolean;
+  onUpdate: (step: WorkflowStep) => void;
+}
 
 interface WorkflowCanvasProps {
   steps: WorkflowStep[];
@@ -25,7 +30,7 @@ interface WorkflowCanvasProps {
   isEditable?: boolean;
 }
 
-const nodeTypes: NodeTypes = {
+const nodeTypes = {
   workflowStep: WorkflowNode,
 };
 
@@ -37,7 +42,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   isEditable = false
 }) => {
   // Convert workflow steps to React Flow nodes
-  const initialNodes: Node[] = steps.map((step, index) => ({
+  const initialNodes: Node<WorkflowNodeData>[] = steps.map((step, index) => ({
     id: step.id || index.toString(),
     type: 'workflowStep',
     position: step.position || { x: index * 200, y: 100 },
