@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { PlayCircle, Plus, Settings, BarChart3, Edit, AlertTriangle, ExternalLink } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import WorkflowCanvas from "@/components/workflow/WorkflowCanvas";
 import { WorkflowBuilder } from "@/components/workflow/WorkflowBuilder";
 import { WorkflowConfigDialog } from "@/components/workflow/WorkflowConfigDialog";
@@ -15,6 +16,7 @@ import { workflowTemplates } from "@/data/workflowTemplates";
 import { WorkflowConfig, WorkflowTemplate, WorkflowStep, WorkflowConnection } from "@/types/workflow";
 
 const Actions = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("workflows");
   const [workflows, setWorkflows] = useState<WorkflowConfig[]>([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowConfig | null>(null);
@@ -185,7 +187,7 @@ const Actions = () => {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => window.open('/email-connector', '_blank')}
+                    onClick={() => navigate('/email-connector')}
                     className="gap-2"
                   >
                     <ExternalLink className="h-3 w-3" />
