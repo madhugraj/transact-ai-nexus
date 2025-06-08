@@ -61,20 +61,35 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
         description: `Analyzing ${file.name} with Gemini AI...`,
       });
 
-      // First download the file
-      const { data } = await fetch('/api/supabase/functions/google-drive', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accessToken: localStorage.getItem('google_drive_access_token'),
-          action: file.mimeType.includes('google-apps') ? 'export' : 'download',
-          fileId: file.id
-        })
-      }).then(res => res.json());
+      // First download the file from Google Drive
+      const accessToken = localStorage.getItem('google_drive_access_token');
+      if (!accessToken) {
+        throw new Error('No access token found. Please reconnect to Google Drive.');
+      }
 
-      // Convert to File object
-      const fileBlob = new Blob([data], { type: file.mimeType });
-      const fileObject = new File([fileBlob], file.name, { type: file.mimeType });
+      console.log('📥 Downloading file for processing:', file.name);
+      
+      // Download file data
+      const downloadUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`;
+      const response = await fetch(downloadUrl, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const blob = new Blob([arrayBuffer], { type: file.mimeType });
+      const fileObject = new File([blob], file.name, { type: file.mimeType });
+
+      console.log('📄 File downloaded, processing with Gemini...', {
+        name: fileObject.name,
+        size: fileObject.size,
+        type: fileObject.type
+      });
 
       // Process with Gemini
       const result = await extractTablesFromImage(fileObject, `
@@ -96,6 +111,8 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
           "billing_address": "Billing address"
         }
       `);
+
+      console.log('🔍 Gemini processing result:', result);
 
       if (result.success) {
         setProcessingResult(result.data);
@@ -162,7 +179,7 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
             onClick={handleDownload}
             disabled={isDownloading}
             className="h-8 w-8 p-0"
-            title="Download for bulk processing"
+            title="Add to batch processing"
           >
             <Download className={`h-4 w-4 ${isDownloading ? 'animate-spin' : ''}`} />
           </Button>

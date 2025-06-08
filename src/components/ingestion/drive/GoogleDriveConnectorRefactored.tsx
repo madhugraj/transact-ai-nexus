@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { GoogleAuthService } from '@/services/auth/googleAuthService';
 import CompactAuthDialog from '@/components/auth/CompactAuthDialog';
 import ConnectionStatus from './ConnectionStatus';
 import FileBrowser from './FileBrowser';
 import ProcessingSection from './ProcessingSection';
-import { FileConverter } from '@/services/gmail/fileConverter';
 
 interface GoogleDriveFile {
   id: string;
@@ -40,7 +38,7 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
   const authService = new GoogleAuthService({
     clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
     scopes: ['https://www.googleapis.com/auth/drive.readonly'],
-    redirectUri: `${window.location.origin}/oauth/callback` // DYNAMIC based on current origin
+    redirectUri: `${window.location.origin}/oauth/callback`
   }, 'drive_auth_tokens');
 
   // Check for stored tokens on mount and maintain connection
@@ -132,41 +130,36 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
   };
 
   const loadGoogleDriveFiles = async (token: string, folderId?: string) => {
-    console.log('Loading Google Drive files with token:', token.substring(0, 20) + '...');
+    console.log('Loading Google Drive files...');
     setIsLoading(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('google-drive', {
-        body: {
-          accessToken: token,
-          action: 'list',
-          folderId
+      // Use Google Drive API directly
+      const url = new URL('https://www.googleapis.com/drive/v3/files');
+      url.searchParams.append('q', "mimeType='application/pdf' or mimeType contains 'image/'");
+      url.searchParams.append('fields', 'files(id,name,mimeType,size,modifiedTime,webViewLink,parents)');
+      url.searchParams.append('pageSize', '100');
+
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
       });
 
-      console.log('Google Drive API response:', { success: data?.success, error, dataLength: data?.data?.length });
-
-      if (error) {
-        console.error('Supabase function error:', error);
-        
-        // Check if it's an auth error
-        if (error.message && (error.message.includes('401') || error.message.includes('invalid_grant') || error.message.includes('UNAUTHENTICATED'))) {
+      if (!response.ok) {
+        if (response.status === 401) {
           console.log('Token expired, clearing stored tokens...');
           authService.clearTokens();
           setIsConnected(false);
           setAccessToken('');
           throw new Error('Session expired. Please reconnect to Google Drive.');
         }
-        throw error;
+        throw new Error(`Google Drive API error: ${response.status}`);
       }
 
-      if (data.success) {
-        console.log('Successfully loaded files:', data.data.length);
-        setFiles(data.data);
-      } else {
-        console.error('API returned unsuccessful response:', data.error);
-        throw new Error(data.error);
-      }
+      const data = await response.json();
+      console.log('Successfully loaded files:', data.files?.length || 0);
+      setFiles(data.files || []);
     } catch (error) {
       console.error('Error loading Google Drive files:', error);
       toast({
@@ -209,39 +202,22 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
       for (const file of selectedFiles) {
         try {
           console.log('🔽 Downloading file:', file.name, 'Type:', file.mimeType);
-          const { data, error } = await supabase.functions.invoke('google-drive', {
-            body: {
-              accessToken,
-              action: file.mimeType.includes('google-apps') ? 'export' : 'download',
-              fileId: file.id
+          
+          // Download directly from Google Drive API
+          const downloadUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`;
+          const response = await fetch(downloadUrl, {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`
             }
           });
 
-          if (error) {
-            console.error('❌ Error downloading file:', file.name, error);
-            throw error;
+          if (!response.ok) {
+            throw new Error(`Failed to download ${file.name}: ${response.status}`);
           }
 
-          console.log('📦 Received file data:', typeof data, 'Size:', data?.length || 'unknown');
-
-          // Use the improved file converter
-          let downloadedFile: File;
-          
-          if (file.mimeType.includes('google-apps')) {
-            // For Google Workspace files, they're exported as PDF
-            downloadedFile = FileConverter.createFileFromCloudStorage(
-              data, 
-              file.name.endsWith('.pdf') ? file.name : `${file.name}.pdf`, 
-              'application/pdf'
-            );
-          } else {
-            // For regular files, preserve original type
-            downloadedFile = FileConverter.createFileFromCloudStorage(
-              data, 
-              file.name, 
-              file.mimeType
-            );
-          }
+          const arrayBuffer = await response.arrayBuffer();
+          const blob = new Blob([arrayBuffer], { type: file.mimeType });
+          const downloadedFile = new File([blob], file.name, { type: file.mimeType });
           
           downloadedFiles.push(downloadedFile);
           console.log('✅ Successfully processed file:', downloadedFile.name, 'Size:', downloadedFile.size);
@@ -259,12 +235,6 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
         console.log('✅ All files processed successfully:', downloadedFiles.length);
         setDownloadedFiles(downloadedFiles);
         onFilesSelected(downloadedFiles);
-        
-        // Auto-start processing after successful download
-        setTimeout(() => {
-          console.log('🚀 Auto-starting processing after download...');
-          // The ProcessingSection will handle the actual processing
-        }, 500);
         
         toast({
           title: "Success",

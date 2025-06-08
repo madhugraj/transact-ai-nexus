@@ -37,7 +37,7 @@ const ProcessingSection = ({ downloadedFiles, onProcessingComplete, onClose }: P
         console.log(`📄 Processing file ${i + 1}/${downloadedFiles.length}: ${file.name}`);
         
         try {
-          // Use Gemini to extract PO data
+          // Use Gemini to extract PO data directly
           const extractionResult = await extractTablesFromImage(file, `
             Extract Purchase Order (PO) data from this document. Return structured JSON with:
             {
@@ -75,7 +75,7 @@ const ProcessingSection = ({ downloadedFiles, onProcessingComplete, onClose }: P
               error: extractionResult.error || 'Failed to extract data',
               processingTime: Date.now()
             });
-            console.log(`❌ Failed to process: ${file.name}`);
+            console.log(`❌ Failed to process: ${file.name}`, extractionResult.error);
           }
         } catch (error) {
           results.push({
