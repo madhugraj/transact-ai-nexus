@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { WorkflowCanvas } from './WorkflowCanvas';
+import WorkflowCanvas from './WorkflowCanvas';
 import { WorkflowStepPalette } from './WorkflowStepPalette';
 import { WorkflowStep, WorkflowConnection, WorkflowConfig } from '@/types/workflow';
 import { Palette, Workflow, Settings } from 'lucide-react';
