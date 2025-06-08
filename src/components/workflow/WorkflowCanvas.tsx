@@ -11,7 +11,8 @@ import {
   addEdge,
   Connection,
   BackgroundVariant,
-  NodeTypes
+  NodeTypes,
+  useReactFlow
 } from '@xyflow/react';
 import { WorkflowStep, WorkflowConnection } from '@/types/workflow';
 import { WorkflowNode } from './WorkflowNode';
@@ -38,10 +39,24 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   onStepDoubleClick,
   isEditable = false
 }) => {
+  const { deleteElements } = useReactFlow();
+
   const handleStepUpdate = useCallback((updatedStep: WorkflowStep) => {
     const newSteps = steps.map(s => s.id === updatedStep.id ? updatedStep : s);
     onStepsChange(newSteps);
   }, [steps, onStepsChange]);
+
+  const handleStepDelete = useCallback((stepId: string) => {
+    // Remove the step
+    const newSteps = steps.filter(s => s.id !== stepId);
+    onStepsChange(newSteps);
+    
+    // Remove connections involving this step
+    const newConnections = connections.filter(c => 
+      c.sourceStepId !== stepId && c.targetStepId !== stepId
+    );
+    onConnectionsChange(newConnections);
+  }, [steps, connections, onStepsChange, onConnectionsChange]);
 
   // Convert workflow steps to React Flow nodes
   const initialNodes: Node[] = steps.map((step, index) => ({
@@ -52,8 +67,11 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
       step,
       isEditable,
       onUpdate: handleStepUpdate,
-      onStepDoubleClick
+      onStepDoubleClick,
+      onDelete: handleStepDelete
     },
+    deletable: isEditable,
+    draggable: isEditable,
   }));
 
   // Convert workflow connections to React Flow edges
@@ -62,9 +80,10 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     source: conn.sourceStepId,
     target: conn.targetStepId,
     type: 'smoothstep',
-    animated: true,
-    style: { stroke: '#3b82f6', strokeWidth: 2 },
+    animated: false,
+    style: { stroke: '#6b7280', strokeWidth: 2 },
     label: conn.condition || '',
+    deletable: isEditable,
   }));
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -80,17 +99,26 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         step,
         isEditable,
         onUpdate: handleStepUpdate,
-        onStepDoubleClick
+        onStepDoubleClick,
+        onDelete: handleStepDelete
       },
+      deletable: isEditable,
+      draggable: isEditable,
     }));
     setNodes(updatedNodes);
-  }, [steps, isEditable, handleStepUpdate, onStepDoubleClick, setNodes]);
+  }, [steps, isEditable, handleStepUpdate, onStepDoubleClick, handleStepDelete, setNodes]);
 
   const onConnect = useCallback(
     (params: Connection) => {
       if (!isEditable) return;
       
-      const newEdge = addEdge(params, edges);
+      const newEdge = addEdge({
+        ...params,
+        type: 'smoothstep',
+        animated: false,
+        style: { stroke: '#6b7280', strokeWidth: 2 },
+        deletable: true,
+      }, edges);
       setEdges(newEdge);
       
       const newConnection: WorkflowConnection = {
@@ -108,7 +136,6 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     (event: any, node: Node) => {
       if (!isEditable) return;
       
-      // Update the step position in the steps array
       const updatedSteps = steps.map(step => 
         step.id === node.id 
           ? { ...step, position: node.position }
@@ -119,8 +146,21 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     [steps, onStepsChange, isEditable]
   );
 
+  const onEdgesDelete = useCallback(
+    (edgesToDelete: Edge[]) => {
+      if (!isEditable) return;
+      
+      const edgeIdsToDelete = edgesToDelete.map(edge => edge.id);
+      const newConnections = connections.filter(conn => 
+        !edgeIdsToDelete.includes(conn.id)
+      );
+      onConnectionsChange(newConnections);
+    },
+    [connections, onConnectionsChange, isEditable]
+  );
+
   return (
-    <div className="w-full h-[600px] border rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 shadow-inner">
+    <div className="w-full h-[600px] border rounded-lg bg-gray-50 shadow-inner">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -128,6 +168,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDragStop={onNodeDragStop}
+        onEdgesDelete={onEdgesDelete}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{
@@ -139,16 +180,19 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         style={{
           background: 'transparent',
         }}
+        deleteKeyCode={['Backspace', 'Delete']}
+        multiSelectionKeyCode={['Meta', 'Ctrl']}
       >
         <Background 
           variant={BackgroundVariant.Dots} 
           gap={20} 
           size={1} 
-          color="#e2e8f0"
-          style={{ opacity: 0.5 }}
+          color="#d1d5db"
+          style={{ opacity: 0.4 }}
         />
         <Controls 
           className="bg-white shadow-lg border border-gray-200 rounded-lg"
+          showInteractive={false}
         />
       </ReactFlow>
     </div>
