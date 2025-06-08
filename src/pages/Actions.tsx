@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { PlayCircle, Plus, Settings, BarChart3, Edit, AlertTriangle, ExternalLink } from "lucide-react";
 import WorkflowCanvas from "@/components/workflow/WorkflowCanvas";
+import { WorkflowBuilder } from "@/components/workflow/WorkflowBuilder";
 import { WorkflowConfigDialog } from "@/components/workflow/WorkflowConfigDialog";
 import { WorkflowEngine } from "@/services/workflow/WorkflowEngine";
 import { workflowTemplates } from "@/data/workflowTemplates";
@@ -371,13 +372,13 @@ const Actions = () => {
 
         {/* Workflow Detail Dialog */}
         <Dialog open={showWorkflowDialog} onOpenChange={setShowWorkflowDialog}>
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+          <DialogContent className="max-w-7xl max-h-[95vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle className="text-xl font-bold">{selectedWorkflow?.name}</DialogTitle>
             </DialogHeader>
             
             {selectedWorkflow && (
-              <div className="space-y-4">
+              <div className="flex flex-col space-y-4 h-[80vh]">
                 <div className="flex justify-between items-center">
                   <p className="text-muted-foreground">{selectedWorkflow.description}</p>
                   <div className="flex gap-2">
@@ -393,17 +394,17 @@ const Actions = () => {
                   </div>
                 </div>
                 
-                <WorkflowCanvas
-                  steps={selectedWorkflow.steps}
-                  connections={selectedWorkflow.connections}
-                  onStepsChange={handleStepsChange}
-                  onConnectionsChange={handleConnectionsChange}
-                  onStepDoubleClick={handleStepDoubleClick}
-                  isEditable={true}
-                />
-                
-                <div className="text-sm text-blue-600 bg-blue-50 p-3 rounded-lg border border-blue-200">
-                  💡 <strong>Tip:</strong> Double-click on any step or use the settings button to configure its parameters
+                <div className="flex-1">
+                  <WorkflowBuilder
+                    workflow={selectedWorkflow}
+                    onWorkflowChange={(updatedWorkflow) => {
+                      setSelectedWorkflow(updatedWorkflow);
+                      setWorkflows(prev => prev.map(w => 
+                        w.id === updatedWorkflow.id ? updatedWorkflow : w
+                      ));
+                    }}
+                    onStepDoubleClick={handleStepDoubleClick}
+                  />
                 </div>
               </div>
             )}
