@@ -34,13 +34,14 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingResult, setProcessingResult] = useState<any>(null);
   const [supabaseData, setSupabaseData] = useState<any>(null);
+  const [processingError, setProcessingError] = useState<string>('');
   const { toast } = useToast();
 
-  // Create auth service instance to get access token consistently
+  // Create auth service instance with FIXED redirect URI
   const authService = new GoogleAuthService({
     clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
     scopes: ['https://www.googleapis.com/auth/drive.readonly'],
-    redirectUri: `${window.location.origin}/oauth/callback`
+    redirectUri: 'https://lovable.app/oauth/callback'  // Fixed redirect URI
   }, 'drive_auth_tokens');
 
   const handlePreview = () => {
@@ -64,6 +65,9 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
   const handleProcessSingle = async () => {
     console.log('🧠 Processing single file with Gemini:', file.name);
     setIsProcessing(true);
+    setProcessingError('');
+    setProcessingResult(null);
+    setSupabaseData(null);
     
     try {
       toast({
@@ -71,7 +75,7 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
         description: `Analyzing ${file.name} with Gemini AI...`,
       });
 
-      // Get access token using the same auth service
+      // Get access token using the auth service
       const tokens = authService.getStoredTokens();
       if (!tokens.accessToken) {
         throw new Error('No access token found. Please reconnect to Google Drive.');
@@ -79,7 +83,7 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
 
       console.log('📥 Downloading file for processing:', file.name);
       
-      // Download file data using the correct access token
+      // Download file data using the access token
       const downloadUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`;
       const response = await fetch(downloadUrl, {
         headers: {
@@ -119,9 +123,11 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
 
     } catch (error) {
       console.error('❌ Single file processing error:', error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to process file";
+      setProcessingError(errorMessage);
       toast({
         title: "Processing Error",
-        description: error instanceof Error ? error.message : "Failed to process file",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -244,12 +250,29 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
                 </Button>
               </div>
 
+              {/* Show processing results OR error OR initial state */}
               {processingResult ? (
                 <PODataDisplay 
                   poData={processingResult} 
                   fileName={file.name}
                   supabaseData={supabaseData}
                 />
+              ) : processingError ? (
+                <div className="bg-red-50 border border-red-200 rounded p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <X className="h-4 w-4 text-red-500" />
+                    <span className="font-medium text-red-800">Processing Failed</span>
+                  </div>
+                  <p className="text-sm text-red-700">{processingError}</p>
+                  <Button 
+                    onClick={handleProcessSingle}
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                  >
+                    Try Again
+                  </Button>
+                </div>
               ) : (
                 <div className="text-center text-muted-foreground py-8">
                   <Brain className="h-12 w-12 mx-auto mb-2 text-muted-foreground/50" />

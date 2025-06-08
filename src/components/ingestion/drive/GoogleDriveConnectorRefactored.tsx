@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -34,11 +35,11 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
   const [downloadedFiles, setDownloadedFiles] = useState<File[]>([]);
   const { toast } = useToast();
 
-  // Create auth service with DYNAMIC redirect URI based on current origin
+  // Create auth service with FIXED redirect URI to prevent OAuth errors
   const authService = new GoogleAuthService({
     clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
     scopes: ['https://www.googleapis.com/auth/drive.readonly'],
-    redirectUri: `${window.location.origin}/oauth/callback`
+    redirectUri: 'https://lovable.app/oauth/callback'  // Fixed redirect URI
   }, 'drive_auth_tokens');
 
   // Check for stored tokens on mount and maintain connection
@@ -284,8 +285,8 @@ const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnecto
         <div className="text-center space-y-2">
           <h3 className="text-lg font-medium">Connect Google Drive</h3>
           <p className="text-sm text-muted-foreground">Access files from your Google Drive</p>
-          <p className="text-xs text-yellow-600 bg-yellow-50 p-2 rounded">
-            Using dynamic redirect URI: {window.location.origin}/oauth/callback
+          <p className="text-xs text-green-600 bg-green-50 p-2 rounded">
+            Using fixed redirect URI: https://lovable.app/oauth/callback
           </p>
         </div>
         <Button onClick={() => setShowAuthDialog(true)} className="gap-2">

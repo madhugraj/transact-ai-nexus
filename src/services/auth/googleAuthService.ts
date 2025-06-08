@@ -1,3 +1,4 @@
+
 export interface AuthConfig {
   clientId: string;
   scopes: string[];
@@ -73,29 +74,22 @@ export class GoogleAuthService {
     return hasTokens;
   }
 
-  // Get the correct redirect URI - Try different URI to bypass blocking
+  // Get the correct redirect URI - Use FIXED lovable.app domain
   private getRedirectUri(): string {
-    // Try current domain first
-    const currentOrigin = window.location.origin;
-    const redirectUri = `${currentOrigin}/oauth/callback`;
+    // Use fixed lovable.app redirect URI to avoid OAuth errors
+    const redirectUri = 'https://lovable.app/oauth/callback';
     
-    console.log('🔧 Using DYNAMIC Redirect URI based on current origin:', redirectUri);
-    console.log('🔧 Current window location:', {
-      origin: currentOrigin,
-      hostname: window.location.hostname,
-      protocol: window.location.protocol,
-      port: window.location.port
-    });
+    console.log('🔧 Using FIXED Redirect URI:', redirectUri);
     
     return redirectUri;
   }
 
-  // Create auth URL for popup with DYNAMIC redirect URI
+  // Create auth URL for popup with FIXED redirect URI
   createAuthUrl(): string {
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     const redirectUri = this.getRedirectUri();
     
-    console.log('🔧 Creating auth URL with DYNAMIC config:', {
+    console.log('🔧 Creating auth URL with FIXED config:', {
       clientId: this.config.clientId,
       redirectUri: redirectUri,
       scopes: this.config.scopes.join(' ')
@@ -112,7 +106,7 @@ export class GoogleAuthService {
     authUrl.searchParams.set('state', Math.random().toString(36).substring(2, 15));
     
     const finalUrl = authUrl.toString();
-    console.log('🔧 Generated auth URL with DYNAMIC domain:', finalUrl);
+    console.log('🔧 Generated auth URL with FIXED domain:', finalUrl);
     
     return finalUrl;
   }
@@ -261,7 +255,7 @@ export class GoogleAuthService {
       console.log('🔄 Exchanging authorization code for access token...');
       const { supabase } = await import('@/integrations/supabase/client');
       
-      // Use the DYNAMIC redirect URI for consistency
+      // Use the FIXED redirect URI for consistency
       const redirectUri = this.getRedirectUri();
       
       console.log('🔧 Token exchange request details:', {
