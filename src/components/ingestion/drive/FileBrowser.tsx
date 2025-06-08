@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Folder, Download } from 'lucide-react';
+import { FileText, Folder, Download, Brain, Database } from 'lucide-react';
 import POFilePreview from './POFilePreview';
 
 interface GoogleDriveFile {
@@ -23,6 +23,12 @@ interface FileBrowserProps {
   isLoading: boolean;
   onFileToggle: (file: GoogleDriveFile) => void;
   onImportFiles: () => void;
+  selectedPOFiles: GoogleDriveFile[];
+  onPOFileToggle: (file: GoogleDriveFile) => void;
+  onBulkProcess: () => void;
+  onBulkSaveToDatabase: () => void;
+  isProcessing?: boolean;
+  processingResults?: any[];
 }
 
 const FileBrowser: React.FC<FileBrowserProps> = ({
@@ -30,7 +36,13 @@ const FileBrowser: React.FC<FileBrowserProps> = ({
   selectedFiles,
   isLoading,
   onFileToggle,
-  onImportFiles
+  onImportFiles,
+  selectedPOFiles,
+  onPOFileToggle,
+  onBulkProcess,
+  onBulkSaveToDatabase,
+  isProcessing = false,
+  processingResults = []
 }) => {
   const formatFileSize = (size?: string) => {
     if (!size) return 'Unknown size';
@@ -57,13 +69,6 @@ const FileBrowser: React.FC<FileBrowserProps> = ({
 
   const handleDownloadPOFile = async (file: GoogleDriveFile) => {
     console.log('📥 Downloading PO file from FileBrowser:', file.name);
-    console.log('📥 File details being processed:', {
-      id: file.id,
-      name: file.name,
-      mimeType: file.mimeType,
-      size: file.size,
-      webViewLink: file.webViewLink
-    });
     
     // Select the file first
     onFileToggle(file);
@@ -77,6 +82,9 @@ const FileBrowser: React.FC<FileBrowserProps> = ({
 
   const regularFiles = files.filter(file => !isPOFile(file.name));
   const poFiles = files.filter(file => isPOFile(file.name));
+
+  const successfulResults = processingResults.filter(r => r.status === 'success' && r.supabaseData);
+  const hasResultsToSave = successfulResults.length > 0;
 
   return (
     <Card>
@@ -111,20 +119,92 @@ const FileBrowser: React.FC<FileBrowserProps> = ({
             {/* PO Files Section */}
             {poFiles.length > 0 && (
               <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <h3 className="text-sm font-medium">Purchase Order Files</h3>
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                    {poFiles.length} found
-                  </Badge>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-medium">Purchase Order Files</h3>
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                      {poFiles.length} found
+                    </Badge>
+                    {selectedPOFiles.length > 0 && (
+                      <Badge variant="outline" className="bg-green-50 text-green-700">
+                        {selectedPOFiles.length} selected
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  {/* Bulk Action Buttons */}
+                  <div className="flex gap-2">
+                    {selectedPOFiles.length > 0 && (
+                      <>
+                        <Button
+                          onClick={onBulkProcess}
+                          disabled={isProcessing}
+                          size="sm"
+                          className="gap-2"
+                        >
+                          {isProcessing ? (
+                            <>
+                              <Brain className="h-4 w-4 animate-pulse" />
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              <Brain className="h-4 w-4" />
+                              Process ({selectedPOFiles.length})
+                            </>
+                          )}
+                        </Button>
+                        
+                        {hasResultsToSave && (
+                          <Button
+                            onClick={onBulkSaveToDatabase}
+                            size="sm"
+                            variant="outline"
+                            className="gap-2"
+                          >
+                            <Database className="h-4 w-4" />
+                            Save to DB ({successfulResults.length})
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
+                
                 <div className="space-y-2">
                   {poFiles.map((file) => (
-                    <POFilePreview
-                      key={file.id}
-                      file={file}
-                      onDownload={handleDownloadPOFile}
-                      isDownloading={isLoading}
-                    />
+                    <div key={file.id} className="flex items-center gap-3 p-3 border rounded-lg bg-card hover:bg-muted/50 transition-colors">
+                      {/* Checkbox for bulk selection */}
+                      <Checkbox
+                        checked={selectedPOFiles.some(f => f.id === file.id)}
+                        onCheckedChange={() => onPOFileToggle(file)}
+                      />
+                      
+                      {/* File Info */}
+                      <div className="flex items-center space-x-3 min-w-0 flex-1">
+                        <div className="flex-shrink-0">
+                          <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
+                            <span className="text-blue-600 text-xs font-medium">PO</span>
+                          </div>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate" title={file.name}>
+                            {file.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatFileSize(file.size)} • {new Date(file.modifiedTime).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Individual Actions */}
+                      <POFilePreview
+                        file={file}
+                        onDownload={handleDownloadPOFile}
+                        isDownloading={isLoading}
+                        hideDownloadButton={true}
+                      />
+                    </div>
                   ))}
                 </div>
               </div>

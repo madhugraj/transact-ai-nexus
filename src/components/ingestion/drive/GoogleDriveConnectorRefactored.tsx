@@ -1,12 +1,11 @@
-
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { GoogleAuthService } from '@/services/auth/googleAuthService';
-import CompactAuthDialog from '@/components/auth/CompactAuthDialog';
 import ConnectionStatus from './ConnectionStatus';
 import FileBrowser from './FileBrowser';
 import ProcessingSection from './ProcessingSection';
+import { extractPODataFromFile } from '@/services/api/poProcessingService';
+import { supabase } from '@/integrations/supabase/client';
 
 interface GoogleDriveFile {
   id: string;
@@ -18,321 +17,375 @@ interface GoogleDriveFile {
   parents?: string[];
 }
 
-interface GoogleDriveConnectorProps {
-  onFilesSelected: (files: File[]) => void;
-}
-
-const GoogleDriveConnectorRefactored = ({ onFilesSelected }: GoogleDriveConnectorProps) => {
+const GoogleDriveConnectorRefactored: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [files, setFiles] = useState<GoogleDriveFile[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<GoogleDriveFile[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [accessToken, setAccessToken] = useState<string>('');
-  const [authError, setAuthError] = useState<string>('');
-  const [hasLoadedInitialFiles, setHasLoadedInitialFiles] = useState(false);
+  const [selectedPOFiles, setSelectedPOFiles] = useState<GoogleDriveFile[]>([]);
   const [downloadedFiles, setDownloadedFiles] = useState<File[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingResults, setProcessingResults] = useState<any[]>([]);
   const { toast } = useToast();
 
-  // Create auth service with FIXED redirect URI to prevent OAuth errors
+  // Create auth service instance with FIXED redirect URI
   const authService = new GoogleAuthService({
     clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
     scopes: ['https://www.googleapis.com/auth/drive.readonly'],
     redirectUri: 'https://lovable.app/oauth/callback'  // Fixed redirect URI
   }, 'drive_auth_tokens');
 
-  // Check for stored tokens on mount and maintain connection
-  React.useEffect(() => {
-    const checkStoredAuth = async () => {
-      console.log('Checking for stored authentication tokens...');
-      if (authService.hasValidTokens()) {
-        const tokens = authService.getStoredTokens();
-        console.log('Found stored tokens:', { hasAccessToken: !!tokens.accessToken });
-        
-        if (tokens.accessToken) {
-          setAccessToken(tokens.accessToken);
-          setIsConnected(true);
-          
-          // Test the token by trying to load files
-          console.log('Testing stored access token...');
-          try {
-            await loadGoogleDriveFiles(tokens.accessToken);
-            setHasLoadedInitialFiles(true);
-            console.log('Stored token is valid, files loaded successfully');
-          } catch (error) {
-            console.error('Stored token is invalid:', error);
-            // Clear invalid tokens and reset state
-            authService.clearTokens();
-            setIsConnected(false);
-            setAccessToken('');
-            setAuthError('Session expired. Please reconnect.');
-          }
-        }
-      } else {
-        console.log('No stored tokens found');
-      }
-    };
-    
-    checkStoredAuth();
-  }, []);
-
-  const handleGoogleAuth = async () => {
-    console.log('Starting Google authentication process...');
-    setIsConnecting(true);
-    setAuthError('');
-
+  const handleConnect = async () => {
     try {
-      const result = await authService.authenticateWithPopup();
-      console.log('Authentication result:', { success: result.success, hasToken: !!result.accessToken });
-      
-      if (result.success && result.accessToken) {
-        console.log('Authentication successful, testing token...');
-        setAccessToken(result.accessToken);
-        setIsConnected(true);
-        setShowAuthDialog(false);
-        setHasLoadedInitialFiles(false);
-        
-        // Test the new token by loading files
-        await loadGoogleDriveFiles(result.accessToken);
-        setHasLoadedInitialFiles(true);
-        
-        toast({
-          title: "Connected",
-          description: "Successfully connected to Google Drive"
-        });
-      } else {
-        console.error('Authentication failed:', result.error);
-        setAuthError(result.error || 'Authentication failed');
-      }
-    } catch (error) {
-      console.error('Authentication error:', error);
-      setAuthError(error instanceof Error ? error.message : 'Authentication failed');
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
-  const handleDisconnect = () => {
-    console.log('Disconnecting from Google Drive...');
-    authService.clearTokens();
-    setIsConnected(false);
-    setFiles([]);
-    setSelectedFiles([]);
-    setAccessToken('');
-    setShowAuthDialog(false);
-    setHasLoadedInitialFiles(false);
-    setDownloadedFiles([]);
-    
-    toast({
-      title: "Disconnected",
-      description: "Google Drive connection removed"
-    });
-  };
-
-  const loadGoogleDriveFiles = async (token: string, folderId?: string) => {
-    console.log('Loading Google Drive files...');
-    setIsLoading(true);
-    
-    try {
-      // Use Google Drive API directly
-      const url = new URL('https://www.googleapis.com/drive/v3/files');
-      url.searchParams.append('q', "mimeType='application/pdf' or mimeType contains 'image/'");
-      url.searchParams.append('fields', 'files(id,name,mimeType,size,modifiedTime,webViewLink,parents)');
-      url.searchParams.append('pageSize', '100');
-
-      const response = await fetch(url.toString(), {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          console.log('Token expired, clearing stored tokens...');
-          authService.clearTokens();
-          setIsConnected(false);
-          setAccessToken('');
-          throw new Error('Session expired. Please reconnect to Google Drive.');
-        }
-        throw new Error(`Google Drive API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('Successfully loaded files:', data.files?.length || 0);
-      setFiles(data.files || []);
-    } catch (error) {
-      console.error('Error loading Google Drive files:', error);
+      setIsLoading(true);
+      await authService.signInWithGoogle();
+      setIsConnected(true);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to load files",
-        variant: "destructive"
+        title: "Connected to Google Drive",
+        description: "Successfully connected to your Google Drive account.",
       });
-      
-      // If it's an auth error, reset the connection
-      if (error instanceof Error && error.message.includes('Session expired')) {
-        handleDisconnect();
-      }
+    } catch (error) {
+      console.error("Google Drive connection error:", error);
+      toast({
+        title: "Connection Error",
+        description: error instanceof Error ? error.message : "Failed to connect to Google Drive.",
+        variant: "destructive",
+      });
+      setIsConnected(false);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const toggleFileSelection = (file: GoogleDriveFile) => {
-    if (file.mimeType === 'application/vnd.google-apps.folder') return;
-    
-    setSelectedFiles(prev => {
-      const isSelected = prev.some(f => f.id === file.id);
-      if (isSelected) {
-        return prev.filter(f => f.id !== file.id);
-      } else {
-        return [...prev, file];
-      }
-    });
+  const handleDisconnect = async () => {
+    try {
+      setIsLoading(true);
+      await authService.signOut();
+      setIsConnected(false);
+      setFiles([]);
+      setSelectedFiles([]);
+      setDownloadedFiles([]);
+      toast({
+        title: "Disconnected",
+        description: "Successfully disconnected from Google Drive.",
+      });
+    } catch (error) {
+      console.error("Google Drive disconnection error:", error);
+      toast({
+        title: "Disconnection Error",
+        description: error instanceof Error ? error.message : "Failed to disconnect from Google Drive.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const downloadSelectedFiles = async () => {
-    if (selectedFiles.length === 0) return;
+  const loadFiles = async () => {
+    try {
+      setIsLoading(true);
+      const fileList = await authService.listFiles();
+      setFiles(fileList);
+      toast({
+        title: "Files Loaded",
+        description: `Successfully loaded ${fileList.length} files from Google Drive.`,
+      });
+    } catch (error) {
+      console.error("Error loading files from Google Drive:", error);
+      toast({
+        title: "File Loading Error",
+        description: error instanceof Error ? error.message : "Failed to load files from Google Drive.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    console.log('🔽 Downloading selected files:', selectedFiles.length);
-    setIsLoading(true);
+  const handleFileToggle = (file: GoogleDriveFile) => {
+    setSelectedFiles(prev =>
+      prev.some(f => f.id === file.id)
+        ? prev.filter(f => f.id !== file.id)
+        : [...prev, file]
+    );
+  };
+
+  const handlePOFileToggle = (file: GoogleDriveFile) => {
+    setSelectedPOFiles(prev =>
+      prev.some(f => f.id === file.id)
+        ? prev.filter(f => f.id !== file.id)
+        : [...prev, file]
+    );
+  };
+
+  const handleBulkProcess = async () => {
+    if (selectedPOFiles.length === 0) {
+      toast({
+        title: "No files selected",
+        description: "Please select PO files to process",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    console.log(`🚀 Starting bulk processing of ${selectedPOFiles.length} files...`);
+    setIsProcessing(true);
+    setProcessingResults([]);
     
     try {
-      const downloadedFiles: File[] = [];
+      toast({
+        title: "Processing Started",
+        description: `Processing ${selectedPOFiles.length} PO file(s)...`,
+      });
+
+      const results = [];
       
-      for (const file of selectedFiles) {
+      for (let i = 0; i < selectedPOFiles.length; i++) {
+        const file = selectedPOFiles[i];
+        console.log(`📄 Processing file ${i + 1}/${selectedPOFiles.length}: ${file.name}`);
+        
         try {
-          console.log('🔽 Downloading file:', file.name, 'Type:', file.mimeType);
-          
-          // Download directly from Google Drive API
+          // Download file data using the access token
+          const tokens = authService.getStoredTokens();
+          if (!tokens.accessToken) {
+            throw new Error('No access token found. Please reconnect to Google Drive.');
+          }
+
           const downloadUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`;
           const response = await fetch(downloadUrl, {
             headers: {
-              'Authorization': `Bearer ${accessToken}`
+              'Authorization': `Bearer ${tokens.accessToken}`
             }
           });
 
           if (!response.ok) {
-            throw new Error(`Failed to download ${file.name}: ${response.status}`);
+            throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
           }
 
           const arrayBuffer = await response.arrayBuffer();
           const blob = new Blob([arrayBuffer], { type: file.mimeType });
-          const downloadedFile = new File([blob], file.name, { type: file.mimeType });
+          const fileObject = new File([blob], file.name, { type: file.mimeType });
+
+          // Process with our dedicated PO service
+          const extractionResult = await extractPODataFromFile(fileObject);
+          console.log(`🔍 Extraction result for ${file.name}:`, extractionResult);
+
+          if (extractionResult.success && extractionResult.data) {
+            const result = {
+              fileName: file.name,
+              fileSize: file.size,
+              status: 'success',
+              data: extractionResult.data,
+              supabaseData: extractionResult.supabaseData,
+              processingTime: Date.now()
+            };
+            results.push(result);
+            console.log(`✅ Successfully processed: ${file.name}`);
+            
+            // Update results incrementally so user can see progress
+            setProcessingResults([...results]);
+          } else {
+            const errorResult = {
+              fileName: file.name,
+              fileSize: file.size,
+              status: 'error',
+              error: extractionResult.error || 'Failed to extract data',
+              processingTime: Date.now()
+            };
+            results.push(errorResult);
+            console.log(`❌ Failed to process: ${file.name}`, extractionResult.error);
+            
+            // Update results incrementally
+            setProcessingResults([...results]);
+          }
+        } catch (error) {
+          const errorResult = {
+            fileName: file.name,
+            fileSize: file.size,
+            status: 'error',
+            error: error instanceof Error ? error.message : 'Unknown error',
+            processingTime: Date.now()
+          };
+          results.push(errorResult);
+          console.error(`❌ Error processing ${file.name}:`, error);
           
-          downloadedFiles.push(downloadedFile);
-          console.log('✅ Successfully processed file:', downloadedFile.name, 'Size:', downloadedFile.size);
-        } catch (fileError) {
-          console.error(`❌ Error processing ${file.name}:`, fileError);
+          // Update results incrementally
+          setProcessingResults([...results]);
+        }
+      }
+
+      const successCount = results.filter(r => r.status === 'success').length;
+      const errorCount = results.filter(r => r.status === 'error').length;
+      
+      toast({
+        title: "Processing Complete",
+        description: `Successfully processed ${successCount} files. ${errorCount > 0 ? `${errorCount} errors.` : ''}`,
+        variant: errorCount > 0 ? "destructive" : "default"
+      });
+
+      console.log(`✅ Bulk processing complete. Success: ${successCount}, Errors: ${errorCount}`);
+
+    } catch (error) {
+      console.error(`❌ Bulk processing error:`, error);
+      toast({
+        title: "Processing Error",
+        description: error instanceof Error ? error.message : "Failed to process files",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleBulkSaveToDatabase = async () => {
+    const successfulResults = processingResults.filter(r => r.status === 'success' && r.supabaseData);
+    
+    if (successfulResults.length === 0) {
+      toast({
+        title: "No data to save",
+        description: "No successfully processed files with valid data",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      console.log('Saving multiple PO records to Supabase po_table:', successfulResults.length);
+      
+      const dataToInsert = successfulResults.map(result => result.supabaseData);
+      
+      const { data, error } = await supabase
+        .from('po_table')
+        .insert(dataToInsert)
+        .select();
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Success!",
+        description: `Saved ${successfulResults.length} PO records to database successfully`,
+      });
+
+      console.log('Successfully saved to po_table:', data);
+    } catch (error) {
+      console.error('Error saving to Supabase:', error);
+      toast({
+        title: "Save failed",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const importFiles = async () => {
+    if (selectedFiles.length === 0) {
+      toast({
+        title: "No files selected",
+        description: "Please select files to import.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const filesToDownload = [...selectedFiles]; // Copy selectedFiles to avoid modifying the original array
+      const downloadedFilesData: File[] = [];
+
+      for (const file of filesToDownload) {
+        try {
+          const tokens = authService.getStoredTokens();
+          if (!tokens.accessToken) {
+            throw new Error('No access token found. Please reconnect to Google Drive.');
+          }
+
+          const downloadUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`;
+          const response = await fetch(downloadUrl, {
+            headers: {
+              'Authorization': `Bearer ${tokens.accessToken}`
+            }
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
+          }
+
+          const arrayBuffer = await response.arrayBuffer();
+          const blob = new Blob([arrayBuffer], { type: file.mimeType });
+          const fileObject = new File([blob], file.name, { type: file.mimeType });
+
+          downloadedFilesData.push(fileObject);
+          console.log(`✅ Downloaded file: ${file.name}, size: ${fileObject.size} bytes, type: ${fileObject.type}`);
+
+        } catch (downloadError) {
+          console.error(`❌ Error downloading file ${file.name}:`, downloadError);
           toast({
             title: "File Download Error",
-            description: `Failed to download ${file.name}: ${fileError.message}`,
-            variant: "destructive"
+            description: `Failed to download ${file.name}: ${downloadError instanceof Error ? downloadError.message : 'Unknown error'}`,
+            variant: "destructive",
           });
         }
       }
-      
-      if (downloadedFiles.length > 0) {
-        console.log('✅ All files processed successfully:', downloadedFiles.length);
-        setDownloadedFiles(downloadedFiles);
-        onFilesSelected(downloadedFiles);
-        
-        toast({
-          title: "Success",
-          description: `${downloadedFiles.length} files imported successfully and ready for processing`
-        });
-      } else {
-        toast({
-          title: "No Files Imported",
-          description: "All file downloads failed. Please try again.",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error('❌ Import failed:', error);
+
+      setDownloadedFiles(downloadedFilesData);
+      setSelectedFiles([]); // Clear selected files after successful download
       toast({
-        title: "Import failed",
-        description: "Failed to import files",
-        variant: "destructive"
+        title: "Files Downloaded",
+        description: `Successfully prepared ${downloadedFilesData.length} files for processing.`,
+      });
+
+    } catch (error) {
+      console.error("Error during file import:", error);
+      toast({
+        title: "Import Error",
+        description: error instanceof Error ? error.message : "Failed to import files.",
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleRefresh = () => {
-    console.log('Refreshing Google Drive files...');
-    if (accessToken) {
-      loadGoogleDriveFiles(accessToken);
-    }
-  };
-
   const handleProcessingComplete = (results: any[]) => {
-    console.log('Processing completed with results:', results.length);
-    setDownloadedFiles([]);
-    setSelectedFiles([]);
+    console.log('Processing complete with results:', results);
+    // Results are already being handled in the processing loop
   };
-
-  const handleCloseProcessing = () => {
-    console.log('Closing processing section');
-    setDownloadedFiles([]);
-    setSelectedFiles([]);
-  };
-
-  if (!isConnected) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 space-y-4">
-        <div className="text-center space-y-2">
-          <h3 className="text-lg font-medium">Connect Google Drive</h3>
-          <p className="text-sm text-muted-foreground">Access files from your Google Drive</p>
-          <p className="text-xs text-green-600 bg-green-50 p-2 rounded">
-            Using fixed redirect URI: https://lovable.app/oauth/callback
-          </p>
-        </div>
-        <Button onClick={() => setShowAuthDialog(true)} className="gap-2">
-          <svg className="w-4 h-4" viewBox="0 0 24 24">
-            <path fill="currentColor" d="M6.28 3l5.72 10 5.72-10zm11.44 1l-5.72 10 2.86 5h5.72zm-17.44 0l2.86 5h11.44l-2.86-5zm2.86 7l2.86 5 2.86-5z"/>
-          </svg>
-          Connect Google Drive
-        </Button>
-        
-        <CompactAuthDialog
-          isOpen={showAuthDialog}
-          onClose={() => setShowAuthDialog(false)}
-          title="Google Drive"
-          description="Authenticate with your Google account to access your files"
-          isConnecting={isConnecting}
-          isConnected={isConnected}
-          onConnect={handleGoogleAuth}
-          onDisconnect={handleDisconnect}
-          error={authError}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4">
-      <ConnectionStatus
+      <ConnectionStatus 
         isConnected={isConnected}
-        isLoading={isLoading}
-        onRefresh={handleRefresh}
+        onConnect={handleConnect}
         onDisconnect={handleDisconnect}
-      />
-
-      <FileBrowser
-        files={files}
-        selectedFiles={selectedFiles}
+        onLoadFiles={loadFiles}
         isLoading={isLoading}
-        onFileToggle={toggleFileSelection}
-        onImportFiles={downloadSelectedFiles}
       />
-
-      <ProcessingSection
-        downloadedFiles={downloadedFiles}
-        onProcessingComplete={handleProcessingComplete}
-        onClose={handleCloseProcessing}
-      />
+      
+      {isConnected && (
+        <FileBrowser
+          files={files}
+          selectedFiles={selectedFiles}
+          selectedPOFiles={selectedPOFiles}
+          isLoading={isLoading}
+          onFileToggle={handleFileToggle}
+          onPOFileToggle={handlePOFileToggle}
+          onImportFiles={importFiles}
+          onBulkProcess={handleBulkProcess}
+          onBulkSaveToDatabase={handleBulkSaveToDatabase}
+          isProcessing={isProcessing}
+          processingResults={processingResults}
+        />
+      )}
+      
+      {downloadedFiles.length > 0 && (
+        <ProcessingSection
+          downloadedFiles={downloadedFiles}
+          onProcessingComplete={handleProcessingComplete}
+          onClose={() => setDownloadedFiles([])}
+        />
+      )}
     </div>
   );
 };
