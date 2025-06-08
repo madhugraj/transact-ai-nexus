@@ -149,13 +149,6 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         />
         <Controls 
           className="bg-white shadow-lg border border-gray-200 rounded-lg"
-          style={{
-            button: {
-              backgroundColor: 'white',
-              border: '1px solid #e2e8f0',
-              color: '#64748b'
-            }
-          }}
         />
       </ReactFlow>
     </div>
