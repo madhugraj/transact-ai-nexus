@@ -19,6 +19,7 @@ export class WorkflowEngine {
     const errors: string[] = [];
     
     console.log('🔍 Validating workflow requirements for:', workflow.name);
+    console.log('📋 Workflow steps:', workflow.steps.map(s => ({ name: s.name, type: s.type })));
     
     // Check if any step needs Gmail authentication
     const needsGmailAuth = workflow.steps.some(step => 
@@ -33,11 +34,13 @@ export class WorkflowEngine {
       step.type === 'data-source' && step.name.toLowerCase().includes('drive')
     );
     
+    console.log('🔐 Authentication requirements:', { needsGmailAuth, needsDriveAuth });
+    
     if (needsGmailAuth) {
-      console.log('📧 Workflow requires Gmail authentication');
-      // Check both storage keys for Gmail tokens
+      console.log('📧 Checking Gmail authentication...');
       const gmailTokens = localStorage.getItem('gmail_auth_tokens');
       const hasGmailTokens = gmailTokens && JSON.parse(gmailTokens).accessToken;
+      console.log('📧 Gmail tokens status:', { hasTokens: !!hasGmailTokens });
       
       if (!hasGmailTokens) {
         errors.push('Gmail authentication required. Please connect your Gmail account.');
@@ -45,16 +48,17 @@ export class WorkflowEngine {
     }
     
     if (needsDriveAuth) {
-      console.log('📁 Workflow requires Drive authentication');
+      console.log('📁 Checking Drive authentication...');
       const driveTokens = localStorage.getItem('google_auth_tokens');
       const hasDriveTokens = driveTokens && JSON.parse(driveTokens).accessToken;
+      console.log('📁 Drive tokens status:', { hasTokens: !!hasDriveTokens });
       
       if (!hasDriveTokens) {
         errors.push('Google Drive authentication required. Please connect your Drive account.');
       }
     }
     
-    console.log('✅ Validation complete. Errors:', errors.length);
+    console.log('✅ Validation complete. Valid:', errors.length === 0, 'Errors:', errors);
     
     return {
       valid: errors.length === 0,
@@ -63,8 +67,11 @@ export class WorkflowEngine {
   }
 
   async executeWorkflow(workflow: WorkflowConfig): Promise<WorkflowExecution> {
+    console.log('🚀 Starting workflow execution:', workflow.name);
+    
     const validation = await this.validateWorkflowRequirements(workflow);
     if (!validation.valid) {
+      console.error('❌ Workflow validation failed:', validation.errors);
       throw new Error(`Workflow validation failed:\n${validation.errors.join('\n')}`);
     }
 
@@ -79,16 +86,21 @@ export class WorkflowEngine {
     };
 
     this.executions.set(execution.id, execution);
+    console.log('📊 Created execution:', execution.id);
 
     try {
-      console.log(`🚀 Starting workflow execution: ${workflow.name}`);
+      console.log('🔄 Executing', workflow.steps.length, 'steps...');
       
       for (const step of workflow.steps) {
+        console.log('🎯 Executing step:', step.name, '(', step.type, ')');
         await this.executeStep(step, execution);
       }
       
       execution.status = 'completed';
       execution.endTime = new Date();
+      
+      console.log('✅ Workflow completed successfully in', 
+        Math.round((execution.endTime.getTime() - execution.startTime.getTime()) / 1000), 'seconds');
       
       toast({
         title: "Workflow Completed",
@@ -100,6 +112,8 @@ export class WorkflowEngine {
       execution.status = 'failed';
       execution.endTime = new Date();
       execution.errors?.push(error instanceof Error ? error.message : 'Unknown error');
+      
+      console.error('❌ Workflow failed:', error);
       
       toast({
         title: "Workflow Failed",
@@ -122,21 +136,34 @@ export class WorkflowEngine {
     execution.currentStepId = step.id;
 
     try {
-      console.log(`🔄 Executing step: ${step.name}`);
+      console.log('⚙️ Processing step:', step.name);
       
-      let output: any = { message: `Executed ${step.name}`, success: true };
+      // Simulate different processing times based on step type
+      let processingTime = 500;
+      if (step.type === 'document-processing') processingTime = 1000;
+      if (step.type === 'analytics') processingTime = 800;
       
-      await new Promise(resolve => setTimeout(resolve, 500));
+      let output: any = { 
+        message: `Successfully executed ${step.name}`, 
+        success: true,
+        stepType: step.type,
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log('⏱️ Simulating processing for', processingTime, 'ms...');
+      await new Promise(resolve => setTimeout(resolve, processingTime));
       
       stepResult.status = 'completed';
       stepResult.endTime = new Date();
       stepResult.output = output;
-
+      
+      console.log('✅ Step completed:', step.name);
       return output;
     } catch (error) {
       stepResult.status = 'failed';
       stepResult.endTime = new Date();
       stepResult.error = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ Step failed:', step.name, error);
       throw error;
     }
   }

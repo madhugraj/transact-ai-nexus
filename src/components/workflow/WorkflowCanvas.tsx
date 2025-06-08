@@ -42,20 +42,33 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   const { deleteElements } = useReactFlow();
 
   const handleStepUpdate = useCallback((updatedStep: WorkflowStep) => {
+    console.log('📝 Updating step:', updatedStep.name);
     const newSteps = steps.map(s => s.id === updatedStep.id ? updatedStep : s);
     onStepsChange(newSteps);
   }, [steps, onStepsChange]);
 
   const handleStepDelete = useCallback((stepId: string) => {
-    // Remove the step
+    console.log('🗑️ Deleting step with ID:', stepId);
+    
+    // Remove the step from the steps array
     const newSteps = steps.filter(s => s.id !== stepId);
+    console.log('📊 Steps before deletion:', steps.length, 'After deletion:', newSteps.length);
     onStepsChange(newSteps);
     
     // Remove connections involving this step
     const newConnections = connections.filter(c => 
       c.sourceStepId !== stepId && c.targetStepId !== stepId
     );
+    console.log('🔗 Connections before deletion:', connections.length, 'After deletion:', newConnections.length);
     onConnectionsChange(newConnections);
+    
+    // Also remove from React Flow state
+    const nodeToDelete = nodes.find(n => n.id === stepId);
+    if (nodeToDelete) {
+      console.log('🎯 Removing node from React Flow:', nodeToDelete.id);
+      setNodes(prevNodes => prevNodes.filter(n => n.id !== stepId));
+      setEdges(prevEdges => prevEdges.filter(e => e.source !== stepId && e.target !== stepId));
+    }
   }, [steps, connections, onStepsChange, onConnectionsChange]);
 
   // Convert workflow steps to React Flow nodes
@@ -91,6 +104,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
 
   // Update nodes when steps change
   React.useEffect(() => {
+    console.log('🔄 Steps changed, updating nodes. Steps count:', steps.length);
     const updatedNodes = steps.map((step, index) => ({
       id: step.id || index.toString(),
       type: 'workflowStep',
@@ -112,6 +126,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     (params: Connection) => {
       if (!isEditable) return;
       
+      console.log('🔗 Creating connection:', params);
       const newEdge = addEdge({
         ...params,
         type: 'smoothstep',
@@ -136,6 +151,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     (event: any, node: Node) => {
       if (!isEditable) return;
       
+      console.log('🎯 Node dragged:', node.id, 'to position:', node.position);
       const updatedSteps = steps.map(step => 
         step.id === node.id 
           ? { ...step, position: node.position }
@@ -150,6 +166,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     (edgesToDelete: Edge[]) => {
       if (!isEditable) return;
       
+      console.log('🗑️ Deleting edges:', edgesToDelete.map(e => e.id));
       const edgeIdsToDelete = edgesToDelete.map(edge => edge.id);
       const newConnections = connections.filter(conn => 
         !edgeIdsToDelete.includes(conn.id)
@@ -157,6 +174,19 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
       onConnectionsChange(newConnections);
     },
     [connections, onConnectionsChange, isEditable]
+  );
+
+  // Handle keyboard deletion
+  const onNodesDelete = useCallback(
+    (nodesToDelete: Node[]) => {
+      if (!isEditable) return;
+      
+      console.log('⌨️ Keyboard delete triggered for nodes:', nodesToDelete.map(n => n.id));
+      nodesToDelete.forEach(node => {
+        handleStepDelete(node.id);
+      });
+    },
+    [isEditable, handleStepDelete]
   );
 
   return (
@@ -169,6 +199,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         onConnect={onConnect}
         onNodeDragStop={onNodeDragStop}
         onEdgesDelete={onEdgesDelete}
+        onNodesDelete={onNodesDelete}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{
