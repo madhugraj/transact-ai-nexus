@@ -4,9 +4,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Eye, Download, X, Brain } from 'lucide-react';
 import DocumentPreview from '@/components/ingestion/DocumentPreview';
-import { extractTablesFromImage } from '@/services/api/geminiService';
 import { useToast } from '@/hooks/use-toast';
 import { GoogleAuthService } from '@/services/auth/googleAuthService';
+import { extractPODataFromFile } from '@/services/api/poProcessingService';
+import PODataDisplay from './PODataDisplay';
 
 interface POFile {
   id: string;
@@ -99,30 +100,12 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
         type: fileObject.type
       });
 
-      // Process with Gemini
-      const result = await extractTablesFromImage(fileObject, `
-        Extract Purchase Order (PO) data from this document. Return structured JSON with:
-        {
-          "po_number": "PO number",
-          "vendor": "Vendor name", 
-          "date": "PO date",
-          "total_amount": "Total amount",
-          "items": [
-            {
-              "description": "Item description",
-              "quantity": "Quantity", 
-              "unit_price": "Unit price",
-              "total": "Line total"
-            }
-          ],
-          "shipping_address": "Shipping address",
-          "billing_address": "Billing address"
-        }
-      `);
+      // Process with our dedicated PO service
+      const result = await extractPODataFromFile(fileObject);
 
-      console.log('🔍 Gemini processing result:', result);
+      console.log('🔍 PO processing result:', result);
 
-      if (result.success) {
+      if (result.success && result.data) {
         setProcessingResult(result.data);
         toast({
           title: "Processing Complete",
@@ -260,14 +243,7 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
               </div>
 
               {processingResult ? (
-                <div className="space-y-3">
-                  <div className="bg-green-50 border border-green-200 rounded p-3">
-                    <h4 className="font-medium text-green-800 mb-2">Extracted PO Data:</h4>
-                    <pre className="text-xs text-green-700 whitespace-pre-wrap overflow-auto max-h-96">
-                      {JSON.stringify(processingResult, null, 2)}
-                    </pre>
-                  </div>
-                </div>
+                <PODataDisplay poData={processingResult} fileName={file.name} />
               ) : (
                 <div className="text-center text-muted-foreground py-8">
                   <Brain className="h-12 w-12 mx-auto mb-2 text-muted-foreground/50" />
