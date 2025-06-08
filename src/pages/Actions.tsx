@@ -6,8 +6,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { PlayCircle, Plus, Settings, BarChart3 } from "lucide-react";
+import { PlayCircle, Plus, Settings, BarChart3, Edit } from "lucide-react";
 import WorkflowCanvas from "@/components/workflow/WorkflowCanvas";
+import { WorkflowConfigDialog } from "@/components/workflow/WorkflowConfigDialog";
 import { WorkflowEngine } from "@/services/workflow/WorkflowEngine";
 import { workflowTemplates } from "@/data/workflowTemplates";
 import { WorkflowConfig, WorkflowTemplate, WorkflowStep, WorkflowConnection } from "@/types/workflow";
@@ -16,8 +17,10 @@ const Actions = () => {
   const [activeTab, setActiveTab] = useState("workflows");
   const [workflows, setWorkflows] = useState<WorkflowConfig[]>([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowConfig | null>(null);
+  const [selectedStep, setSelectedStep] = useState<WorkflowStep | null>(null);
   const [showWorkflowDialog, setShowWorkflowDialog] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [showConfigDialog, setShowConfigDialog] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionResults, setExecutionResults] = useState<any>(null);
   const { toast } = useToast();
@@ -104,6 +107,20 @@ const Actions = () => {
     }
   };
 
+  const handleStepDoubleClick = (step: WorkflowStep) => {
+    setSelectedStep(step);
+    setShowConfigDialog(true);
+  };
+
+  const handleStepConfigSave = (updatedStep: WorkflowStep) => {
+    if (selectedWorkflow) {
+      const updatedSteps = selectedWorkflow.steps.map(s => 
+        s.id === updatedStep.id ? updatedStep : s
+      );
+      handleStepsChange(updatedSteps);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -145,7 +162,7 @@ const Actions = () => {
                               setShowWorkflowDialog(true);
                             }}
                           >
-                            <Settings className="h-4 w-4" />
+                            <Edit className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -240,6 +257,16 @@ const Actions = () => {
                       `${Math.round((new Date(executionResults.endTime).getTime() - new Date(executionResults.startTime).getTime()) / 1000)}s` 
                       : 'Running...'
                     }</div>
+                    {executionResults.errors && executionResults.errors.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="font-medium text-red-600">Errors:</h4>
+                        <ul className="list-disc list-inside text-sm text-red-600">
+                          {executionResults.errors.map((error: string, index: number) => (
+                            <li key={index}>{error}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -294,23 +321,47 @@ const Actions = () => {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <p className="text-muted-foreground">{selectedWorkflow.description}</p>
-                  <Button
-                    onClick={() => executeWorkflow(selectedWorkflow)}
-                    disabled={isExecuting}
-                    className="gap-2"
-                  >
-                    <PlayCircle className="h-4 w-4" />
-                    {isExecuting ? 'Executing...' : 'Run Workflow'}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        // Double-click any step to configure
+                        if (selectedWorkflow.steps.length > 0) {
+                          handleStepDoubleClick(selectedWorkflow.steps[0]);
+                        }
+                      }}
+                    >
+                      <Settings className="h-4 w-4 mr-2" />
+                      Configure Steps
+                    </Button>
+                    <Button
+                      onClick={() => executeWorkflow(selectedWorkflow)}
+                      disabled={isExecuting}
+                      className="gap-2"
+                    >
+                      <PlayCircle className="h-4 w-4" />
+                      {isExecuting ? 'Executing...' : 'Run Workflow'}
+                    </Button>
+                  </div>
                 </div>
                 
-                <WorkflowCanvas
-                  steps={selectedWorkflow.steps}
-                  connections={selectedWorkflow.connections}
-                  onStepsChange={handleStepsChange}
-                  onConnectionsChange={handleConnectionsChange}
-                  isEditable={true}
-                />
+                <div onDoubleClick={() => {
+                  if (selectedWorkflow.steps.length > 0) {
+                    handleStepDoubleClick(selectedWorkflow.steps[0]);
+                  }
+                }}>
+                  <WorkflowCanvas
+                    steps={selectedWorkflow.steps}
+                    connections={selectedWorkflow.connections}
+                    onStepsChange={handleStepsChange}
+                    onConnectionsChange={handleConnectionsChange}
+                    isEditable={true}
+                  />
+                </div>
+                
+                <div className="text-sm text-muted-foreground">
+                  💡 Tip: Double-click on any step in the workflow to configure its settings
+                </div>
               </div>
             )}
           </DialogContent>
@@ -348,6 +399,17 @@ const Actions = () => {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Step Configuration Dialog */}
+        <WorkflowConfigDialog
+          step={selectedStep}
+          isOpen={showConfigDialog}
+          onClose={() => {
+            setShowConfigDialog(false);
+            setSelectedStep(null);
+          }}
+          onSave={handleStepConfigSave}
+        />
       </div>
     </AppLayout>
   );

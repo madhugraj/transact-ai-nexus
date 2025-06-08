@@ -25,19 +25,28 @@ interface WorkflowNodeData {
 const getStepIcon = (type: string) => {
   switch (type) {
     case 'data-source':
+    case 'document-source':
+    case 'document_source':
       return <Mail className="h-4 w-4" />;
     case 'document-processing':
       return <FileText className="h-4 w-4" />;
     case 'data-storage':
+    case 'database_storage':
       return <Database className="h-4 w-4" />;
     case 'analytics':
       return <BarChart3 className="h-4 w-4" />;
     case 'notification':
+    case 'approval_notification':
       return <Bell className="h-4 w-4" />;
     case 'conditional':
+    case 'comparison':
+    case 'document_comparison':
       return <GitBranch className="h-4 w-4" />;
     case 'parallel':
       return <Zap className="h-4 w-4" />;
+    case 'report-generation':
+    case 'report_generation':
+      return <BarChart3 className="h-4 w-4" />;
     default:
       return <Settings className="h-4 w-4" />;
   }
@@ -46,16 +55,24 @@ const getStepIcon = (type: string) => {
 const getStepColor = (type: string) => {
   switch (type) {
     case 'data-source':
+    case 'document-source':
+    case 'document_source':
       return 'bg-blue-100 border-blue-300';
     case 'document-processing':
       return 'bg-green-100 border-green-300';
     case 'data-storage':
+    case 'database_storage':
       return 'bg-purple-100 border-purple-300';
     case 'analytics':
+    case 'report-generation':
+    case 'report_generation':
       return 'bg-orange-100 border-orange-300';
     case 'notification':
+    case 'approval_notification':
       return 'bg-yellow-100 border-yellow-300';
     case 'conditional':
+    case 'comparison':
+    case 'document_comparison':
       return 'bg-red-100 border-red-300';
     default:
       return 'bg-gray-100 border-gray-300';
@@ -83,7 +100,7 @@ export const WorkflowNode: React.FC<NodeProps<WorkflowNodeData>> = ({ data }) =>
         <CardContent className="pt-0">
           <div className="space-y-2">
             <Badge variant="secondary" className="text-xs">
-              {step.type.replace('-', ' ')}
+              {step.type.replace('-', ' ').replace('_', ' ')}
             </Badge>
             {step.description && (
               <p className="text-xs text-muted-foreground line-clamp-2">
@@ -92,11 +109,14 @@ export const WorkflowNode: React.FC<NodeProps<WorkflowNodeData>> = ({ data }) =>
             )}
             {step.config && Object.keys(step.config).length > 0 && (
               <div className="text-xs text-muted-foreground">
-                {Object.keys(step.config).map(key => (
-                  <div key={key} className="truncate">
-                    {key}: {JSON.stringify(step.config[key as keyof typeof step.config]).slice(0, 20)}...
-                  </div>
-                ))}
+                {Object.keys(step.config).map(key => {
+                  if (key === 'x' || key === 'y' || key === 'connectedTo') return null;
+                  return (
+                    <div key={key} className="truncate">
+                      {key}: {JSON.stringify(step.config[key as keyof typeof step.config])?.slice(0, 20)}...
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

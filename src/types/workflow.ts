@@ -9,10 +9,24 @@ export type WorkflowStepType =
   | "notification"         // Send notifications
   | "conditional"          // Conditional logic
   | "parallel"             // Parallel processing
-  | "custom";              // Custom step
+  | "custom"               // Custom step
+  // Legacy types for compatibility
+  | "document-source"
+  | "comparison"
+  | "report-generation"
+  | "document_source"
+  | "document_comparison"
+  | "report_generation"
+  | "approval_notification"
+  | "database_storage";
 
 // Enhanced step configuration
 export interface WorkflowStepConfig {
+  // Position for react-flow compatibility
+  x?: number;
+  y?: number;
+  connectedTo?: string[];
+  
   // Data source configurations
   emailConfig?: {
     source: 'gmail' | 'outlook';
@@ -118,6 +132,9 @@ export interface WorkflowStepResult {
   error?: string;
   metadata?: Record<string, any>;
 }
+
+// Alias for compatibility
+export type WorkflowExecutionResult = WorkflowExecution;
 
 // Template workflows
 export interface WorkflowTemplate {

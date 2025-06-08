@@ -10,7 +10,8 @@ import {
   useEdgesState,
   addEdge,
   Connection,
-  NodeTypes
+  NodeTypes,
+  BackgroundVariant
 } from '@xyflow/react';
 import { WorkflowStep, WorkflowConnection } from '@/types/workflow';
 import { WorkflowNode } from './WorkflowNode';
@@ -94,7 +95,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         fitView
         attributionPosition="bottom-left"
       >
-        <Background variant="dots" gap={20} size={1} />
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
         <Controls />
       </ReactFlow>
     </div>
