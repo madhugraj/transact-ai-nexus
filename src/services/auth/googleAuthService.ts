@@ -106,26 +106,12 @@ export class GoogleAuthService {
     return data.files || [];
   }
 
-  // Get the correct redirect URI - Use current domain
-  private getRedirectUri(): string {
-    const currentDomain = window.location.origin;
-    const redirectUri = `${currentDomain}/oauth/callback`;
-    
-    console.log('🔧 Using current domain redirect URI:', redirectUri);
-    
-    return redirectUri;
-  }
-
-  // Create auth URL for popup with current domain
-  createAuthUrl(): string {
+  // Create auth URL for popup with proper redirect URI
+  private createAuthUrl(): string {
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    const redirectUri = this.getRedirectUri();
+    const redirectUri = `${window.location.origin}/oauth/callback`;
     
-    console.log('🔧 Creating auth URL with current domain config:', {
-      clientId: this.config.clientId,
-      redirectUri: redirectUri,
-      scopes: this.config.scopes.join(' ')
-    });
+    console.log('🔧 Creating auth URL with redirect URI:', redirectUri);
     
     authUrl.searchParams.set('client_id', this.config.clientId);
     authUrl.searchParams.set('response_type', 'code');
@@ -138,18 +124,17 @@ export class GoogleAuthService {
     authUrl.searchParams.set('state', Math.random().toString(36).substring(2, 15));
     
     const finalUrl = authUrl.toString();
-    console.log('🔧 Generated auth URL with current domain:', finalUrl);
+    console.log('🔧 Generated auth URL:', finalUrl);
     
     return finalUrl;
   }
 
-  // Simplified popup-based authentication using postMessage
+  // Popup-based authentication using proper redirect
   async authenticateWithPopup(): Promise<AuthResult> {
     console.log('🚀 Starting popup authentication...');
     
     return new Promise((resolve) => {
-      // Create a simplified auth URL that redirects to a data URL with postMessage
-      const authUrl = this.createSimpleAuthUrl();
+      const authUrl = this.createAuthUrl();
       
       console.log('🔗 Opening popup with URL:', authUrl);
       
@@ -181,31 +166,48 @@ export class GoogleAuthService {
         });
         
         // Check if this is our OAuth response
-        if (event.data && typeof event.data === 'object' && event.data.type === 'GOOGLE_AUTH') {
-          messageReceived = true;
-          console.log('✅ Valid OAuth message received');
-          
-          // Clean up
-          window.removeEventListener('message', messageListener);
-          if (checkClosedInterval) {
-            clearInterval(checkClosedInterval);
-          }
-          
-          // Close popup
-          if (popup && !popup.closed) {
-            popup.close();
-          }
-          
-          if (event.data.success && event.data.accessToken) {
-            console.log('🔄 OAuth success, storing tokens...');
-            this.storeTokens(event.data.accessToken, event.data.refreshToken);
-            resolve({
-              success: true,
-              accessToken: event.data.accessToken,
-              refreshToken: event.data.refreshToken
+        if (event.data && typeof event.data === 'object') {
+          if (event.data.type === 'OAUTH_SUCCESS' && event.data.code) {
+            messageReceived = true;
+            console.log('✅ OAuth success message received');
+            
+            // Clean up
+            window.removeEventListener('message', messageListener);
+            if (checkClosedInterval) {
+              clearInterval(checkClosedInterval);
+            }
+            
+            // Close popup
+            if (popup && !popup.closed) {
+              popup.close();
+            }
+            
+            // Exchange code for tokens
+            this.exchangeCodeForTokens(event.data.code).then((tokenResult) => {
+              if (tokenResult.success) {
+                resolve(tokenResult);
+              } else {
+                resolve({ success: false, error: tokenResult.error });
+              }
+            }).catch((error) => {
+              resolve({ success: false, error: error.message });
             });
-          } else {
+            
+          } else if (event.data.type === 'OAUTH_ERROR') {
+            messageReceived = true;
             console.error('❌ OAuth error:', event.data.error);
+            
+            // Clean up
+            window.removeEventListener('message', messageListener);
+            if (checkClosedInterval) {
+              clearInterval(checkClosedInterval);
+            }
+            
+            // Close popup
+            if (popup && !popup.closed) {
+              popup.close();
+            }
+            
             resolve({ success: false, error: event.data.error || 'Authentication failed' });
           }
         }
@@ -250,16 +252,50 @@ export class GoogleAuthService {
     });
   }
 
-  // Create a simple auth URL that will work with the Google API directly
-  private createSimpleAuthUrl(): string {
-    const params = new URLSearchParams({
-      client_id: this.config.clientId,
-      response_type: 'token',  // Use implicit flow for simplicity
-      scope: this.config.scopes.join(' '),
-      redirect_uri: 'urn:ietf:wg:oauth:2.0:oob',  // Use out-of-band flow
-      state: Math.random().toString(36).substring(2, 15)
-    });
+  // Exchange authorization code for access tokens
+  private async exchangeCodeForTokens(code: string): Promise<AuthResult> {
+    try {
+      console.log('🔄 Exchanging code for tokens...');
+      
+      const tokenUrl = 'https://oauth2.googleapis.com/token';
+      const redirectUri = `${window.location.origin}/oauth/callback`;
+      
+      const response = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          code: code,
+          client_id: this.config.clientId,
+          client_secret: '', // We'll need this from environment
+          redirect_uri: redirectUri,
+          grant_type: 'authorization_code',
+        }),
+      });
 
-    return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('❌ Token exchange failed:', errorData);
+        throw new Error(`Token exchange failed: ${response.status} ${response.statusText}`);
+      }
+
+      const tokenData = await response.json();
+      console.log('✅ Token exchange successful');
+      
+      this.storeTokens(tokenData.access_token, tokenData.refresh_token);
+      
+      return {
+        success: true,
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token
+      };
+    } catch (error) {
+      console.error('❌ Error exchanging code for tokens:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to exchange code for tokens'
+      };
+    }
   }
 }
