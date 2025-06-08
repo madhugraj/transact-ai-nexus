@@ -1,10 +1,10 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import ProcessingStats from './processing/ProcessingStats';
 import { Loader, Play, X } from 'lucide-react';
-import { useAgentProcessing } from '@/hooks/useAgentProcessing';
+import { extractTablesFromImage } from '@/services/api/geminiService';
 
 interface ProcessingSectionProps {
   downloadedFiles: File[];
@@ -13,45 +13,103 @@ interface ProcessingSectionProps {
 }
 
 const ProcessingSection = ({ downloadedFiles, onProcessingComplete, onClose }: ProcessingSectionProps) => {
+  const [isProcessing, setIsProcessing] = React.useState(false);
+  const [processingResults, setProcessingResults] = React.useState<any[]>([]);
   const { toast } = useToast();
-  const {
-    isProcessing,
-    processingComplete,
-    processingResults,
-    startProcessing
-  } = useAgentProcessing();
 
   if (downloadedFiles.length === 0) return null;
 
   const processPOFiles = async () => {
-    console.log(`🚀 Starting to process ${downloadedFiles.length} files...`);
+    console.log(`🚀 Starting bulk processing of ${downloadedFiles.length} files...`);
+    setIsProcessing(true);
+    setProcessingResults([]);
     
     try {
       toast({
         title: "Processing Started",
-        description: `Processing ${downloadedFiles.length} PO file(s)...`,
+        description: `Processing ${downloadedFiles.length} PO file(s) with Gemini AI...`,
       });
 
-      // Use the agent processing system directly
-      await startProcessing(downloadedFiles);
+      const results = [];
       
-      if (processingResults) {
-        console.log(`📊 Processing results:`, processingResults);
-        onProcessingComplete(processingResults);
+      for (let i = 0; i < downloadedFiles.length; i++) {
+        const file = downloadedFiles[i];
+        console.log(`📄 Processing file ${i + 1}/${downloadedFiles.length}: ${file.name}`);
         
-        toast({
-          title: "Processing Complete",
-          description: `Successfully processed ${downloadedFiles.length} file(s)`,
-        });
+        try {
+          // Use Gemini to extract PO data
+          const extractionResult = await extractTablesFromImage(file, `
+            Extract Purchase Order (PO) data from this document. Return structured JSON with:
+            {
+              "po_number": "PO number",
+              "vendor": "Vendor name",
+              "date": "PO date",
+              "total_amount": "Total amount",
+              "items": [
+                {
+                  "description": "Item description",
+                  "quantity": "Quantity",
+                  "unit_price": "Unit price",
+                  "total": "Line total"
+                }
+              ],
+              "shipping_address": "Shipping address",
+              "billing_address": "Billing address"
+            }
+          `);
+
+          if (extractionResult.success && extractionResult.data) {
+            results.push({
+              fileName: file.name,
+              fileSize: file.size,
+              status: 'success',
+              data: extractionResult.data,
+              processingTime: Date.now()
+            });
+            console.log(`✅ Successfully processed: ${file.name}`);
+          } else {
+            results.push({
+              fileName: file.name,
+              fileSize: file.size,
+              status: 'error',
+              error: extractionResult.error || 'Failed to extract data',
+              processingTime: Date.now()
+            });
+            console.log(`❌ Failed to process: ${file.name}`);
+          }
+        } catch (error) {
+          results.push({
+            fileName: file.name,
+            fileSize: file.size,
+            status: 'error',
+            error: error instanceof Error ? error.message : 'Unknown error',
+            processingTime: Date.now()
+          });
+          console.error(`❌ Error processing ${file.name}:`, error);
+        }
       }
 
+      setProcessingResults(results);
+      onProcessingComplete(results);
+      
+      const successCount = results.filter(r => r.status === 'success').length;
+      const errorCount = results.filter(r => r.status === 'error').length;
+      
+      toast({
+        title: "Processing Complete",
+        description: `Processed ${successCount} files successfully. ${errorCount > 0 ? `${errorCount} errors.` : ''}`,
+        variant: errorCount > 0 ? "destructive" : "default"
+      });
+
     } catch (error) {
-      console.error(`❌ Processing error:`, error);
+      console.error(`❌ Bulk processing error:`, error);
       toast({
         title: "Processing Error",
         description: error instanceof Error ? error.message : "Failed to process files",
         variant: "destructive"
       });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -61,7 +119,7 @@ const ProcessingSection = ({ downloadedFiles, onProcessingComplete, onClose }: P
         <div>
           <h3 className="font-medium text-sm">Ready to Process</h3>
           <p className="text-xs text-muted-foreground">
-            {downloadedFiles.length} file{downloadedFiles.length !== 1 ? 's' : ''} ready for PO analysis
+            {downloadedFiles.length} file{downloadedFiles.length !== 1 ? 's' : ''} ready for PO analysis with Gemini AI
           </p>
         </div>
         <div className="flex gap-2">
@@ -90,7 +148,7 @@ const ProcessingSection = ({ downloadedFiles, onProcessingComplete, onClose }: P
       </div>
 
       <ProcessingStats 
-        results={processingResults ? [processingResults] : []} 
+        results={processingResults} 
         isProcessing={isProcessing} 
       />
     </div>
