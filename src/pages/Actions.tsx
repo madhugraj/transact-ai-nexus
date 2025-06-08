@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,9 +57,14 @@ const Actions = () => {
     setWorkflows(prev => [...prev, workflow]);
     setShowTemplateDialog(false);
     
+    // Automatically select and open the new workflow for editing
+    setSelectedWorkflow(workflow);
+    setShowWorkflowDialog(true);
+    setActiveTab("workflows");
+    
     toast({
       title: "Workflow Created",
-      description: `${template.name} workflow has been created successfully.`
+      description: `${template.name} workflow has been created successfully. You can now configure the steps.`
     });
   };
 
@@ -255,6 +261,11 @@ const Actions = () => {
                           Success rate: {workflow.successRate}%
                         </div>
                       )}
+                      <div className="mt-2">
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          {workflow.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
                     </CardContent>
                   </Card>
                 ))}
@@ -376,7 +387,12 @@ const Actions = () => {
         <Dialog open={showWorkflowDialog} onOpenChange={setShowWorkflowDialog}>
           <DialogContent className="max-w-7xl max-h-[95vh] overflow-hidden">
             <DialogHeader>
-              <DialogTitle className="text-xl font-bold">{selectedWorkflow?.name}</DialogTitle>
+              <DialogTitle className="text-xl font-bold">
+                Configure Workflow: {selectedWorkflow?.name}
+              </DialogTitle>
+              <p className="text-sm text-muted-foreground">
+                Drag and drop components from the palette to build your workflow. Double-click steps to configure them.
+              </p>
             </DialogHeader>
             
             {selectedWorkflow && (

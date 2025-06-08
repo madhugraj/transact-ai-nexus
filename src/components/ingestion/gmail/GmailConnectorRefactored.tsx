@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { GoogleAuthService } from '@/services/auth/googleAuthService';
 import CompactAuthDialog from '@/components/auth/CompactAuthDialog';
@@ -23,6 +24,7 @@ interface GmailConnectorProps {
 }
 
 const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => {
+  const navigate = useNavigate();
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
@@ -86,8 +88,13 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
         
         toast({
           title: "Connected to Gmail",
-          description: "Successfully authenticated with your Gmail account"
+          description: "Successfully authenticated with your Gmail account. Redirecting back to workflow configuration..."
         });
+        
+        // Navigate back to workflows page after successful authentication
+        setTimeout(() => {
+          navigate('/actions');
+        }, 2000);
       } else {
         console.error('Authentication failed:', result.error);
         setAuthError(result.error || 'Authentication failed');
