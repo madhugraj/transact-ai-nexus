@@ -6,6 +6,7 @@ import { Eye, Download, X, Brain } from 'lucide-react';
 import DocumentPreview from '@/components/ingestion/DocumentPreview';
 import { extractTablesFromImage } from '@/services/api/geminiService';
 import { useToast } from '@/hooks/use-toast';
+import { GoogleAuthService } from '@/services/auth/googleAuthService';
 
 interface POFile {
   id: string;
@@ -32,6 +33,13 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingResult, setProcessingResult] = useState<any>(null);
   const { toast } = useToast();
+
+  // Create auth service instance to get access token consistently
+  const authService = new GoogleAuthService({
+    clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
+    scopes: ['https://www.googleapis.com/auth/drive.readonly'],
+    redirectUri: `${window.location.origin}/oauth/callback`
+  }, 'drive_auth_tokens');
 
   const handlePreview = () => {
     console.log('🔍 Opening preview for PO file:', file.name);
@@ -61,19 +69,19 @@ const POFilePreview: React.FC<POFilePreviewProps> = ({
         description: `Analyzing ${file.name} with Gemini AI...`,
       });
 
-      // First download the file from Google Drive
-      const accessToken = localStorage.getItem('google_drive_access_token');
-      if (!accessToken) {
+      // Get access token using the same auth service
+      const tokens = authService.getStoredTokens();
+      if (!tokens.accessToken) {
         throw new Error('No access token found. Please reconnect to Google Drive.');
       }
 
       console.log('📥 Downloading file for processing:', file.name);
       
-      // Download file data
+      // Download file data using the correct access token
       const downloadUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`;
       const response = await fetch(downloadUrl, {
         headers: {
-          'Authorization': `Bearer ${accessToken}`
+          'Authorization': `Bearer ${tokens.accessToken}`
         }
       });
 
