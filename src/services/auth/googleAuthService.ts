@@ -1,3 +1,4 @@
+
 export interface AuthConfig {
   clientId: string;
   scopes: string[];
@@ -65,11 +66,27 @@ export class GoogleAuthService {
     }
   }
 
-  // Check if we have valid stored tokens
+  // Enhanced token validity check
   hasValidTokens(): boolean {
     const tokens = this.getStoredTokens();
     const hasTokens = !!tokens.accessToken;
-    console.log('Checking token validity:', { hasTokens });
+    
+    // Check if tokens are not too old (24 hours)
+    if (hasTokens && tokens.timestamp) {
+      const tokenAge = Date.now() - tokens.timestamp;
+      const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+      
+      if (tokenAge > maxAge) {
+        console.log('Tokens are too old, clearing them');
+        this.clearTokens();
+        return false;
+      }
+    }
+    
+    console.log('Checking token validity:', { 
+      hasTokens, 
+      age: tokens.timestamp ? Math.round((Date.now() - tokens.timestamp) / 1000 / 60) + ' minutes' : 'unknown'
+    });
     return hasTokens;
   }
 

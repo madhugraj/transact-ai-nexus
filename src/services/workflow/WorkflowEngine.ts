@@ -22,26 +22,40 @@ export class WorkflowEngine {
   async validateWorkflowRequirements(workflow: WorkflowConfig): Promise<{ valid: boolean; errors: string[] }> {
     const errors: string[] = [];
     
+    console.log('🔍 Validating workflow requirements for:', workflow.name);
+    
     // Check for email/drive source steps that require authentication
     const dataSourceSteps = workflow.steps.filter(step => 
       ['data-source', 'document-source', 'document_source'].includes(step.type)
     );
     
+    console.log('📋 Found data source steps:', dataSourceSteps.length);
+    
     for (const step of dataSourceSteps) {
-      if (step.config.emailConfig) {
+      console.log(`🔍 Checking step: ${step.name}, config:`, step.config);
+      
+      if (step.config.emailConfig || step.name.toLowerCase().includes('email') || step.name.toLowerCase().includes('gmail')) {
+        console.log('📧 Step requires Gmail authentication');
         const hasTokens = this.googleAuthService.hasValidTokens();
+        console.log('🔑 Gmail tokens valid:', hasTokens);
+        
         if (!hasTokens) {
           errors.push(`Step "${step.name}" requires Gmail authentication. Please connect your Gmail account first.`);
         }
       }
       
-      if (step.config.driveConfig) {
+      if (step.config.driveConfig || step.name.toLowerCase().includes('drive')) {
+        console.log('📁 Step requires Google Drive authentication');
         const hasTokens = this.googleAuthService.hasValidTokens();
+        console.log('🔑 Drive tokens valid:', hasTokens);
+        
         if (!hasTokens) {
           errors.push(`Step "${step.name}" requires Google Drive authentication. Please connect your Google Drive account first.`);
         }
       }
     }
+    
+    console.log('✅ Validation complete. Errors:', errors.length);
     
     return {
       valid: errors.length === 0,

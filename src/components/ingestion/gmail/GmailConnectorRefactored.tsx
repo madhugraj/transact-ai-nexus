@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -46,28 +47,51 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
     redirectUri: `${window.location.origin}/oauth/callback` // DYNAMIC based on current origin
   }, 'gmail_auth_tokens');
 
-  // Check for stored tokens on mount and maintain connection
+  // Enhanced authentication check with better persistence
   React.useEffect(() => {
     console.log('Gmail connector mounted, checking for stored tokens...');
     
     const checkStoredAuth = () => {
-      if (authService.hasValidTokens()) {
-        const tokens = authService.getStoredTokens();
-        if (tokens.accessToken) {
-          console.log('Found stored tokens, setting connected state');
-          setAccessToken(tokens.accessToken);
-          setIsConnected(true);
-          
-          // Only load emails if we haven't loaded them yet
-          if (!hasLoadedInitialEmails) {
-            loadGmailMessages(tokens.accessToken);
-            setHasLoadedInitialEmails(true);
-          }
+      const hasValidTokens = authService.hasValidTokens();
+      const tokens = authService.getStoredTokens();
+      
+      console.log('Auth check results:', { hasValidTokens, hasAccessToken: !!tokens.accessToken });
+      
+      if (hasValidTokens && tokens.accessToken) {
+        console.log('Found valid stored tokens, setting connected state');
+        setAccessToken(tokens.accessToken);
+        setIsConnected(true);
+        
+        // Only load emails if we haven't loaded them yet
+        if (!hasLoadedInitialEmails) {
+          console.log('Loading initial emails...');
+          loadGmailMessages(tokens.accessToken);
+          setHasLoadedInitialEmails(true);
         }
+      } else {
+        console.log('No valid tokens found, user needs to authenticate');
+        setIsConnected(false);
+        setAccessToken('');
+        setHasLoadedInitialEmails(false);
       }
     };
 
+    // Check immediately and also set up a listener for storage changes
     checkStoredAuth();
+    
+    // Listen for storage changes (in case user authenticates in another tab)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'gmail_auth_tokens') {
+        console.log('Storage changed, rechecking auth...');
+        checkStoredAuth();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, [hasLoadedInitialEmails]);
 
   const handleGmailAuth = async () => {
