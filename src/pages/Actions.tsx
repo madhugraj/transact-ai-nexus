@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,20 +8,18 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { PlayCircle, Plus, Settings, BarChart3, Edit, AlertTriangle, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import WorkflowCanvas from "@/components/workflow/WorkflowCanvas";
-import { WorkflowBuilder } from "@/components/workflow/WorkflowBuilder";
+import { DragDropWorkflowBuilder } from "@/components/workflow/DragDropWorkflowBuilder";
 import { WorkflowConfigDialog } from "@/components/workflow/WorkflowConfigDialog";
-import { WorkflowEngine } from "@/services/workflow/WorkflowEngine";
+import { RealWorkflowEngine } from "@/services/workflow/RealWorkflowEngine";
 import { workflowTemplates } from "@/data/workflowTemplates";
-import { WorkflowConfig, WorkflowTemplate, WorkflowStep, WorkflowConnection } from "@/types/workflow";
+import { WorkflowConfig, WorkflowTemplate, WorkflowStep } from "@/types/workflow";
+import { ReactFlowProvider } from '@xyflow/react';
 
 const Actions = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("workflows");
+  const [activeTab, setActiveTab] = useState("builder");
   const [workflows, setWorkflows] = useState<WorkflowConfig[]>([]);
-  const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowConfig | null>(null);
   const [selectedStep, setSelectedStep] = useState<WorkflowStep | null>(null);
-  const [showWorkflowDialog, setShowWorkflowDialog] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [showConfigDialog, setShowConfigDialog] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -30,7 +27,7 @@ const Actions = () => {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const { toast } = useToast();
 
-  const workflowEngine = new WorkflowEngine();
+  const workflowEngine = new RealWorkflowEngine();
 
   const createWorkflowFromTemplate = (template: WorkflowTemplate) => {
     const workflow: WorkflowConfig = {
@@ -57,14 +54,9 @@ const Actions = () => {
     setWorkflows(prev => [...prev, workflow]);
     setShowTemplateDialog(false);
     
-    // Automatically select and open the new workflow for editing
-    setSelectedWorkflow(workflow);
-    setShowWorkflowDialog(true);
-    setActiveTab("workflows");
-    
     toast({
       title: "Workflow Created",
-      description: `${template.name} workflow has been created successfully. You can now configure the steps.`
+      description: `${template.name} workflow has been created from template.`
     });
   };
 
@@ -74,7 +66,6 @@ const Actions = () => {
     setValidationErrors([]);
     
     try {
-      // Validate workflow requirements first
       const validation = await workflowEngine.validateWorkflowRequirements(workflow);
       
       if (!validation.valid) {
@@ -95,7 +86,6 @@ const Actions = () => {
       const execution = await workflowEngine.executeWorkflow(workflow);
       setExecutionResults(execution);
       
-      // Update workflow stats
       const updatedWorkflows = workflows.map(w => 
         w.id === workflow.id 
           ? { 
@@ -116,47 +106,15 @@ const Actions = () => {
     }
   };
 
-  const handleStepsChange = (steps: WorkflowStep[]) => {
-    if (selectedWorkflow) {
-      const updated = { ...selectedWorkflow, steps };
-      setSelectedWorkflow(updated);
-      setWorkflows(prev => prev.map(w => w.id === updated.id ? updated : w));
-    }
-  };
-
-  const handleConnectionsChange = (connections: WorkflowConnection[]) => {
-    if (selectedWorkflow) {
-      const updated = { ...selectedWorkflow, connections };
-      setSelectedWorkflow(updated);
-      setWorkflows(prev => prev.map(w => w.id === updated.id ? updated : w));
-    }
-  };
-
-  const handleStepDoubleClick = (step: WorkflowStep) => {
-    console.log('Step double-clicked:', step.name);
-    setSelectedStep(step);
-    setShowConfigDialog(true);
+  const handleWorkflowSave = (workflow: WorkflowConfig) => {
+    setWorkflows(prev => [...prev, workflow]);
   };
 
   const handleStepConfigSave = (updatedStep: WorkflowStep) => {
-    if (selectedWorkflow) {
-      const updatedSteps = selectedWorkflow.steps.map(s => 
-        s.id === updatedStep.id ? updatedStep : s
-      );
-      handleStepsChange(updatedSteps);
-      
-      // Also update the workflows array to persist the changes
-      setWorkflows(prev => prev.map(w => 
-        w.id === selectedWorkflow.id 
-          ? { ...w, steps: updatedSteps }
-          : w
-      ));
-      
-      toast({
-        title: "Configuration Saved",
-        description: `${updatedStep.name} configuration has been updated.`
-      });
-    }
+    toast({
+      title: "Configuration Saved",
+      description: `${updatedStep.name} configuration has been updated.`
+    });
     setShowConfigDialog(false);
     setSelectedStep(null);
   };
@@ -168,12 +126,12 @@ const Actions = () => {
           <div>
             <h1 className="text-3xl font-bold">Workflow Automation</h1>
             <p className="text-muted-foreground">
-              Create and manage end-to-end document processing workflows
+              Create and manage end-to-end document processing workflows with drag-and-drop
             </p>
           </div>
           <Button onClick={() => setShowTemplateDialog(true)} className="gap-2">
             <Plus className="h-4 w-4" />
-            New Workflow
+            Use Template
           </Button>
         </div>
 
@@ -207,11 +165,31 @@ const Actions = () => {
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
-            <TabsTrigger value="workflows">Active Workflows</TabsTrigger>
+            <TabsTrigger value="builder">Workflow Builder</TabsTrigger>
+            <TabsTrigger value="workflows">Saved Workflows</TabsTrigger>
             <TabsTrigger value="templates">Templates</TabsTrigger>
             <TabsTrigger value="executions">Execution History</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="builder" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Drag & Drop Workflow Builder</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Drag components from the left panel to the canvas and connect them to build your workflow.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <ReactFlowProvider>
+                  <DragDropWorkflowBuilder
+                    onWorkflowSave={handleWorkflowSave}
+                    onWorkflowExecute={executeWorkflow}
+                  />
+                </ReactFlowProvider>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="workflows" className="space-y-4">
             {workflows.length > 0 ? (
@@ -222,16 +200,6 @@ const Actions = () => {
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-lg">{workflow.name}</CardTitle>
                         <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedWorkflow(workflow);
-                              setShowWorkflowDialog(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -278,9 +246,9 @@ const Actions = () => {
                   </div>
                   <h3 className="font-medium mb-2">No Workflows Created</h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Start by creating a workflow from our templates
+                    Use the Workflow Builder tab to create your first workflow
                   </p>
-                  <Button onClick={() => setShowTemplateDialog(true)}>
+                  <Button onClick={() => setActiveTab('builder')}>
                     Create First Workflow
                   </Button>
                 </CardContent>
@@ -382,52 +350,6 @@ const Actions = () => {
             </Card>
           </TabsContent>
         </Tabs>
-
-        {/* Workflow Detail Dialog */}
-        <Dialog open={showWorkflowDialog} onOpenChange={setShowWorkflowDialog}>
-          <DialogContent className="max-w-7xl max-h-[95vh] overflow-hidden">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-bold">
-                Configure Workflow: {selectedWorkflow?.name}
-              </DialogTitle>
-              <p className="text-sm text-muted-foreground">
-                Drag and drop components from the palette to build your workflow. Double-click steps to configure them.
-              </p>
-            </DialogHeader>
-            
-            {selectedWorkflow && (
-              <div className="flex flex-col space-y-4 h-[80vh]">
-                <div className="flex justify-between items-center">
-                  <p className="text-muted-foreground">{selectedWorkflow.description}</p>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => executeWorkflow(selectedWorkflow)}
-                      disabled={isExecuting}
-                      className="gap-2"
-                    >
-                      <PlayCircle className="h-4 w-4" />
-                      {isExecuting ? 'Executing...' : 'Run Workflow'}
-                    </Button>
-                  </div>
-                </div>
-                
-                <div className="flex-1">
-                  <WorkflowBuilder
-                    workflow={selectedWorkflow}
-                    onWorkflowChange={(updatedWorkflow) => {
-                      setSelectedWorkflow(updatedWorkflow);
-                      setWorkflows(prev => prev.map(w => 
-                        w.id === updatedWorkflow.id ? updatedWorkflow : w
-                      ));
-                    }}
-                    onStepDoubleClick={handleStepDoubleClick}
-                  />
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
 
         {/* Template Selection Dialog */}
         <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
