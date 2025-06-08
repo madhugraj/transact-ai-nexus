@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { PlayCircle, Plus, Settings, BarChart3, Edit } from "lucide-react";
+import { PlayCircle, Plus, Settings, BarChart3, Edit, AlertTriangle, ExternalLink } from "lucide-react";
 import WorkflowCanvas from "@/components/workflow/WorkflowCanvas";
 import { WorkflowConfigDialog } from "@/components/workflow/WorkflowConfigDialog";
 import { WorkflowEngine } from "@/services/workflow/WorkflowEngine";
@@ -22,6 +23,7 @@ const Actions = () => {
   const [showConfigDialog, setShowConfigDialog] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionResults, setExecutionResults] = useState<any>(null);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const { toast } = useToast();
 
   const workflowEngine = new WorkflowEngine();
@@ -60,8 +62,22 @@ const Actions = () => {
   const executeWorkflow = async (workflow: WorkflowConfig) => {
     setIsExecuting(true);
     setExecutionResults(null);
+    setValidationErrors([]);
     
     try {
+      // Validate workflow requirements first
+      const validation = await workflowEngine.validateWorkflowRequirements(workflow);
+      
+      if (!validation.valid) {
+        setValidationErrors(validation.errors);
+        toast({
+          title: "Workflow Validation Failed",
+          description: "Please fix the issues below before running the workflow.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       toast({
         title: "Workflow Started",
         description: `Executing ${workflow.name}...`
@@ -85,6 +101,7 @@ const Actions = () => {
 
     } catch (error) {
       console.error('Workflow execution error:', error);
+      setValidationErrors([error instanceof Error ? error.message : 'Unknown error occurred']);
     } finally {
       setIsExecuting(false);
     }
@@ -147,6 +164,34 @@ const Actions = () => {
             New Workflow
           </Button>
         </div>
+
+        {/* Validation Errors Alert */}
+        {validationErrors.length > 0 && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <div className="space-y-2">
+                <p className="font-medium">Workflow cannot run due to the following issues:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  {validationErrors.map((error, index) => (
+                    <li key={index} className="text-sm">{error}</li>
+                  ))}
+                </ul>
+                <div className="flex gap-2 mt-3">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => window.open('/email-connector', '_blank')}
+                    className="gap-2"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    Connect Gmail/Drive
+                  </Button>
+                </div>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>

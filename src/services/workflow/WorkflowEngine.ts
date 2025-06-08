@@ -1,3 +1,4 @@
+
 import { WorkflowConfig, WorkflowExecution, WorkflowStep, WorkflowStepResult } from '@/types/workflow';
 import { EmailProcessingService } from '@/services/email/emailProcessingUtils';
 import { GoogleAuthService } from '@/services/auth/googleAuthService';
@@ -18,7 +19,43 @@ export class WorkflowEngine {
     });
   }
 
+  async validateWorkflowRequirements(workflow: WorkflowConfig): Promise<{ valid: boolean; errors: string[] }> {
+    const errors: string[] = [];
+    
+    // Check for email/drive source steps that require authentication
+    const dataSourceSteps = workflow.steps.filter(step => 
+      ['data-source', 'document-source', 'document_source'].includes(step.type)
+    );
+    
+    for (const step of dataSourceSteps) {
+      if (step.config.emailConfig) {
+        const hasTokens = this.googleAuthService.hasValidTokens();
+        if (!hasTokens) {
+          errors.push(`Step "${step.name}" requires Gmail authentication. Please connect your Gmail account first.`);
+        }
+      }
+      
+      if (step.config.driveConfig) {
+        const hasTokens = this.googleAuthService.hasValidTokens();
+        if (!hasTokens) {
+          errors.push(`Step "${step.name}" requires Google Drive authentication. Please connect your Google Drive account first.`);
+        }
+      }
+    }
+    
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  }
+
   async executeWorkflow(workflow: WorkflowConfig): Promise<WorkflowExecution> {
+    // Validate requirements first
+    const validation = await this.validateWorkflowRequirements(workflow);
+    if (!validation.valid) {
+      throw new Error(`Workflow validation failed:\n${validation.errors.join('\n')}`);
+    }
+
     const execution: WorkflowExecution = {
       id: `exec_${Date.now()}`,
       workflowId: workflow.id,
@@ -269,7 +306,7 @@ export class WorkflowEngine {
       // Check if user has valid tokens stored
       const hasTokens = this.googleAuthService.hasValidTokens();
       if (!hasTokens) {
-        throw new Error('Gmail authentication required. Please connect your Gmail account first.');
+        throw new Error('Gmail authentication required. Please go to Email Connector page to connect your Gmail account first.');
       }
       
       // This would integrate with your existing email processing
@@ -291,7 +328,7 @@ export class WorkflowEngine {
       // Check if user has valid tokens stored
       const hasTokens = this.googleAuthService.hasValidTokens();
       if (!hasTokens) {
-        throw new Error('Google Drive authentication required. Please connect your Google Drive account first.');
+        throw new Error('Google Drive authentication required. Please go to Email Connector page to connect your Google Drive account first.');
       }
       
       // This would integrate with your existing drive processing
