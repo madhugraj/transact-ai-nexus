@@ -40,42 +40,53 @@ const ProcessingSection = ({ downloadedFiles, onProcessingComplete, onClose }: P
         try {
           // Use our dedicated PO processing service
           const extractionResult = await extractPODataFromFile(file);
+          console.log(`🔍 Extraction result for ${file.name}:`, extractionResult);
 
           if (extractionResult.success && extractionResult.data) {
-            results.push({
+            const result = {
               fileName: file.name,
               fileSize: file.size,
               status: 'success',
               data: extractionResult.data,
               supabaseData: extractionResult.supabaseData,
               processingTime: Date.now()
-            });
+            };
+            results.push(result);
             console.log(`✅ Successfully processed: ${file.name}`);
+            
+            // Update results incrementally so user can see progress
+            setProcessingResults([...results]);
           } else {
-            results.push({
+            const errorResult = {
               fileName: file.name,
               fileSize: file.size,
               status: 'error',
               error: extractionResult.error || 'Failed to extract data',
               processingTime: Date.now()
-            });
+            };
+            results.push(errorResult);
             console.log(`❌ Failed to process: ${file.name}`, extractionResult.error);
+            
+            // Update results incrementally
+            setProcessingResults([...results]);
           }
         } catch (error) {
-          results.push({
+          const errorResult = {
             fileName: file.name,
             fileSize: file.size,
             status: 'error',
             error: error instanceof Error ? error.message : 'Unknown error',
             processingTime: Date.now()
-          });
+          };
+          results.push(errorResult);
           console.error(`❌ Error processing ${file.name}:`, error);
+          
+          // Update results incrementally
+          setProcessingResults([...results]);
         }
-
-        // Update results incrementally so user can see progress
-        setProcessingResults([...results]);
       }
 
+      // Call the completion callback
       onProcessingComplete(results);
       
       const successCount = results.filter(r => r.status === 'success').length;
@@ -86,6 +97,8 @@ const ProcessingSection = ({ downloadedFiles, onProcessingComplete, onClose }: P
         description: `Successfully processed ${successCount} files. ${errorCount > 0 ? `${errorCount} errors.` : ''}`,
         variant: errorCount > 0 ? "destructive" : "default"
       });
+
+      console.log(`✅ Bulk processing complete. Success: ${successCount}, Errors: ${errorCount}`);
 
     } catch (error) {
       console.error(`❌ Bulk processing error:`, error);
