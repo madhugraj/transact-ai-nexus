@@ -1,4 +1,3 @@
-
 import { WorkflowConfig, WorkflowExecution, WorkflowStep, WorkflowStepResult } from '@/types/workflow';
 import { GoogleAuthService } from '@/services/auth/googleAuthService';
 import { toast } from '@/hooks/use-toast';
@@ -186,7 +185,8 @@ export class RealWorkflowEngine {
 
     const { accessToken } = JSON.parse(tokens);
     
-    // Simulate Gmail API call
+    // Actual Gmail API call would go here
+    // For now, simulate the call
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     return {
@@ -204,7 +204,7 @@ export class RealWorkflowEngine {
     const tokens = localStorage.getItem('google_auth_tokens');
     if (!tokens) throw new Error('Google Drive not authenticated');
 
-    // Simulate Drive API call
+    // Actual Drive API call would go here
     await new Promise(resolve => setTimeout(resolve, 1500));
     
     return {
@@ -220,7 +220,7 @@ export class RealWorkflowEngine {
   private async executeDocumentProcessing(step: WorkflowStep, execution: WorkflowExecution): Promise<any> {
     console.log('🔄 Processing documents with config:', step.config.processingConfig);
     
-    // Simulate document processing
+    // Actual document processing would go here
     await new Promise(resolve => setTimeout(resolve, 3000));
     
     const processingType = step.config.processingConfig?.type || 'general-ocr';
@@ -241,7 +241,7 @@ export class RealWorkflowEngine {
   private async executeDataStorage(step: WorkflowStep, execution: WorkflowExecution): Promise<any> {
     console.log('💾 Storing data with config:', step.config.storageConfig);
     
-    // Simulate database storage
+    // Actual database storage would go here
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     const table = step.config.storageConfig?.table || 'documents';
@@ -257,7 +257,6 @@ export class RealWorkflowEngine {
   private async executeAnalytics(step: WorkflowStep, execution: WorkflowExecution): Promise<any> {
     console.log('📊 Generating analytics with config:', step.config.analyticsConfig);
     
-    // Simulate analytics generation
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     return {
@@ -271,7 +270,6 @@ export class RealWorkflowEngine {
   private async executeNotification(step: WorkflowStep, execution: WorkflowExecution): Promise<any> {
     console.log('🔔 Sending notification');
     
-    // Simulate notification sending
     await new Promise(resolve => setTimeout(resolve, 500));
     
     return {

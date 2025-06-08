@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,14 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { PlayCircle, Plus, Settings, BarChart3, Edit, AlertTriangle, ExternalLink } from "lucide-react";
+import { Plus, AlertTriangle, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { DragDropWorkflowBuilder } from "@/components/workflow/DragDropWorkflowBuilder";
+import { WorkflowBuilderTab } from "./tabs/WorkflowBuilderTab";
+import { SavedWorkflowsTab } from "./tabs/SavedWorkflowsTab";
 import { WorkflowConfigDialog } from "@/components/workflow/WorkflowConfigDialog";
 import { RealWorkflowEngine } from "@/services/workflow/RealWorkflowEngine";
 import { workflowTemplates } from "@/data/workflowTemplates";
 import { WorkflowConfig, WorkflowTemplate, WorkflowStep } from "@/types/workflow";
-import { ReactFlowProvider } from '@xyflow/react';
 
 const Actions = () => {
   const navigate = useNavigate();
@@ -173,87 +174,19 @@ const Actions = () => {
           </TabsList>
 
           <TabsContent value="builder" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Drag & Drop Workflow Builder</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Drag components from the left panel to the canvas and connect them to build your workflow.
-                </p>
-              </CardHeader>
-              <CardContent>
-                <ReactFlowProvider>
-                  <DragDropWorkflowBuilder
-                    onWorkflowSave={handleWorkflowSave}
-                    onWorkflowExecute={executeWorkflow}
-                  />
-                </ReactFlowProvider>
-              </CardContent>
-            </Card>
+            <WorkflowBuilderTab
+              onWorkflowSave={handleWorkflowSave}
+              onWorkflowExecute={executeWorkflow}
+            />
           </TabsContent>
 
           <TabsContent value="workflows" className="space-y-4">
-            {workflows.length > 0 ? (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {workflows.map((workflow) => (
-                  <Card key={workflow.id} className="hover:shadow-md transition-shadow">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg">{workflow.name}</CardTitle>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => executeWorkflow(workflow)}
-                            disabled={isExecuting}
-                          >
-                            <PlayCircle className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        {workflow.description}
-                      </p>
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>{workflow.steps.length} steps</span>
-                        <span>
-                          {workflow.lastRun 
-                            ? `Last run: ${workflow.lastRun.toLocaleDateString()}`
-                            : 'Never run'
-                          }
-                        </span>
-                      </div>
-                      {workflow.successRate !== undefined && (
-                        <div className="mt-2 text-xs">
-                          Success rate: {workflow.successRate}%
-                        </div>
-                      )}
-                      <div className="mt-2">
-                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                          {workflow.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4 mx-auto">
-                    <BarChart3 className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <h3 className="font-medium mb-2">No Workflows Created</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Use the Workflow Builder tab to create your first workflow
-                  </p>
-                  <Button onClick={() => setActiveTab('builder')}>
-                    Create First Workflow
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
+            <SavedWorkflowsTab
+              workflows={workflows}
+              onExecuteWorkflow={executeWorkflow}
+              onCreateFirst={() => setActiveTab('builder')}
+              isExecuting={isExecuting}
+            />
           </TabsContent>
 
           <TabsContent value="templates" className="space-y-4">
