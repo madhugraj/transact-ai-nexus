@@ -15,19 +15,6 @@ const CloudStorageConnector = ({ onFilesSelected }: CloudStorageConnectorProps) 
 
   console.log('CloudStorageConnector: onFilesSelected callback received');
 
-  const handleGoogleDriveFilesSelected = (files: File[]) => {
-    console.log('CloudStorageConnector: Google Drive files selected:', files.length);
-    setSelectedFiles(files);
-    onFilesSelected(files);
-    
-    if (files.length > 0) {
-      toast({
-        title: "Files Selected",
-        description: `${files.length} files selected from Google Drive. You can now process them.`
-      });
-    }
-  };
-
   return (
     <div className="space-y-4">
       {selectedFiles.length > 0 && (
@@ -56,7 +43,7 @@ const CloudStorageConnector = ({ onFilesSelected }: CloudStorageConnectorProps) 
         </TabsList>
         
         <TabsContent value="google_drive" className="mt-4">
-          <GoogleDriveConnector onFilesSelected={handleGoogleDriveFilesSelected} />
+          <GoogleDriveConnector />
         </TabsContent>
         
         <TabsContent value="onedrive" className="mt-4">
