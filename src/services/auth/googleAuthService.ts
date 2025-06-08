@@ -74,6 +74,38 @@ export class GoogleAuthService {
     return hasTokens;
   }
 
+  // Alias methods for backward compatibility
+  async signInWithGoogle(): Promise<void> {
+    const result = await this.authenticateWithPopup();
+    if (!result.success) {
+      throw new Error(result.error || 'Authentication failed');
+    }
+  }
+
+  async signOut(): Promise<void> {
+    this.clearTokens();
+  }
+
+  async listFiles(): Promise<any[]> {
+    const tokens = this.getStoredTokens();
+    if (!tokens.accessToken) {
+      throw new Error('No access token available');
+    }
+
+    const response = await fetch('https://www.googleapis.com/drive/v3/files', {
+      headers: {
+        'Authorization': `Bearer ${tokens.accessToken}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch files from Google Drive');
+    }
+
+    const data = await response.json();
+    return data.files || [];
+  }
+
   // Get the correct redirect URI - Use FIXED lovable.app domain
   private getRedirectUri(): string {
     // Use fixed lovable.app redirect URI to avoid OAuth errors
