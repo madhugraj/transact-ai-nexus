@@ -10,7 +10,8 @@ import {
   useEdgesState,
   addEdge,
   Connection,
-  BackgroundVariant
+  BackgroundVariant,
+  NodeTypes
 } from '@xyflow/react';
 import { WorkflowStep, WorkflowConnection } from '@/types/workflow';
 import { WorkflowNode } from './WorkflowNode';
@@ -30,7 +31,7 @@ interface WorkflowCanvasProps {
   isEditable?: boolean;
 }
 
-const nodeTypes = {
+const nodeTypes: NodeTypes = {
   workflowStep: WorkflowNode,
 };
 
