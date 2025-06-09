@@ -32,9 +32,10 @@ interface WorkflowCardProps {
   workflow: WorkflowConfig;
   onEdit?: (workflow: WorkflowConfig) => void;
   onDelete?: (workflowId: string) => void;
+  onExecute?: (workflow: WorkflowConfig) => void;
 }
 
-const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onEdit, onDelete }) => {
+const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onEdit, onDelete, onExecute }) => {
   const { updateWorkflow, executeWorkflow, isExecuting } = useWorkflow();
   const { toast } = useToast();
   const [showPreview, setShowPreview] = useState(false);
@@ -44,20 +45,22 @@ const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onEdit, onDelete 
   };
   
   const handleExecute = () => {
-    executeWorkflow(workflow.id);
-    toast({
-      title: "Workflow Execution Started",
-      description: `${workflow.name} is now running...`,
-    });
+    if (onExecute) {
+      // Use the parent's execute function if provided
+      onExecute(workflow);
+    } else {
+      // Fallback to the hook's execute function
+      executeWorkflow(workflow.id);
+      toast({
+        title: "Workflow Execution Started",
+        description: `${workflow.name} is now running...`,
+      });
+    }
   };
 
   const handleDelete = () => {
     if (onDelete) {
       onDelete(workflow.id);
-      toast({
-        title: "Workflow Deleted",
-        description: `"${workflow.name}" has been removed`,
-      });
     }
   };
 
@@ -99,10 +102,11 @@ const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onEdit, onDelete 
                 key={step.id} 
                 variant="outline" 
                 className={
-                  step.type === 'document-source' ? 'bg-blue-50 text-blue-800' :
-                  step.type === 'comparison' ? 'bg-amber-50 text-amber-800' :
+                  step.type === 'document-source' || step.type === 'data-source' ? 'bg-blue-50 text-blue-800' :
+                  step.type === 'comparison' || step.type === 'document-processing' ? 'bg-amber-50 text-amber-800' :
                   step.type === 'report-generation' ? 'bg-green-50 text-green-800' :
                   step.type === 'notification' ? 'bg-purple-50 text-purple-800' :
+                  step.type === 'data-storage' ? 'bg-indigo-50 text-indigo-800' :
                   'bg-gray-50 text-gray-800'
                 }
               >
@@ -153,38 +157,40 @@ const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onEdit, onDelete 
               </Tooltip>
             </TooltipProvider>
 
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Delete</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Workflow</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete "{workflow.name}"? This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            {onDelete && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Delete</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Workflow</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete "{workflow.name}"? This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
           
           <TooltipProvider>

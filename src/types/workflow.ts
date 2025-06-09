@@ -4,6 +4,7 @@ export type WorkflowStepType =
   | "data-source"           // Email, Drive, Upload, SAP
   | "document-processing"   // Extract Invoice, Extract PO
   | "data-validation"       // Validate extracted data
+  | "data-comparison"       // Compare PO vs Invoice
   | "data-storage"         // Store in database
   | "analytics"            // Generate analytics
   | "notification"         // Send notifications
@@ -44,6 +45,14 @@ export interface WorkflowStepConfig {
     type: 'invoice-extraction' | 'po-extraction' | 'general-ocr';
     aiModel?: 'gemini' | 'openai';
     confidence?: number;
+  };
+  
+  // Comparison configurations
+  comparisonConfig?: {
+    type: 'po-invoice-comparison';
+    fields?: string[];
+    tolerance?: number;
+    matchingCriteria?: 'exact' | 'fuzzy' | 'threshold';
   };
   
   // Storage configurations

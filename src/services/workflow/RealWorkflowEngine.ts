@@ -77,6 +77,8 @@ export class RealWorkflowEngine {
     };
 
     let stepData: any = null;
+    let poData: any[] = [];
+    let invoiceData: any[] = [];
 
     try {
       // Execute each step in sequence
@@ -96,13 +98,27 @@ export class RealWorkflowEngine {
           switch (step.type) {
             case 'data-source':
               stepData = await this.executeDataSourceStep(step);
+              
+              // Store data based on source type for comparison
+              if (stepData?.source === 'gmail') {
+                invoiceData = stepData.extractedData || [];
+              } else if (stepData?.source === 'google-drive') {
+                poData = stepData.extractedData || [];
+              }
               break;
+              
             case 'document-processing':
               stepData = await this.executeDocumentProcessingStep(step, stepData);
               break;
+              
+            case 'data-comparison':
+              stepData = await this.executeComparisonStep(step, { poData, invoiceData });
+              break;
+              
             case 'data-storage':
               stepData = await this.executeDatabaseStorageStep(step, stepData, workflow.id);
               break;
+              
             default:
               console.log(`⚠️ Skipping unsupported step type: ${step.type}`);
               stepData = { message: `Step type ${step.type} not implemented yet` };
@@ -139,6 +155,124 @@ export class RealWorkflowEngine {
     }
 
     return execution;
+  }
+
+  private async executeComparisonStep(step: WorkflowStep, data: { poData: any[], invoiceData: any[] }): Promise<any> {
+    console.log('🔄 Executing PO vs Invoice comparison step');
+    console.log('📊 PO Data:', data.poData.length, 'records');
+    console.log('📊 Invoice Data:', data.invoiceData.length, 'records');
+    
+    const { poData, invoiceData } = data;
+    const comparisonResults = [];
+    
+    if (poData.length === 0 || invoiceData.length === 0) {
+      console.log('⚠️ Insufficient data for comparison');
+      return {
+        message: 'Insufficient data for comparison',
+        comparisonResults: [],
+        poCount: poData.length,
+        invoiceCount: invoiceData.length
+      };
+    }
+    
+    // Compare each PO with each Invoice
+    for (const po of poData) {
+      for (const invoice of invoiceData) {
+        const comparison = this.comparePOAndInvoice(po.data, invoice.data);
+        comparisonResults.push({
+          poFileName: po.filename,
+          invoiceFileName: invoice.filename,
+          poNumber: po.data?.po_number,
+          invoiceNumber: invoice.data?.invoice_number,
+          comparison,
+          matchScore: comparison.overallMatch,
+          createdAt: new Date().toISOString()
+        });
+      }
+    }
+    
+    console.log(`✅ Generated ${comparisonResults.length} comparison results`);
+    
+    return {
+      action: 'po_invoice_comparison',
+      comparisonResults,
+      totalComparisons: comparisonResults.length,
+      poCount: poData.length,
+      invoiceCount: invoiceData.length
+    };
+  }
+
+  private comparePOAndInvoice(poData: any, invoiceData: any): any {
+    const fields = ['vendor_name', 'total_amount', 'quantity', 'description'];
+    const fieldMatches: Record<string, any> = {};
+    
+    for (const field of fields) {
+      const poValue = poData?.[field] || '';
+      const invoiceValue = invoiceData?.[field] || '';
+      
+      fieldMatches[field] = {
+        poValue,
+        invoiceValue,
+        match: this.fuzzyMatch(poValue, invoiceValue),
+        exact: poValue === invoiceValue
+      };
+    }
+    
+    // Calculate overall match score
+    const matchScores = Object.values(fieldMatches).map((match: any) => match.match);
+    const overallMatch = matchScores.reduce((a, b) => a + b, 0) / matchScores.length;
+    
+    return {
+      fieldMatches,
+      overallMatch: Math.round(overallMatch * 100),
+      status: overallMatch > 0.8 ? 'good_match' : overallMatch > 0.5 ? 'partial_match' : 'poor_match'
+    };
+  }
+
+  private fuzzyMatch(str1: any, str2: any): number {
+    if (!str1 || !str2) return 0;
+    
+    const s1 = str1.toString().toLowerCase();
+    const s2 = str2.toString().toLowerCase();
+    
+    if (s1 === s2) return 1;
+    
+    // Simple fuzzy matching - can be enhanced
+    const longer = s1.length > s2.length ? s1 : s2;
+    const shorter = s1.length > s2.length ? s2 : s1;
+    
+    if (longer.length === 0) return 1;
+    
+    const editDistance = this.levenshteinDistance(longer, shorter);
+    return (longer.length - editDistance) / longer.length;
+  }
+
+  private levenshteinDistance(str1: string, str2: string): number {
+    const matrix = [];
+    
+    for (let i = 0; i <= str2.length; i++) {
+      matrix[i] = [i];
+    }
+    
+    for (let j = 0; j <= str1.length; j++) {
+      matrix[0][j] = j;
+    }
+    
+    for (let i = 1; i <= str2.length; i++) {
+      for (let j = 1; j <= str1.length; j++) {
+        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    
+    return matrix[str2.length][str1.length];
   }
 
   private async executeDataSourceStep(step: WorkflowStep): Promise<any> {
@@ -220,7 +354,7 @@ export class RealWorkflowEngine {
 
                       console.log(`✅ Created file: ${file.name}, size: ${file.size} bytes`);
 
-                      // Process with Invoice Data Extraction Agent instead of DocumentClassifier
+                      // Process with Invoice Data Extraction Agent
                       console.log(`🤖 Processing ${attachment.filename} with Invoice Data Extraction Agent...`);
                       const extractionResult = await this.invoiceAgent.process(file);
                       
@@ -253,11 +387,6 @@ export class RealWorkflowEngine {
                     }
                   } catch (error) {
                     console.error(`❌ Error processing attachment ${attachment.filename}:`, error);
-                    console.error('Error details:', {
-                      name: error.name,
-                      message: error.message,
-                      stack: error.stack
-                    });
                   }
                 }
               }
@@ -344,12 +473,12 @@ export class RealWorkflowEngine {
               // Convert blob to File object
               const fileObject = new File([fileData], file.name, { type: 'application/pdf' });
 
-              // Process with Invoice Data Extraction Agent instead of DocumentClassifier
+              // Process with Invoice Data Extraction Agent
               console.log(`🤖 Processing ${file.name} with Invoice Data Extraction Agent...`);
               const extractionResult = await this.invoiceAgent.process(fileObject);
               
               if (extractionResult.success && extractionResult.data) {
-                console.log(`✅ Successfully extracted invoice data from ${file.name}:`, extractionResult.data);
+                console.log(`✅ Successfully extracted data from ${file.name}:`, extractionResult.data);
                 
                 processedResults.push({
                   file: file,
@@ -460,6 +589,43 @@ export class RealWorkflowEngine {
     
     console.log('💾 Storing data with config:', config.storageConfig);
     console.log('📄 Input data for storage:', inputData);
+    
+    // Handle comparison results storage
+    if (inputData?.action === 'po_invoice_comparison' && inputData.comparisonResults) {
+      console.log(`💾 Storing ${inputData.comparisonResults.length} comparison results to po_invoice_compare table`);
+      
+      try {
+        const { data, error } = await supabase
+          .from('po_invoice_compare')
+          .insert(inputData.comparisonResults.map((result: any) => ({
+            po_filename: result.poFileName,
+            invoice_filename: result.invoiceFileName,
+            po_number: result.poNumber,
+            invoice_number: result.invoiceNumber,
+            comparison_results: result.comparison,
+            match_score: result.matchScore,
+            workflow_id: workflowId,
+            created_at: result.createdAt
+          })))
+          .select();
+
+        if (error) {
+          throw error;
+        }
+
+        console.log('✅ Successfully stored comparison results:', data);
+        
+        return {
+          action: 'comparison_storage',
+          table: 'po_invoice_compare',
+          recordsStored: data?.length || 0,
+          workflowId
+        };
+      } catch (error) {
+        console.error('❌ Error storing comparison results:', error);
+        throw error;
+      }
+    }
     
     // Handle extracted invoice data from email processing
     if (inputData?.extractedData && inputData.extractedData.length > 0) {

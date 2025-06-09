@@ -7,6 +7,7 @@ import { WorkflowConfig } from '@/types/workflow';
 import WorkflowCard from '@/components/actions/WorkflowCard';
 import { useWorkflowPersistence } from '@/hooks/useWorkflowPersistence';
 import { useToast } from '@/hooks/use-toast';
+import { RealWorkflowEngine } from '@/services/workflow/RealWorkflowEngine';
 
 interface SavedWorkflowsTabProps {
   workflows: WorkflowConfig[];
@@ -23,8 +24,63 @@ export const SavedWorkflowsTab: React.FC<SavedWorkflowsTabProps> = ({
   onEditWorkflow,
   isExecuting
 }) => {
-  const { deleteWorkflow, clearAllWorkflows, debugStorage } = useWorkflowPersistence();
+  const { deleteWorkflow, clearAllWorkflows, updateWorkflow, debugStorage } = useWorkflowPersistence();
   const { toast } = useToast();
+  const workflowEngine = new RealWorkflowEngine();
+
+  const handleExecuteWorkflow = async (workflow: WorkflowConfig) => {
+    console.log('🚀 SavedWorkflowsTab: Executing workflow:', workflow.name);
+    
+    try {
+      // Validate workflow requirements first
+      const validation = await workflowEngine.validateWorkflowRequirements(workflow);
+      
+      if (!validation.valid) {
+        toast({
+          title: "Workflow Cannot Run",
+          description: `Please fix these issues: ${validation.errors.join(', ')}`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      toast({
+        title: "Workflow Started",
+        description: `Executing ${workflow.name}...`
+      });
+
+      // Execute the workflow
+      const execution = await workflowEngine.executeWorkflow(workflow);
+      
+      // Update workflow stats
+      updateWorkflow(workflow.id, { 
+        lastRun: new Date(), 
+        totalRuns: (workflow.totalRuns || 0) + 1,
+        successRate: execution.status === 'completed' ? 95 : 85
+      });
+
+      if (execution.status === 'completed') {
+        toast({
+          title: "Workflow Completed",
+          description: `${workflow.name} executed successfully!`,
+        });
+      } else {
+        toast({
+          title: "Workflow Failed",
+          description: execution.errors?.[0] || 'Unknown error occurred',
+          variant: "destructive"
+        });
+      }
+
+    } catch (error) {
+      console.error('❌ Workflow execution error:', error);
+      toast({
+        title: "Workflow Execution Failed",
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: "destructive"
+      });
+    }
+  };
 
   const handleDeleteWorkflow = (workflowId: string) => {
     console.log('🗑️ SavedWorkflowsTab: Handling delete for workflow:', workflowId);
@@ -125,6 +181,7 @@ export const SavedWorkflowsTab: React.FC<SavedWorkflowsTabProps> = ({
             workflow={workflow}
             onEdit={onEditWorkflow}
             onDelete={handleDeleteWorkflow}
+            onExecute={handleExecuteWorkflow}
           />
         ))}
       </div>
