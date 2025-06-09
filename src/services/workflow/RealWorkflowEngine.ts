@@ -21,7 +21,7 @@ export class RealWorkflowEngine {
 
     // Check for Gmail authentication if workflow uses Gmail
     const hasGmailStep = workflow.steps.some(step => 
-      step.type === 'data-source' && step.config?.source === 'gmail'
+      step.type === 'data-source' && step.config?.emailConfig?.source === 'gmail'
     );
     
     if (hasGmailStep) {
@@ -35,7 +35,7 @@ export class RealWorkflowEngine {
     const hasStorageStep = workflow.steps.some(step => step.type === 'data-storage');
     if (hasStorageStep) {
       for (const step of workflow.steps.filter(s => s.type === 'data-storage')) {
-        if (!step.config?.table) {
+        if (!step.config?.storageConfig?.table) {
           errors.push(`Storage step "${step.name}" requires a table name`);
         }
       }
@@ -69,6 +69,9 @@ export class RealWorkflowEngine {
           stepId: step.id,
           startTime: new Date(),
           status: 'running' as const,
+          endTime: undefined as Date | undefined,
+          output: undefined as any,
+          error: undefined as string | undefined,
         };
 
         try {
@@ -89,7 +92,7 @@ export class RealWorkflowEngine {
 
           stepResult.status = 'completed';
           stepResult.endTime = new Date();
-          stepResult.result = stepData;
+          stepResult.output = stepData;
           
           console.log(`✅ Step completed: ${step.name}`);
 
@@ -114,7 +117,7 @@ export class RealWorkflowEngine {
       console.error('❌ Workflow execution failed:', error);
       execution.status = 'failed';
       execution.endTime = new Date();
-      execution.error = error instanceof Error ? error.message : 'Unknown error';
+      execution.errors = [error instanceof Error ? error.message : 'Unknown error'];
     }
 
     return execution;
@@ -123,27 +126,25 @@ export class RealWorkflowEngine {
   private async executeDataSourceStep(step: WorkflowStep): Promise<any> {
     const config = step.config || {};
     
-    switch (config.source) {
-      case 'gmail':
-        console.log('📧 Fetching Gmail data with config:', config);
-        const gmailData = await this.gmailService.fetchEmailsWithAttachments(config.filters || []);
-        
-        if (config.attachmentTypes?.includes('pdf')) {
-          const attachments = await this.gmailService.processEmailAttachments(gmailData.emails || []);
-          return { ...gmailData, attachments };
-        }
-        
-        return gmailData;
-        
-      default:
-        throw new Error(`Unsupported data source: ${config.source}`);
+    if (config.emailConfig) {
+      console.log('📧 Fetching Gmail data with config:', config.emailConfig);
+      const gmailData = await this.gmailService.fetchEmailsWithAttachments(config.emailConfig.filters || []);
+      
+      if (config.emailConfig.attachmentTypes?.includes('pdf')) {
+        const attachments = await this.gmailService.processEmailAttachments(gmailData.emails || []);
+        return { ...gmailData, attachments };
+      }
+      
+      return gmailData;
+    } else {
+      throw new Error('Data source configuration not found');
     }
   }
 
   private async executeDocumentProcessingStep(step: WorkflowStep, inputData: any): Promise<any> {
     const config = step.config || {};
     
-    console.log('🔄 Processing documents with config:', config);
+    console.log('🔄 Processing documents with config:', config.processingConfig);
     
     // Extract files/attachments from input data
     const files = inputData?.attachments || inputData?.files || [];
@@ -153,20 +154,20 @@ export class RealWorkflowEngine {
       return { message: 'No files found to process', processedData: [] };
     }
     
-    return await this.documentService.processDocuments(files, config.type || 'general');
+    return await this.documentService.processDocuments(files, config.processingConfig?.type || 'general');
   }
 
   private async executeDatabaseStorageStep(step: WorkflowStep, inputData: any, workflowId: string): Promise<any> {
     const config = step.config || {};
     
-    console.log('💾 Storing data with config:', config);
+    console.log('💾 Storing data with config:', config.storageConfig);
     
     // Extract the processed data
     const dataToStore = inputData?.extractedData || inputData?.processedData || inputData || [];
     
     // Add workflow ID to config for tracking
     const storageConfig = {
-      ...config,
+      ...config.storageConfig,
       workflowId
     };
     
