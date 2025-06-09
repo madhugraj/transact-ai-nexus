@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef } from 'react';
 import { ReactFlowProvider, ReactFlow, Background, Controls, useNodesState, useEdgesState, addEdge, Connection, Edge, Node, Panel } from '@xyflow/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +6,7 @@ import { WorkflowNode } from './WorkflowNode';
 import { WorkflowConfigDialog } from './WorkflowConfigDialog';
 import { ComponentPalette } from './builder/ComponentPalette';
 import { WorkflowControls } from './builder/WorkflowControls';
+import { WorkflowProcessActions } from './builder/WorkflowProcessActions';
 import { WorkflowStep, WorkflowConfig, WorkflowConnection } from '@/types/workflow';
 import { useToast } from '@/hooks/use-toast';
 import '@xyflow/react/dist/style.css';
@@ -172,7 +172,7 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
     });
   }, [workflowName, nodes, edges, onWorkflowSave, toast]);
 
-  const handleExecuteWorkflow = useCallback(() => {
+  const handleExecuteWorkflow = useCallback((workflow?: WorkflowConfig) => {
     if (nodes.length === 0) {
       toast({
         title: "No Components",
@@ -189,7 +189,7 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
       targetStepId: edge.target,
     }));
 
-    const workflow: WorkflowConfig = {
+    const finalWorkflow = workflow || {
       id: `temp-workflow-${Date.now()}`,
       name: workflowName || 'Unnamed Workflow',
       description: 'Temporary workflow for execution',
@@ -201,7 +201,7 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
       successRate: 0
     };
 
-    onWorkflowExecute?.(workflow);
+    onWorkflowExecute?.(finalWorkflow);
   }, [nodes, edges, workflowName, onWorkflowExecute]);
 
   return (
@@ -213,9 +213,30 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
           workflowName={workflowName}
           onWorkflowNameChange={setWorkflowName}
           onSave={handleSaveWorkflow}
-          onExecute={handleExecuteWorkflow}
+          onExecute={() => handleExecuteWorkflow()}
           nodeCount={nodes.length}
           edgeCount={edges.length}
+        />
+        
+        {/* Add Process Actions */}
+        <WorkflowProcessActions
+          workflow={{
+            id: 'temp',
+            name: workflowName,
+            description: '',
+            steps: nodes.map((node) => node.data.step),
+            connections: edges.map((edge, index) => ({
+              id: `conn-${index}`,
+              sourceStepId: edge.source,
+              targetStepId: edge.target,
+            })),
+            isActive: true,
+            createdAt: new Date(),
+            totalRuns: 0,
+            successRate: 0
+          }}
+          onExecute={handleExecuteWorkflow}
+          nodeCount={nodes.length}
         />
       </div>
 

@@ -165,30 +165,138 @@ export class RealWorkflowEngine {
     const { poData, invoiceData } = data;
     const comparisonResults = [];
     
-    if (poData.length === 0 || invoiceData.length === 0) {
+    // If no data from workflow sources, fetch from Supabase tables
+    let finalPOData = poData;
+    let finalInvoiceData = invoiceData;
+    
+    if (poData.length === 0) {
+      console.log('📊 No PO data from workflow, fetching from po_table...');
+      const { data: poTableData, error: poError } = await supabase
+        .from('po_table')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      
+      if (poError) {
+        console.error('❌ Error fetching PO data:', poError);
+      } else {
+        finalPOData = poTableData?.map(po => ({
+          filename: po.file_name || `PO-${po.po_number}`,
+          data: {
+            po_number: po.po_number,
+            vendor_name: po.vendor_code,
+            po_date: po.po_date,
+            description: po.description,
+            total_amount: po.description?.total_amount || 0,
+            gstn: po.gstn,
+            project: po.project
+          },
+          source: 'po_table'
+        })) || [];
+        console.log(`✅ Fetched ${finalPOData.length} PO records from database`);
+      }
+    }
+    
+    if (invoiceData.length === 0) {
+      console.log('📊 No Invoice data from workflow, fetching from invoice_table...');
+      const { data: invoiceTableData, error: invoiceError } = await supabase
+        .from('invoice_table')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      
+      if (invoiceError) {
+        console.error('❌ Error fetching Invoice data:', invoiceError);
+      } else {
+        finalInvoiceData = invoiceTableData?.map(invoice => ({
+          filename: invoice.attachment_invoice_name || `Invoice-${invoice.invoice_number}`,
+          data: {
+            invoice_number: invoice.invoice_number,
+            vendor_name: invoice.details?.vendor_name || '',
+            invoice_date: invoice.invoice_date,
+            po_number: invoice.po_number,
+            description: invoice.details?.description || '',
+            total_amount: invoice.details?.total_amount || 0,
+            quantity: invoice.details?.quantity || 0,
+            unit_price: invoice.details?.unit_price || 0,
+            gst_amount: invoice.details?.gst_amount || 0
+          },
+          source: 'invoice_table'
+        })) || [];
+        console.log(`✅ Fetched ${finalInvoiceData.length} Invoice records from database`);
+      }
+    }
+    
+    if (finalPOData.length === 0 || finalInvoiceData.length === 0) {
       console.log('⚠️ Insufficient data for comparison');
       return {
         message: 'Insufficient data for comparison',
         comparisonResults: [],
-        poCount: poData.length,
-        invoiceCount: invoiceData.length
+        poCount: finalPOData.length,
+        invoiceCount: finalInvoiceData.length
       };
     }
     
-    // Compare each PO with each Invoice
-    for (const po of poData) {
-      for (const invoice of invoiceData) {
-        const comparison = this.comparePOAndInvoice(po.data, invoice.data);
+    // Enhanced comparison logic for PO vs Invoice matching
+    for (const po of finalPOData) {
+      for (const invoice of finalInvoiceData) {
+        const comparison = this.compareAdvancedPOAndInvoice(po.data, invoice.data);
+        
         comparisonResults.push({
           poFileName: po.filename,
           invoiceFileName: invoice.filename,
           poNumber: po.data?.po_number,
           invoiceNumber: invoice.data?.invoice_number,
+          poVendor: po.data?.vendor_name,
+          invoiceVendor: invoice.data?.vendor_name,
+          poDate: po.data?.po_date,
+          invoiceDate: invoice.data?.invoice_date,
           comparison,
           matchScore: comparison.overallMatch,
-          createdAt: new Date().toISOString()
+          matchStatus: comparison.status,
+          fieldMatches: comparison.fieldMatches,
+          createdAt: new Date().toISOString(),
+          source: {
+            po: po.source || 'workflow',
+            invoice: invoice.source || 'workflow'
+          }
         });
       }
+    }
+    
+    // Save comparison results to po_invoice_compare table (create if doesn't exist)
+    try {
+      console.log('💾 Saving comparison results to database...');
+      
+      const { data: savedResults, error: saveError } = await supabase
+        .from('po_invoice_compare')
+        .insert(
+          comparisonResults.map(result => ({
+            po_number: result.poNumber,
+            invoice_number: result.invoiceNumber,
+            po_vendor: result.poVendor,
+            invoice_vendor: result.invoiceVendor,
+            po_date: result.poDate,
+            invoice_date: result.invoiceDate,
+            match_score: result.matchScore,
+            match_status: result.matchStatus,
+            field_matches: result.fieldMatches,
+            comparison_details: result.comparison,
+            po_filename: result.poFileName,
+            invoice_filename: result.invoiceFileName
+          }))
+        )
+        .select();
+      
+      if (saveError) {
+        console.error('❌ Error saving comparison results:', saveError);
+        // Continue execution even if save fails
+      } else {
+        console.log(`✅ Saved ${savedResults?.length || 0} comparison results to database`);
+      }
+    } catch (dbError) {
+      console.error('❌ Database operation error:', dbError);
+      // Continue execution even if database operation fails
     }
     
     console.log(`✅ Generated ${comparisonResults.length} comparison results`);
@@ -197,36 +305,83 @@ export class RealWorkflowEngine {
       action: 'po_invoice_comparison',
       comparisonResults,
       totalComparisons: comparisonResults.length,
-      poCount: poData.length,
-      invoiceCount: invoiceData.length
+      poCount: finalPOData.length,
+      invoiceCount: finalInvoiceData.length,
+      highMatchCount: comparisonResults.filter(r => r.matchScore >= 80).length,
+      mediumMatchCount: comparisonResults.filter(r => r.matchScore >= 50 && r.matchScore < 80).length,
+      lowMatchCount: comparisonResults.filter(r => r.matchScore < 50).length
     };
   }
 
-  private comparePOAndInvoice(poData: any, invoiceData: any): any {
-    const fields = ['vendor_name', 'total_amount', 'quantity', 'description'];
+  private compareAdvancedPOAndInvoice(poData: any, invoiceData: any): any {
+    const fields = [
+      { key: 'vendor_name', weight: 0.3, type: 'string' },
+      { key: 'total_amount', weight: 0.25, type: 'number' },
+      { key: 'description', weight: 0.2, type: 'string' },
+      { key: 'quantity', weight: 0.15, type: 'number' },
+      { key: 'po_number', weight: 0.1, type: 'exact' }
+    ];
+    
     const fieldMatches: Record<string, any> = {};
+    let weightedScore = 0;
+    let totalWeight = 0;
     
     for (const field of fields) {
-      const poValue = poData?.[field] || '';
-      const invoiceValue = invoiceData?.[field] || '';
+      const poValue = poData?.[field.key] || '';
+      const invoiceValue = invoiceData?.[field.key] || '';
       
-      fieldMatches[field] = {
+      let matchScore = 0;
+      
+      if (field.type === 'exact') {
+        matchScore = poValue === invoiceValue ? 1 : 0;
+      } else if (field.type === 'number') {
+        matchScore = this.compareNumbers(poValue, invoiceValue);
+      } else {
+        matchScore = this.fuzzyMatch(poValue, invoiceValue);
+      }
+      
+      fieldMatches[field.key] = {
         poValue,
         invoiceValue,
-        match: this.fuzzyMatch(poValue, invoiceValue),
-        exact: poValue === invoiceValue
+        match: matchScore,
+        exact: poValue === invoiceValue,
+        weight: field.weight
       };
+      
+      weightedScore += matchScore * field.weight;
+      totalWeight += field.weight;
     }
     
     // Calculate overall match score
-    const matchScores = Object.values(fieldMatches).map((match: any) => match.match);
-    const overallMatch = matchScores.reduce((a, b) => a + b, 0) / matchScores.length;
+    const overallMatch = totalWeight > 0 ? (weightedScore / totalWeight) * 100 : 0;
+    
+    // Determine match status
+    let status = 'poor_match';
+    if (overallMatch >= 80) status = 'excellent_match';
+    else if (overallMatch >= 65) status = 'good_match';
+    else if (overallMatch >= 50) status = 'partial_match';
     
     return {
       fieldMatches,
-      overallMatch: Math.round(overallMatch * 100),
-      status: overallMatch > 0.8 ? 'good_match' : overallMatch > 0.5 ? 'partial_match' : 'poor_match'
+      overallMatch: Math.round(overallMatch),
+      weightedScore: Math.round(weightedScore * 100),
+      status,
+      confidence: overallMatch >= 80 ? 'high' : overallMatch >= 50 ? 'medium' : 'low'
     };
+  }
+
+  private compareNumbers(num1: any, num2: any): number {
+    const n1 = parseFloat(num1) || 0;
+    const n2 = parseFloat(num2) || 0;
+    
+    if (n1 === 0 && n2 === 0) return 1;
+    if (n1 === 0 || n2 === 0) return 0;
+    
+    const difference = Math.abs(n1 - n2);
+    const average = (n1 + n2) / 2;
+    const tolerance = average * 0.05; // 5% tolerance
+    
+    return difference <= tolerance ? 1 : Math.max(0, 1 - (difference / average));
   }
 
   private fuzzyMatch(str1: any, str2: any): number {
