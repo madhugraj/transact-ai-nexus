@@ -5,6 +5,7 @@ import { DocumentProcessingService } from './DocumentProcessingService';
 import { DatabaseStorageService } from './DatabaseStorageService';
 import { EmailAttachmentProcessor } from '@/services/email/attachmentProcessor';
 import { DatabaseStorage } from '@/services/email/databaseStorage';
+import { supabase } from '@/integrations/supabase/client';
 
 export class RealWorkflowEngine {
   private gmailService = new GmailWorkflowService();
@@ -140,95 +141,136 @@ export class RealWorkflowEngine {
       if (config.emailConfig.attachmentTypes?.includes('pdf')) {
         console.log('📎 Processing email attachments...');
         
-        // Step 2: Process attachments using the tested email processor
+        // Step 2: Get detailed email data with attachments using Gmail API
         const emails = gmailData.emails || [];
-        const allResults = [];
+        const processedResults = [];
+        let extractedDataCount = 0;
 
-        for (const email of emails.slice(0, 5)) { // Process first 5 emails
+        for (const email of emails.slice(0, 3)) { // Process first 3 emails
           console.log(`📧 Processing email: ${email.subject}`);
           
-          // Create a processing result for this email
-          const emailResult = {
-            email: email,
-            emailContext: {
-              isLikelyInvoice: true,
-              context: {
-                attachmentCount: email.attachments?.length || 0,
-                hasInvoiceKeywords: true,
-                hasFinancialKeywords: true,
-                hasBusinessKeywords: true,
-                analysis: `Processing email: ${email.subject}`
+          try {
+            // Get full email details including attachments
+            const { data: emailDetails } = await supabase.functions.invoke('gmail', {
+              body: {
+                action: 'get',
+                accessToken: JSON.parse(localStorage.getItem('gmail_auth_tokens') || '{}').accessToken,
+                messageId: email.id
               }
-            },
-            attachments: email.attachments || [],
-            invoiceValidation: [],
-            extractedData: [],
-            status: 'processing' as 'processing' | 'completed' | 'error'
-          };
-          
-          if (email.attachments && email.attachments.length > 0) {
-            for (const attachment of email.attachments) {
-              if (attachment.mimeType === 'application/pdf') {
-                console.log(`📎 Processing PDF attachment: ${attachment.filename}`);
-                
-                try {
-                  // Create a mock file object for processing
-                  const mockFile = new File([], attachment.filename, { type: attachment.mimeType });
-                  const attachmentData = {
-                    file: mockFile,
-                    filename: attachment.filename,
-                    mimeType: attachment.mimeType,
-                    size: attachment.size
-                  };
+            });
 
-                  const emailContext = {
-                    subject: email.subject,
-                    from: email.from,
-                    date: email.date
-                  };
+            if (emailDetails && emailDetails.success && emailDetails.data) {
+              const fullEmail = emailDetails.data;
+              const attachments = this.extractAttachments(fullEmail);
+              
+              console.log(`📎 Found ${attachments.length} attachments in email: ${email.subject}`);
 
-                  // Use the tested email attachment processor
-                  const processed = await this.emailProcessor.processAttachment(
-                    attachmentData,
-                    email,
-                    emailContext,
-                    emailResult
-                  );
+              // Process each PDF attachment
+              for (const attachment of attachments) {
+                if (attachment.mimeType === 'application/pdf') {
+                  console.log(`📄 Processing PDF: ${attachment.filename}`);
+                  
+                  try {
+                    // Get attachment data
+                    const { data: attachmentData } = await supabase.functions.invoke('gmail', {
+                      body: {
+                        action: 'attachment',
+                        accessToken: JSON.parse(localStorage.getItem('gmail_auth_tokens') || '{}').accessToken,
+                        messageId: email.id,
+                        attachmentId: attachment.attachmentId
+                      }
+                    });
 
-                  console.log(`✅ Processed attachment: ${attachment.filename}, success: ${processed}`);
+                    if (attachmentData && attachmentData.success) {
+                      // Convert base64 to blob and create file
+                      const binaryData = atob(attachmentData.data.data);
+                      const bytes = new Uint8Array(binaryData.length);
+                      for (let i = 0; i < binaryData.length; i++) {
+                        bytes[i] = binaryData.charCodeAt(i);
+                      }
+                      const blob = new Blob([bytes], { type: 'application/pdf' });
+                      const file = new File([blob], attachment.filename, { type: 'application/pdf' });
 
-                } catch (error) {
-                  console.error(`❌ Error processing attachment ${attachment.filename}:`, error);
-                  emailResult.status = 'error';
+                      // Process with Gemini
+                      console.log(`🤖 Processing ${attachment.filename} with Gemini...`);
+                      const { classifyDocument } = await import('@/components/document-comparison/upload/DocumentClassifier');
+                      
+                      const extractedData = await classifyDocument(file);
+                      console.log(`✅ Extracted data from ${attachment.filename}:`, extractedData);
+                      
+                      processedResults.push({
+                        email: email,
+                        filename: attachment.filename,
+                        extractedData: extractedData,
+                        success: true
+                      });
+                      
+                      extractedDataCount++;
+
+                    } else {
+                      console.error(`❌ Failed to get attachment data for ${attachment.filename}`);
+                    }
+                  } catch (error) {
+                    console.error(`❌ Error processing attachment ${attachment.filename}:`, error);
+                  }
                 }
               }
             }
+          } catch (error) {
+            console.error(`❌ Error getting email details for ${email.subject}:`, error);
           }
-          
-          emailResult.status = 'completed';
-          allResults.push(emailResult);
         }
         
-        // Return aggregated results
-        const aggregatedResults = {
+        console.log(`✅ Processed ${processedResults.length} attachments, extracted ${extractedDataCount} documents`);
+        
+        // Return structured data for the next steps
+        return {
           source: 'gmail',
           emails: emails,
-          processedResults: allResults,
+          processedResults: processedResults,
           totalEmails: emails.length,
-          processedCount: allResults.length,
-          successCount: allResults.filter(r => r.status === 'completed').length,
-          extractedData: allResults.flatMap(r => r.extractedData),
-          invoiceValidation: allResults.flatMap(r => r.invoiceValidation)
+          processedCount: processedResults.length,
+          successCount: processedResults.filter(r => r.success).length,
+          extractedData: processedResults.filter(r => r.success).map(r => ({
+            filename: r.filename,
+            data: r.extractedData,
+            email: r.email,
+            success: true
+          }))
         };
-        
-        console.log(`✅ Processed ${aggregatedResults.processedCount} emails, ${aggregatedResults.successCount} successful`);
-        return aggregatedResults;
       }
       
       return gmailData;
     } else {
       throw new Error('Data source configuration not found');
     }
+  }
+
+  private extractAttachments(emailData: any): any[] {
+    const attachments: any[] = [];
+    
+    const extractFromParts = (parts: any[]) => {
+      for (const part of parts) {
+        if (part.filename && part.filename.length > 0 && part.body?.attachmentId) {
+          attachments.push({
+            filename: part.filename,
+            mimeType: part.mimeType,
+            size: part.body.size,
+            attachmentId: part.body.attachmentId
+          });
+        }
+        
+        if (part.parts) {
+          extractFromParts(part.parts);
+        }
+      }
+    };
+    
+    if (emailData.payload?.parts) {
+      extractFromParts(emailData.payload.parts);
+    }
+    
+    return attachments;
   }
 
   private async executeDocumentProcessingStep(step: WorkflowStep, inputData: any): Promise<any> {
@@ -268,26 +310,17 @@ export class RealWorkflowEngine {
       for (const extractedItem of inputData.extractedData) {
         if (extractedItem.success && extractedItem.data) {
           try {
-            // Find corresponding email for context
-            const email = inputData.emails?.find((e: any) => 
-              e.attachments?.some((a: any) => a.filename === extractedItem.filename)
+            console.log(`💾 Storing invoice data for ${extractedItem.filename}`);
+            
+            await this.dbStorage.storeInvoiceInDatabase(
+              extractedItem.data,
+              extractedItem.email,
+              extractedItem.filename,
+              { source: 'workflow', workflowId }
             );
             
-            if (email) {
-              console.log(`💾 Storing invoice data for ${extractedItem.filename}`);
-              
-              await this.dbStorage.storeInvoiceInDatabase(
-                extractedItem.data,
-                email,
-                extractedItem.filename,
-                { source: 'workflow', workflowId }
-              );
-              
-              storedCount++;
-              console.log(`✅ Successfully stored ${extractedItem.filename} to database`);
-            } else {
-              console.log(`⚠️ No email context found for ${extractedItem.filename}`);
-            }
+            storedCount++;
+            console.log(`✅ Successfully stored ${extractedItem.filename} to database`);
           } catch (error) {
             console.error(`❌ Error storing ${extractedItem.filename}:`, error);
             errors.push(`Failed to store ${extractedItem.filename}: ${error instanceof Error ? error.message : 'Unknown error'}`);
