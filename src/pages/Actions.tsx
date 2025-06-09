@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,14 +11,16 @@ import { useNavigate } from "react-router-dom";
 import { WorkflowBuilderTab } from "./tabs/WorkflowBuilderTab";
 import { SavedWorkflowsTab } from "./tabs/SavedWorkflowsTab";
 import { WorkflowConfigDialog } from "@/components/workflow/WorkflowConfigDialog";
+import { ExecutionTracker } from "@/components/workflow/ExecutionTracker";
 import { RealWorkflowEngine } from "@/services/workflow/RealWorkflowEngine";
 import { workflowTemplates } from "@/data/workflowTemplates";
+import { useWorkflowPersistence } from "@/hooks/useWorkflowPersistence";
 import { WorkflowConfig, WorkflowTemplate, WorkflowStep } from "@/types/workflow";
 
 const Actions = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("builder");
-  const [workflows, setWorkflows] = useState<WorkflowConfig[]>([]);
+  const { workflows, addWorkflow, updateWorkflow } = useWorkflowPersistence();
   const [selectedStep, setSelectedStep] = useState<WorkflowStep | null>(null);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [showConfigDialog, setShowConfigDialog] = useState(false);
@@ -52,7 +53,7 @@ const Actions = () => {
       successRate: 0
     };
 
-    setWorkflows(prev => [...prev, workflow]);
+    addWorkflow(workflow);
     setShowTemplateDialog(false);
     
     toast({
@@ -87,28 +88,37 @@ const Actions = () => {
       const execution = await workflowEngine.executeWorkflow(workflow);
       setExecutionResults(execution);
       
-      const updatedWorkflows = workflows.map(w => 
-        w.id === workflow.id 
-          ? { 
-              ...w, 
-              lastRun: new Date(), 
-              totalRuns: (w.totalRuns || 0) + 1,
-              successRate: execution.status === 'completed' ? 95 : 85
-            }
-          : w
-      );
-      setWorkflows(updatedWorkflows);
+      // Update workflow with execution stats
+      updateWorkflow(workflow.id, { 
+        lastRun: new Date(), 
+        totalRuns: (workflow.totalRuns || 0) + 1,
+        successRate: execution.status === 'completed' ? 95 : 85
+      });
+
+      toast({
+        title: "Workflow Completed",
+        description: `${workflow.name} executed successfully!`,
+      });
 
     } catch (error) {
       console.error('Workflow execution error:', error);
       setValidationErrors([error instanceof Error ? error.message : 'Unknown error occurred']);
+      toast({
+        title: "Workflow Failed",
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: "destructive",
+      });
     } finally {
       setIsExecuting(false);
     }
   };
 
   const handleWorkflowSave = (workflow: WorkflowConfig) => {
-    setWorkflows(prev => [...prev, workflow]);
+    addWorkflow(workflow);
+    toast({
+      title: "Workflow Saved",
+      description: `"${workflow.name}" has been saved successfully.`,
+    });
   };
 
   const handleStepConfigSave = (updatedStep: WorkflowStep) => {
@@ -167,9 +177,11 @@ const Actions = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="builder">Workflow Builder</TabsTrigger>
-            <TabsTrigger value="workflows">Saved Workflows</TabsTrigger>
+            <TabsTrigger value="workflows">
+              Saved Workflows ({workflows.length})
+            </TabsTrigger>
             <TabsTrigger value="templates">Templates</TabsTrigger>
-            <TabsTrigger value="executions">Execution History</TabsTrigger>
+            <TabsTrigger value="executions">Execution Status</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
 
@@ -218,39 +230,7 @@ const Actions = () => {
           </TabsContent>
 
           <TabsContent value="executions" className="space-y-4">
-            {executionResults ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Latest Execution Results</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div>Status: <span className="font-medium">{executionResults.status}</span></div>
-                    <div>Steps Completed: {executionResults.stepResults.length}</div>
-                    <div>Duration: {executionResults.endTime ? 
-                      `${Math.round((new Date(executionResults.endTime).getTime() - new Date(executionResults.startTime).getTime()) / 1000)}s` 
-                      : 'Running...'
-                    }</div>
-                    {executionResults.errors && executionResults.errors.length > 0 && (
-                      <div className="mt-4">
-                        <h4 className="font-medium text-red-600">Errors:</h4>
-                        <ul className="list-disc list-inside text-sm text-red-600">
-                          {executionResults.errors.map((error: string, index: number) => (
-                            <li key={index}>{error}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <p className="text-muted-foreground">No executions yet</p>
-                </CardContent>
-              </Card>
-            )}
+            <ExecutionTracker execution={executionResults} />
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-4">

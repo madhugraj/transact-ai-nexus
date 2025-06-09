@@ -1,14 +1,13 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WorkflowStep } from '@/types/workflow';
-import { Settings, Mail, HardDrive, FileText, Database } from 'lucide-react';
+import { Settings } from 'lucide-react';
+import { DataSourceConfig } from './config/DataSourceConfig';
+import { DatabaseConfig } from './config/DatabaseConfig';
 
 interface WorkflowConfigDialogProps {
   step: WorkflowStep | null;
@@ -84,67 +83,17 @@ export const WorkflowConfigDialog: React.FC<WorkflowConfigDialogProps> = ({
 
           <TabsContent value="config" className="space-y-4">
             {editedStep.type === 'data-source' && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    Data Source Configuration
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label htmlFor="sourceType">Source Type</Label>
-                    <Select
-                      value={editedStep.config.emailConfig ? 'email' : editedStep.config.driveConfig ? 'drive' : ''}
-                      onValueChange={(value) => {
-                        if (value === 'email') {
-                          updateConfig('emailConfig', { source: 'gmail', filters: [], attachmentTypes: ['pdf'] });
-                          updateConfig('driveConfig', undefined);
-                        } else if (value === 'drive') {
-                          updateConfig('driveConfig', { source: 'google-drive', fileTypes: ['pdf'] });
-                          updateConfig('emailConfig', undefined);
-                        }
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select source type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="email">Email (Gmail)</SelectItem>
-                        <SelectItem value="drive">Google Drive</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+              <DataSourceConfig
+                step={editedStep}
+                onConfigUpdate={updateConfig}
+              />
+            )}
 
-                  {editedStep.config.emailConfig && (
-                    <div className="space-y-2">
-                      <Label>Email Filters (comma-separated)</Label>
-                      <Input
-                        placeholder="invoice, billing, purchase"
-                        value={editedStep.config.emailConfig.filters?.join(', ') || ''}
-                        onChange={(e) => updateConfig('emailConfig', {
-                          ...editedStep.config.emailConfig,
-                          filters: e.target.value.split(',').map(f => f.trim()).filter(Boolean)
-                        })}
-                      />
-                    </div>
-                  )}
-
-                  {editedStep.config.driveConfig && (
-                    <div className="space-y-2">
-                      <Label>Folder Path</Label>
-                      <Input
-                        placeholder="/Documents/Invoices"
-                        value={editedStep.config.driveConfig.folderPath || ''}
-                        onChange={(e) => updateConfig('driveConfig', {
-                          ...editedStep.config.driveConfig,
-                          folderPath: e.target.value
-                        })}
-                      />
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+            {editedStep.type === 'data-storage' && (
+              <DatabaseConfig
+                step={editedStep}
+                onConfigUpdate={updateConfig}
+              />
             )}
 
             {editedStep.type === 'document-processing' && (
@@ -190,48 +139,6 @@ export const WorkflowConfigDialog: React.FC<WorkflowConfigDialogProps> = ({
                       <SelectContent>
                         <SelectItem value="gemini">Gemini</SelectItem>
                         <SelectItem value="openai">OpenAI</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {editedStep.type === 'data-storage' && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Database className="h-4 w-4" />
-                    Storage Configuration
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label>Table Name</Label>
-                    <Input
-                      value={editedStep.config.storageConfig?.table || ''}
-                      onChange={(e) => updateConfig('storageConfig', {
-                        ...editedStep.config.storageConfig,
-                        table: e.target.value
-                      })}
-                      placeholder="invoice_data"
-                    />
-                  </div>
-                  <div>
-                    <Label>Action</Label>
-                    <Select
-                      value={editedStep.config.storageConfig?.action || 'insert'}
-                      onValueChange={(value) => updateConfig('storageConfig', {
-                        ...editedStep.config.storageConfig,
-                        action: value
-                      })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="insert">Insert</SelectItem>
-                        <SelectItem value="upsert">Upsert</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
