@@ -1,10 +1,10 @@
-
 import { WorkflowConfig, WorkflowStep, WorkflowExecutionResult } from '@/types/workflow';
 import { GmailWorkflowService } from './GmailWorkflowService';
 import { DocumentProcessingService } from './DocumentProcessingService';
 import { DatabaseStorageService } from './DatabaseStorageService';
 import { EmailAttachmentProcessor } from '@/services/email/attachmentProcessor';
 import { DatabaseStorage } from '@/services/email/databaseStorage';
+import { InvoiceDataExtractionAgent } from '@/services/agents/InvoiceDataExtractionAgent';
 import { supabase } from '@/integrations/supabase/client';
 
 export class RealWorkflowEngine {
@@ -13,6 +13,7 @@ export class RealWorkflowEngine {
   private databaseService = new DatabaseStorageService();
   private emailProcessor = new EmailAttachmentProcessor();
   private dbStorage = new DatabaseStorage();
+  private invoiceAgent = new InvoiceDataExtractionAgent();
 
   async validateWorkflowRequirements(workflow: WorkflowConfig): Promise<{ valid: boolean; errors: string[] }> {
     console.log('🔍 Validating workflow requirements for:', workflow.name);
@@ -219,21 +220,33 @@ export class RealWorkflowEngine {
 
                       console.log(`✅ Created file: ${file.name}, size: ${file.size} bytes`);
 
-                      // Process with Gemini
-                      console.log(`🤖 Processing ${attachment.filename} with Gemini...`);
-                      const { classifyDocument } = await import('@/components/document-comparison/upload/DocumentClassifier');
+                      // Process with Invoice Data Extraction Agent instead of DocumentClassifier
+                      console.log(`🤖 Processing ${attachment.filename} with Invoice Data Extraction Agent...`);
+                      const extractionResult = await this.invoiceAgent.process(file);
                       
-                      const extractedData = await classifyDocument(file);
-                      console.log(`✅ Extracted data from ${attachment.filename}:`, extractedData);
-                      
-                      processedResults.push({
-                        email: email,
-                        filename: attachment.filename,
-                        extractedData: extractedData,
-                        success: true
-                      });
-                      
-                      extractedDataCount++;
+                      if (extractionResult.success && extractionResult.data) {
+                        console.log(`✅ Successfully extracted invoice data from ${attachment.filename}:`, extractionResult.data);
+                        
+                        processedResults.push({
+                          email: email,
+                          filename: attachment.filename,
+                          extractedData: extractionResult.data,
+                          success: true,
+                          agent: 'invoice-data-extraction',
+                          metadata: extractionResult.metadata
+                        });
+                        
+                        extractedDataCount++;
+                      } else {
+                        console.error(`❌ Failed to extract data from ${attachment.filename}:`, extractionResult.error);
+                        processedResults.push({
+                          email: email,
+                          filename: attachment.filename,
+                          extractedData: null,
+                          success: false,
+                          error: extractionResult.error
+                        });
+                      }
 
                     } else {
                       console.error(`❌ Failed to get attachment data for ${attachment.filename}`);
@@ -268,7 +281,9 @@ export class RealWorkflowEngine {
             filename: r.filename,
             data: r.extractedData,
             email: r.email,
-            success: true
+            success: true,
+            agent: r.agent,
+            metadata: r.metadata
           }))
         };
       }
@@ -329,19 +344,31 @@ export class RealWorkflowEngine {
               // Convert blob to File object
               const fileObject = new File([fileData], file.name, { type: 'application/pdf' });
 
-              // Process with Gemini
-              console.log(`🤖 Processing ${file.name} with Gemini...`);
-              const { classifyDocument } = await import('@/components/document-comparison/upload/DocumentClassifier');
+              // Process with Invoice Data Extraction Agent instead of DocumentClassifier
+              console.log(`🤖 Processing ${file.name} with Invoice Data Extraction Agent...`);
+              const extractionResult = await this.invoiceAgent.process(fileObject);
               
-              const extractedData = await classifyDocument(fileObject);
-              console.log(`✅ Extracted data from ${file.name}:`, extractedData);
-              
-              processedResults.push({
-                file: file,
-                filename: file.name,
-                extractedData: extractedData,
-                success: true
-              });
+              if (extractionResult.success && extractionResult.data) {
+                console.log(`✅ Successfully extracted invoice data from ${file.name}:`, extractionResult.data);
+                
+                processedResults.push({
+                  file: file,
+                  filename: file.name,
+                  extractedData: extractionResult.data,
+                  success: true,
+                  agent: 'invoice-data-extraction',
+                  metadata: extractionResult.metadata
+                });
+              } else {
+                console.error(`❌ Failed to extract data from ${file.name}:`, extractionResult.error);
+                processedResults.push({
+                  file: file,
+                  filename: file.name,
+                  extractedData: null,
+                  success: false,
+                  error: extractionResult.error
+                });
+              }
 
             } else {
               console.error(`❌ Failed to download file: ${file.name}`);
@@ -362,7 +389,9 @@ export class RealWorkflowEngine {
             filename: r.filename,
             data: r.extractedData,
             file: r.file,
-            success: true
+            success: true,
+            agent: r.agent,
+            metadata: r.metadata
           }))
         };
 
