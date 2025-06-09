@@ -196,6 +196,7 @@ export type Database = {
           invoice_date: string | null
           invoice_number: number
           po_number: number | null
+          user_id: string | null
         }
         Insert: {
           attachment_invoice_name?: string | null
@@ -207,6 +208,7 @@ export type Database = {
           invoice_date?: string | null
           invoice_number: number
           po_number?: number | null
+          user_id?: string | null
         }
         Update: {
           attachment_invoice_name?: string | null
@@ -218,6 +220,7 @@ export type Database = {
           invoice_date?: string | null
           invoice_number?: number
           po_number?: number | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -244,6 +247,7 @@ export type Database = {
           project: string | null
           ship_to: string | null
           terms_conditions: string | null
+          user_id: string | null
           vendor_code: string | null
         }
         Insert: {
@@ -260,6 +264,7 @@ export type Database = {
           project?: string | null
           ship_to?: string | null
           terms_conditions?: string | null
+          user_id?: string | null
           vendor_code?: string | null
         }
         Update: {
@@ -276,7 +281,35 @@ export type Database = {
           project?: string | null
           ship_to?: string | null
           terms_conditions?: string | null
+          user_id?: string | null
           vendor_code?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
         }
         Relationships: []
       }

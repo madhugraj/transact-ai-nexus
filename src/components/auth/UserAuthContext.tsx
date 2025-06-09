@@ -1,55 +1,28 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { User, Session } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
 
 // Define user roles
 export type UserRole = 'finance_analyst' | 'project_manager' | 'auditor' | 'admin';
 
-// Define user interface
-export interface User {
+// Define user interface with profile data
+export interface UserProfile {
   id: string;
-  name: string;
   email: string;
-  role: UserRole;
-  avatar?: string;
+  full_name?: string;
+  avatar_url?: string;
+  role?: UserRole;
 }
-
-// Mock user data for demo
-const mockUsers: User[] = [
-  {
-    id: '1',
-    name: 'John Finance',
-    email: 'finance@example.com',
-    role: 'finance_analyst',
-    avatar: 'https://api.dicebear.com/7.x/personas/svg?seed=John'
-  },
-  {
-    id: '2',
-    name: 'Mary Manager',
-    email: 'manager@example.com',
-    role: 'project_manager',
-    avatar: 'https://api.dicebear.com/7.x/personas/svg?seed=Mary'
-  },
-  {
-    id: '3',
-    name: 'Alex Auditor',
-    email: 'auditor@example.com',
-    role: 'auditor',
-    avatar: 'https://api.dicebear.com/7.x/personas/svg?seed=Alex'
-  },
-  {
-    id: '4',
-    name: 'Admin User',
-    email: 'admin@example.com',
-    role: 'admin',
-    avatar: 'https://api.dicebear.com/7.x/personas/svg?seed=Admin'
-  }
-];
 
 // Context interfaces
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  profile: UserProfile | null;
+  session: Session | null;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signup: (email: string, password: string, fullName?: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
@@ -60,47 +33,147 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Provider component
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for saved user in localStorage
-    const savedUser = localStorage.getItem('transactionAgentUser');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setIsLoading(false);
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.email);
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        // Fetch user profile when authenticated
+        if (session?.user) {
+          setTimeout(async () => {
+            await fetchUserProfile(session.user.id);
+          }, 0);
+        } else {
+          setProfile(null);
+        }
+        
+        setIsLoading(false);
+      }
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        fetchUserProfile(session.user.id);
+      }
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  // Mock login function
-  const login = async (email: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
-    
-    // Simulate API request delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const foundUser = mockUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
-    
-    if (foundUser && password === '123456') { // Simple password for demo
-      setUser(foundUser);
-      localStorage.setItem('transactionAgentUser', JSON.stringify(foundUser));
-      setIsLoading(false);
-      return true;
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching profile:', error);
+        return;
+      }
+
+      if (profileData) {
+        setProfile({
+          id: profileData.id,
+          email: profileData.email || '',
+          full_name: profileData.full_name,
+          avatar_url: profileData.avatar_url,
+          role: 'finance_analyst' // Default role for now
+        });
+      }
+    } catch (error) {
+      console.error('Error in fetchUserProfile:', error);
     }
-    
-    setIsLoading(false);
-    return false;
+  };
+
+  // Login function using Supabase auth
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      setIsLoading(true);
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'An unexpected error occurred' 
+      };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Signup function using Supabase auth
+  const signup = async (email: string, password: string, fullName?: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      setIsLoading(true);
+      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            full_name: fullName || '',
+          }
+        }
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'An unexpected error occurred' 
+      };
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Logout function
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('transactionAgentUser');
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
   };
 
   return (
     <AuthContext.Provider value={{ 
       user, 
+      profile,
+      session,
       login, 
+      signup,
       logout, 
       isAuthenticated: !!user,
       isLoading 

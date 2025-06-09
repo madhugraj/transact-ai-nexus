@@ -13,6 +13,13 @@ export class DatabaseStorage {
     console.log(`📊 Extracted data:`, extractedData);
     
     try {
+      // Get current user from Supabase auth
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        throw new Error('User must be authenticated to store invoice data');
+      }
+
       // Validate required fields before processing
       if (!extractedData) {
         throw new Error('No extracted data provided');
@@ -22,7 +29,6 @@ export class DatabaseStorage {
       let invoiceNumber = 0;
       if (extractedData.invoice_number) {
         if (typeof extractedData.invoice_number === 'string') {
-          // Try to extract numbers from string
           const numberMatch = extractedData.invoice_number.match(/\d+/);
           invoiceNumber = numberMatch ? parseInt(numberMatch[0]) : 0;
         } else {
@@ -39,7 +45,6 @@ export class DatabaseStorage {
         
         let poNumberValue;
         if (typeof extractedData.po_number === 'string') {
-          // Try to extract numbers from string
           const numberMatch = extractedData.po_number.match(/\d+/);
           poNumberValue = numberMatch ? parseInt(numberMatch[0]) : null;
         } else {
@@ -51,15 +56,16 @@ export class DatabaseStorage {
             .from('po_table')
             .select('po_number')
             .eq('po_number', poNumberValue)
+            .eq('user_id', user.id) // Only check user's own POs
             .single();
 
-          if (poError && poError.code !== 'PGRST116') { // PGRST116 is "not found"
+          if (poError && poError.code !== 'PGRST116') {
             console.error('Error checking PO existence:', poError);
           } else if (poData) {
             poNumber = poNumberValue;
             console.log(`✅ PO number ${poNumberValue} exists in po_table`);
           } else {
-            console.log(`⚠️ PO number ${poNumberValue} not found in po_table - will proceed with null PO reference`);
+            console.log(`⚠️ PO number ${poNumberValue} not found in user's po_table - will proceed with null PO reference`);
           }
         }
       } else {
@@ -83,16 +89,18 @@ export class DatabaseStorage {
             .select('*')
             .eq('invoice_number', invoiceNumber)
             .eq('attachment_invoice_name', filename)
-            .eq('email_header', email.subject || '');
+            .eq('email_header', email.subject || '')
+            .eq('user_id', user.id); // Only check user's own invoices
 
           if (existingRecord && existingRecord.length > 0) {
             console.log(`⚠️ Record already exists for invoice ${invoiceNumber} with filename ${filename}, skipping insertion`);
             continue;
           }
           
-          // Map to the actual invoice_table schema
+          // Map to the actual invoice_table schema with user_id
           const invoiceRecord = {
-            po_number: poNumber, // This can now be null
+            user_id: user.id, // Add user_id for RLS
+            po_number: poNumber,
             invoice_date: extractedData.invoice_date || null,
             invoice_number: invoiceNumber,
             email_date: email.date ? new Date(email.date).toISOString().split('T')[0] : null,
@@ -117,7 +125,8 @@ export class DatabaseStorage {
             invoice_number: invoiceRecord.invoice_number,
             po_number: invoiceRecord.po_number,
             attachment_invoice_name: invoiceRecord.attachment_invoice_name,
-            email_header: invoiceRecord.email_header
+            email_header: invoiceRecord.email_header,
+            user_id: invoiceRecord.user_id
           });
 
           try {
@@ -128,29 +137,25 @@ export class DatabaseStorage {
 
             if (insertError) {
               console.error(`❌ Database insert error for line item ${i + 1}:`, insertError);
-              console.error(`❌ Failed record:`, invoiceRecord);
               
-              // If it's a duplicate key error, log it but don't throw to continue processing
               if (insertError.code === '23505') {
                 console.log(`⚠️ Duplicate key detected for line item ${i + 1}, skipping but continuing with next items`);
                 continue;
               }
               
-              throw insertError; // Throw for other types of errors
+              throw insertError;
             } else {
               console.log(`✅ Successfully inserted line item ${i + 1}/${lineItems.length} into invoice_table`, data);
             }
           } catch (itemError: any) {
             console.error(`❌ Error inserting line item ${i + 1}:`, itemError);
-            console.error(`❌ Failed record:`, invoiceRecord);
             
-            // If it's a duplicate key error, continue with next item
             if (itemError.code === '23505') {
               console.log(`⚠️ Duplicate key detected for line item ${i + 1}, continuing with next items`);
               continue;
             }
             
-            throw itemError; // Re-throw for other types of errors
+            throw itemError;
           }
         }
       } else {
@@ -163,7 +168,8 @@ export class DatabaseStorage {
           .select('*')
           .eq('invoice_number', invoiceNumber)
           .eq('attachment_invoice_name', filename)
-          .eq('email_header', email.subject || '');
+          .eq('email_header', email.subject || '')
+          .eq('user_id', user.id); // Only check user's own invoices
 
         if (existingRecord && existingRecord.length > 0) {
           console.log(`⚠️ Record already exists for invoice ${invoiceNumber} with filename ${filename}, skipping insertion`);
@@ -171,7 +177,8 @@ export class DatabaseStorage {
         }
         
         const invoiceRecord = {
-          po_number: poNumber, // This can now be null
+          user_id: user.id, // Add user_id for RLS
+          po_number: poNumber,
           invoice_date: extractedData.invoice_date || null,
           invoice_number: invoiceNumber,
           email_date: email.date ? new Date(email.date).toISOString().split('T')[0] : null,
@@ -193,7 +200,8 @@ export class DatabaseStorage {
         console.log(`💾 Attempting to insert single invoice record:`, {
           invoice_number: invoiceRecord.invoice_number,
           po_number: invoiceRecord.po_number,
-          attachment_invoice_name: invoiceRecord.attachment_invoice_name
+          attachment_invoice_name: invoiceRecord.attachment_invoice_name,
+          user_id: invoiceRecord.user_id
         });
 
         try {
@@ -204,9 +212,7 @@ export class DatabaseStorage {
 
           if (insertError) {
             console.error(`❌ Database insert error:`, insertError);
-            console.error(`❌ Failed record:`, invoiceRecord);
             
-            // If it's a duplicate key error, log it but don't throw
             if (insertError.code === '23505') {
               console.log(`⚠️ Duplicate key detected for invoice record, but processing completed`);
               return;
@@ -218,9 +224,7 @@ export class DatabaseStorage {
           }
         } catch (insertError: any) {
           console.error(`❌ Failed to insert invoice record:`, insertError);
-          console.error(`❌ Failed record:`, invoiceRecord);
           
-          // If it's a duplicate key error, log it but don't throw
           if (insertError.code === '23505') {
             console.log(`⚠️ Duplicate key detected for invoice record, but processing completed`);
             return;

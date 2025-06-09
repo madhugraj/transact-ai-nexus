@@ -6,6 +6,13 @@ export class DatabaseStorageService {
     console.log('💾 Storing data to database with config:', config);
     console.log('📄 Data to store:', data);
     
+    // Get current user from Supabase auth
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      throw new Error('User must be authenticated to store data');
+    }
+    
     if (!data || data.length === 0) {
       console.log('⚠️ No data to store');
       return {
@@ -23,8 +30,9 @@ export class DatabaseStorageService {
       
       console.log(`📊 Attempting to ${action} ${data.length} records to table: ${tableName}`);
       
-      // Transform data for database storage
+      // Transform data for database storage with user_id
       const dbRecords = data.map(item => ({
+        user_id: user.id, // Add user_id for RLS
         file_name: item.fileName || item.name || 'unknown',
         source: item.source || 'workflow',
         type: item.type || 'document',
@@ -39,7 +47,7 @@ export class DatabaseStorageService {
         result = await supabase
           .from(tableName)
           .upsert(dbRecords, { 
-            onConflict: 'file_name,source',
+            onConflict: 'file_name,source,user_id',
             ignoreDuplicates: false 
           });
       } else {
