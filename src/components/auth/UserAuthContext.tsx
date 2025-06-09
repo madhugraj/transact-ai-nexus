@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error fetching profile:', error);
@@ -110,11 +110,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) {
+        console.error('Login error:', error);
         return { success: false, error: error.message };
       }
 
+      console.log('Login successful:', data);
       return { success: true };
     } catch (error) {
+      console.error('Login exception:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'An unexpected error occurred' 
@@ -129,6 +132,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       
+      console.log('Attempting signup for:', email);
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -141,11 +146,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) {
+        console.error('Signup error:', error);
         return { success: false, error: error.message };
+      }
+
+      console.log('Signup response:', data);
+
+      // Check if user needs email confirmation
+      if (data.user && !data.session) {
+        return { 
+          success: true, 
+          error: 'Please check your email to confirm your account before signing in.' 
+        };
       }
 
       return { success: true };
     } catch (error) {
+      console.error('Signup exception:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'An unexpected error occurred' 

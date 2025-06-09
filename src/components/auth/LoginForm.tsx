@@ -54,14 +54,19 @@ const LoginForm = () => {
       let result;
       
       if (isSignUp) {
+        console.log('Attempting signup...');
         result = await signup(email, password, fullName);
         if (result.success) {
           toast({
-            title: "Account created",
-            description: "Please check your email to confirm your account"
+            title: "Account created successfully",
+            description: result.error || "Welcome to Z-Transact! You can now sign in.",
           });
+          // Switch to login mode after successful signup
+          setIsSignUp(false);
+          setPassword(''); // Clear password for security
         }
       } else {
+        console.log('Attempting login...');
         result = await login(email, password);
         if (result.success) {
           toast({
@@ -71,14 +76,15 @@ const LoginForm = () => {
         }
       }
 
-      if (!result.success) {
+      if (!result.success && result.error) {
         toast({
           title: isSignUp ? "Signup failed" : "Authentication failed",
-          description: result.error || "An error occurred",
+          description: result.error,
           variant: "destructive"
         });
       }
     } catch (error) {
+      console.error('Form submission error:', error);
       toast({
         title: "Error",
         description: "An unexpected error occurred",
@@ -87,6 +93,14 @@ const LoginForm = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Clear form when switching between login/signup
+  const handleModeSwitch = () => {
+    setIsSignUp(!isSignUp);
+    setEmail('');
+    setPassword('');
+    setFullName('');
   };
 
   return (
@@ -157,6 +171,7 @@ const LoginForm = () => {
                     value={fullName} 
                     onChange={e => setFullName(e.target.value)} 
                     className="h-12 bg-[#1c2136] border-[#2a3149] text-white focus:ring-[#6366F1] focus:border-[#6366F1] transition-all" 
+                    required={isSignUp}
                   />
                 </div>
               )}
@@ -172,6 +187,7 @@ const LoginForm = () => {
                     value={email} 
                     onChange={e => setEmail(e.target.value)} 
                     className="pl-10 h-12 bg-[#1c2136] border-[#2a3149] text-white focus:ring-[#6366F1] focus:border-[#6366F1] transition-all" 
+                    required
                   />
                 </div>
               </div>
@@ -193,6 +209,8 @@ const LoginForm = () => {
                     value={password} 
                     onChange={e => setPassword(e.target.value)}
                     className="pl-10 pr-10 h-12 bg-[#1c2136] border-[#2a3149] text-white focus:ring-[#6366F1] focus:border-[#6366F1] transition-all" 
+                    required
+                    minLength={isSignUp ? 6 : undefined}
                   />
                   <button
                     type="button"
@@ -202,6 +220,9 @@ const LoginForm = () => {
                     {showPassword ? <EyeOff /> : <Eye />}
                   </button>
                 </div>
+                {isSignUp && (
+                  <p className="text-xs text-gray-400">Password must be at least 6 characters long</p>
+                )}
               </div>
               
               <Button 
@@ -219,7 +240,7 @@ const LoginForm = () => {
                 {isSignUp ? "Already have an account? " : "Don't have an account? "}
                 <button 
                   type="button"
-                  onClick={() => setIsSignUp(!isSignUp)}
+                  onClick={handleModeSwitch}
                   className="text-[#6366F1] hover:text-[#A855F7] transition-colors hover:underline"
                 >
                   {isSignUp ? "Sign in" : "Sign up"}
