@@ -1,12 +1,17 @@
+
 import { WorkflowConfig, WorkflowStep, WorkflowExecutionResult } from '@/types/workflow';
 import { GmailWorkflowService } from './GmailWorkflowService';
 import { DocumentProcessingService } from './DocumentProcessingService';
 import { DatabaseStorageService } from './DatabaseStorageService';
+import { EmailAttachmentProcessor } from '@/services/email/attachmentProcessor';
+import { DatabaseStorage } from '@/services/email/databaseStorage';
 
 export class RealWorkflowEngine {
   private gmailService = new GmailWorkflowService();
   private documentService = new DocumentProcessingService();
   private databaseService = new DatabaseStorageService();
+  private emailProcessor = new EmailAttachmentProcessor();
+  private dbStorage = new DatabaseStorage();
 
   async validateWorkflowRequirements(workflow: WorkflowConfig): Promise<{ valid: boolean; errors: string[] }> {
     console.log('🔍 Validating workflow requirements for:', workflow.name);
@@ -127,11 +132,73 @@ export class RealWorkflowEngine {
     
     if (config.emailConfig) {
       console.log('📧 Fetching Gmail data with config:', config.emailConfig);
+      
+      // Step 1: Fetch emails with attachments
       const gmailData = await this.gmailService.fetchEmailsWithAttachments(config.emailConfig.filters || []);
+      console.log('📧 Gmail data fetched:', gmailData);
       
       if (config.emailConfig.attachmentTypes?.includes('pdf')) {
-        const attachments = await this.gmailService.processEmailAttachments(gmailData.emails || []);
-        return { ...gmailData, attachments };
+        console.log('📎 Processing email attachments...');
+        
+        // Step 2: Process attachments using the tested email processor
+        const emails = gmailData.emails || [];
+        const processedResults = {
+          source: 'gmail',
+          emails: [],
+          attachments: [],
+          invoiceValidation: [],
+          extractedData: [],
+          processedCount: 0,
+          successCount: 0
+        };
+
+        for (const email of emails.slice(0, 5)) { // Process first 5 emails
+          console.log(`📧 Processing email: ${email.subject}`);
+          
+          if (email.attachments && email.attachments.length > 0) {
+            for (const attachment of email.attachments) {
+              if (attachment.mimeType === 'application/pdf') {
+                console.log(`📎 Processing PDF attachment: ${attachment.filename}`);
+                
+                try {
+                  // Create a mock file object for processing
+                  const mockFile = new File([], attachment.filename, { type: attachment.mimeType });
+                  const attachmentData = {
+                    file: mockFile,
+                    filename: attachment.filename,
+                    mimeType: attachment.mimeType,
+                    size: attachment.size
+                  };
+
+                  const emailContext = {
+                    subject: email.subject,
+                    from: email.from,
+                    date: email.date
+                  };
+
+                  // Use the tested email attachment processor
+                  const processed = await this.emailProcessor.processAttachment(
+                    attachmentData,
+                    email,
+                    emailContext,
+                    processedResults
+                  );
+
+                  if (processed) {
+                    processedResults.successCount++;
+                  }
+                  processedResults.processedCount++;
+
+                } catch (error) {
+                  console.error(`❌ Error processing attachment ${attachment.filename}:`, error);
+                }
+              }
+            }
+          }
+        }
+        
+        console.log(`✅ Processed ${processedResults.processedCount} attachments, ${processedResults.successCount} successful`);
+        return processedResults;
       }
       
       return gmailData;
@@ -141,11 +208,16 @@ export class RealWorkflowEngine {
   }
 
   private async executeDocumentProcessingStep(step: WorkflowStep, inputData: any): Promise<any> {
+    console.log('🔄 Document processing step - data already processed in data source step');
+    
+    // Document processing was already done in the data source step for emails
+    if (inputData?.extractedData && inputData.extractedData.length > 0) {
+      console.log(`📊 Found ${inputData.extractedData.length} extracted documents`);
+      return inputData;
+    }
+    
+    // For other data sources, use the document service
     const config = step.config || {};
-    
-    console.log('🔄 Processing documents with config:', config.processingConfig);
-    
-    // Extract files/attachments from input data
     const files = inputData?.attachments || inputData?.files || [];
     
     if (files.length === 0) {
@@ -160,11 +232,57 @@ export class RealWorkflowEngine {
     const config = step.config || {};
     
     console.log('💾 Storing data with config:', config.storageConfig);
+    console.log('📄 Input data for storage:', inputData);
     
-    // Extract the processed data
-    const dataToStore = inputData?.extractedData || inputData?.processedData || inputData || [];
+    // Handle extracted invoice data from email processing
+    if (inputData?.extractedData && inputData.extractedData.length > 0) {
+      console.log(`💾 Storing ${inputData.extractedData.length} extracted invoices to database`);
+      
+      let storedCount = 0;
+      const errors: string[] = [];
+      
+      for (const extractedItem of inputData.extractedData) {
+        if (extractedItem.success && extractedItem.data) {
+          try {
+            // Find corresponding email for context
+            const email = inputData.emails?.find((e: any) => 
+              e.attachments?.some((a: any) => a.filename === extractedItem.filename)
+            );
+            
+            if (email) {
+              console.log(`💾 Storing invoice data for ${extractedItem.filename}`);
+              
+              await this.dbStorage.storeInvoiceInDatabase(
+                extractedItem.data,
+                email,
+                extractedItem.filename,
+                { source: 'workflow', workflowId }
+              );
+              
+              storedCount++;
+              console.log(`✅ Successfully stored ${extractedItem.filename} to database`);
+            } else {
+              console.log(`⚠️ No email context found for ${extractedItem.filename}`);
+            }
+          } catch (error) {
+            console.error(`❌ Error storing ${extractedItem.filename}:`, error);
+            errors.push(`Failed to store ${extractedItem.filename}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        }
+      }
+      
+      return {
+        action: 'invoice_storage',
+        table: 'invoice_table',
+        recordsProcessed: inputData.extractedData.length,
+        recordsStored: storedCount,
+        errors,
+        workflowId
+      };
+    }
     
-    // Add workflow ID to config for tracking
+    // Fallback to generic database storage
+    const dataToStore = inputData?.processedData || inputData || [];
     const storageConfig = {
       ...config.storageConfig,
       workflowId
