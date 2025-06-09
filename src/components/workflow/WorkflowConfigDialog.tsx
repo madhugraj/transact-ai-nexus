@@ -1,11 +1,14 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { WorkflowStep } from '@/types/workflow';
-import { Settings } from 'lucide-react';
+import { Settings, FileText } from 'lucide-react';
 import { DataSourceConfig } from './config/DataSourceConfig';
 import { DatabaseConfig } from './config/DatabaseConfig';
 
