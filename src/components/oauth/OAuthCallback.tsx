@@ -7,7 +7,6 @@ const OAuthCallback = () => {
     console.log('Current URL:', window.location.href);
     console.log('Current origin:', window.location.origin);
     console.log('Has opener:', !!window.opener);
-    console.log('Opener closed:', window.opener ? window.opener.closed : 'no opener');
     
     // Get the current URL and extract any parameters
     const urlParams = new URLSearchParams(window.location.search);
@@ -19,145 +18,109 @@ const OAuthCallback = () => {
     console.log('URL search params:', window.location.search);
     console.log('Full URL for debugging:', window.location.href);
     
-    // Send the result back to the parent window
-    if (window.opener && !window.opener.closed) {
-      console.log('Opener window found and not closed, preparing to send message...');
-      
-      // Get the opener's origin to send messages to the correct target
-      let targetOrigin = '*';
+    // Create a robust message to send to parent
+    const sendMessageToParent = (messageData: any) => {
       try {
-        if (window.opener.location && window.opener.location.origin) {
-          targetOrigin = window.opener.location.origin;
-          console.log('Using opener origin as target:', targetOrigin);
+        // Try to send to opener window first
+        if (window.opener && !window.opener.closed) {
+          console.log('Sending message to opener window');
+          window.opener.postMessage(messageData, '*');
+        }
+        
+        // Also try to send to parent (in case of iframe)
+        if (window.parent && window.parent !== window) {
+          console.log('Sending message to parent window');
+          window.parent.postMessage(messageData, '*');
+        }
+        
+        // Also try to send to top window
+        if (window.top && window.top !== window) {
+          console.log('Sending message to top window');
+          window.top.postMessage(messageData, '*');
         }
       } catch (e) {
-        console.log('Could not access opener origin, using wildcard');
+        console.error('Failed to send message:', e);
       }
+    };
+    
+    if (code) {
+      console.log('OAuth success, sending code to parent');
+      const message = {
+        type: 'OAUTH_SUCCESS',
+        code: code,
+        timestamp: Date.now(),
+        source: 'oauth-callback'
+      };
       
-      if (code) {
-        console.log('OAuth success, sending code to parent');
-        const message = {
-          type: 'OAUTH_SUCCESS',
-          code: code,
-          timestamp: Date.now(),
-          source: 'oauth-callback'
-        };
-        
-        console.log('Message to send:', message);
-        console.log('Target origin:', targetOrigin);
-        
-        // Send message multiple times to ensure delivery
-        const sendMessage = () => {
-          try {
-            window.opener.postMessage(message, targetOrigin);
-            console.log('✅ Successfully sent success message to opener');
-          } catch (error) {
-            console.error('❌ Failed to send message:', error);
-            // Fallback to wildcard if specific origin fails
-            try {
-              window.opener.postMessage(message, '*');
-              console.log('✅ Fallback: sent message with wildcard origin');
-            } catch (fallbackError) {
-              console.error('❌ Fallback also failed:', fallbackError);
-            }
-          }
-        };
-        
-        // Send immediately
-        sendMessage();
-        
-        // Send again after small delays
-        setTimeout(sendMessage, 100);
-        setTimeout(sendMessage, 500);
-        setTimeout(sendMessage, 1000);
-        
-        // Wait longer before closing to ensure message is received
-        setTimeout(() => {
-          console.log('Attempting to close popup window after success');
-          try {
-            window.close();
-          } catch (e) {
-            console.log('Could not close window automatically:', e);
-          }
-        }, 3000);
-      } else if (error) {
-        console.log('OAuth error detected:', error);
-        const message = {
-          type: 'OAUTH_ERROR',
-          error: error,
-          timestamp: Date.now(),
-          source: 'oauth-callback'
-        };
-        
-        console.log('Error message to send:', message);
-        
-        const sendErrorMessage = () => {
-          try {
-            window.opener.postMessage(message, targetOrigin);
-            console.log('✅ Successfully sent error message to opener');
-          } catch (error) {
-            console.error('❌ Failed to send error message:', error);
-            // Fallback to wildcard
-            try {
-              window.opener.postMessage(message, '*');
-              console.log('✅ Fallback: sent error message with wildcard origin');
-            } catch (fallbackError) {
-              console.error('❌ Fallback error message also failed:', fallbackError);
-            }
-          }
-        };
-        
-        // Send error message multiple times
-        sendErrorMessage();
-        setTimeout(sendErrorMessage, 100);
-        setTimeout(sendErrorMessage, 500);
-        setTimeout(sendErrorMessage, 1000);
-        
-        setTimeout(() => {
-          console.log('Attempting to close popup window after error');
-          try {
-            window.close();
-          } catch (e) {
-            console.log('Could not close window automatically:', e);
-          }
-        }, 3000);
-      } else {
-        console.log('No code or error found in URL parameters');
-        
-        const message = {
-          type: 'OAUTH_ERROR',
-          error: 'No authorization code or error received',
-          timestamp: Date.now(),
-          source: 'oauth-callback'
-        };
-        
+      console.log('Message to send:', message);
+      
+      // Send message multiple times with different intervals to ensure delivery
+      const sendMessage = () => sendMessageToParent(message);
+      
+      // Send immediately and with delays
+      sendMessage();
+      setTimeout(sendMessage, 100);
+      setTimeout(sendMessage, 500);
+      setTimeout(sendMessage, 1000);
+      setTimeout(sendMessage, 2000);
+      
+      // Wait before closing to ensure message is received
+      setTimeout(() => {
+        console.log('Attempting to close popup window after success');
         try {
-          window.opener.postMessage(message, targetOrigin);
-          console.log('Sent no-data message to opener');
+          window.close();
         } catch (e) {
-          console.error('Failed to send no-data message:', e);
-          try {
-            window.opener.postMessage(message, '*');
-            console.log('Fallback: sent no-data message with wildcard');
-          } catch (fallbackError) {
-            console.error('Fallback no-data message also failed:', fallbackError);
-          }
+          console.log('Could not close window automatically:', e);
         }
-        
-        setTimeout(() => {
-          console.log('Closing popup - no auth data found');
-          try {
-            window.close();
-          } catch (e) {
-            console.log('Could not close window automatically:', e);
-          }
-        }, 4000);
-      }
+      }, 3000);
+    } else if (error) {
+      console.log('OAuth error detected:', error);
+      const message = {
+        type: 'OAUTH_ERROR',
+        error: error,
+        timestamp: Date.now(),
+        source: 'oauth-callback'
+      };
+      
+      console.log('Error message to send:', message);
+      
+      const sendErrorMessage = () => sendMessageToParent(message);
+      
+      // Send error message multiple times
+      sendErrorMessage();
+      setTimeout(sendErrorMessage, 100);
+      setTimeout(sendErrorMessage, 500);
+      setTimeout(sendErrorMessage, 1000);
+      setTimeout(sendErrorMessage, 2000);
+      
+      setTimeout(() => {
+        console.log('Attempting to close popup window after error');
+        try {
+          window.close();
+        } catch (e) {
+          console.log('Could not close window automatically:', e);
+        }
+      }, 3000);
     } else {
-      console.log('No opener window found or opener is closed');
-      console.log('Redirecting to main app...');
-      // If no opener, redirect to the main app
-      window.location.href = '/';
+      console.log('No code or error found in URL parameters');
+      
+      const message = {
+        type: 'OAUTH_ERROR',
+        error: 'No authorization code or error received',
+        timestamp: Date.now(),
+        source: 'oauth-callback'
+      };
+      
+      sendMessageToParent(message);
+      
+      setTimeout(() => {
+        console.log('Closing popup - no auth data found');
+        try {
+          window.close();
+        } catch (e) {
+          console.log('Could not close window automatically:', e);
+        }
+      }, 4000);
     }
   }, []);
 
@@ -174,7 +137,15 @@ const OAuthCallback = () => {
           <p>URL: {window.location.href}</p>
           <p>Origin: {window.location.origin}</p>
           <p>Has opener: {window.opener ? 'Yes' : 'No'}</p>
-          <p>Opener closed: {window.opener ? (window.opener.closed ? 'Yes' : 'No') : 'N/A'}</p>
+          {window.opener && (
+            <p>Opener closed: {(() => {
+              try {
+                return window.opener.closed ? 'Yes' : 'No';
+              } catch (e) {
+                return 'Cannot check (COOP)';
+              }
+            })()}</p>
+          )}
         </div>
         
         <p className="text-xs text-gray-400 mt-4">

@@ -97,65 +97,91 @@ const GoogleDriveConnectorRefactored = () => {
 
       console.log('🔗 Opening Google Drive auth URL');
       
-      // Open auth window
+      // Use a different approach for popup handling to avoid COOP issues
       const authWindow = window.open(
         data.authUrl,
         'google-drive-auth',
-        'width=500,height=600,scrollbars=yes,resizable=yes'
+        'width=600,height=700,scrollbars=yes,resizable=yes,status=yes,toolbar=no,menubar=no,location=no'
       );
 
       if (!authWindow) {
         throw new Error('Failed to open authentication window. Please check popup blocker settings.');
       }
 
-      // Listen for auth completion
+      // Enhanced message listener with better error handling
       const messageListener = (event: MessageEvent) => {
-        if (event.origin !== window.location.origin) return;
+        // Accept messages from any origin to handle COOP restrictions
+        console.log('📨 Received message:', event.data, 'from origin:', event.origin);
 
-        if (event.data.type === 'GOOGLE_DRIVE_AUTH_SUCCESS') {
-          console.log('✅ Google Drive authentication successful');
-          
-          // Store tokens with error handling
-          try {
-            localStorage.setItem('drive_auth_tokens', JSON.stringify(event.data.tokens));
-            setIsConnected(true);
-            setError(null);
-            authWindow.close();
+        if (event.data && typeof event.data === 'object') {
+          if (event.data.type === 'OAUTH_SUCCESS' && event.data.code) {
+            console.log('✅ OAuth success detected, processing...');
             
-            toast({
-              title: "Connected to Google Drive",
-              description: "Successfully connected to your Google Drive account",
-            });
-
-            // Auto-load files after successful connection
-            setTimeout(() => {
-              loadFiles();
-            }, 1000);
-
-          } catch (storageError) {
-            console.error('❌ Failed to store tokens:', storageError);
-            setError('Failed to save authentication tokens');
+            // Exchange the code for tokens
+            exchangeCodeForTokens(event.data.code);
+            
+            // Close the popup window
+            try {
+              authWindow.close();
+            } catch (e) {
+              console.log('Could not close auth window:', e);
+            }
+            
+            window.removeEventListener('message', messageListener);
+          } else if (event.data.type === 'OAUTH_ERROR') {
+            console.error('❌ OAuth error:', event.data.error);
+            setError(event.data.error || 'Authentication failed');
+            
+            try {
+              authWindow.close();
+            } catch (e) {
+              console.log('Could not close auth window:', e);
+            }
+            
+            window.removeEventListener('message', messageListener);
+            setIsLoading(false);
           }
-          
-          window.removeEventListener('message', messageListener);
-        } else if (event.data.type === 'GOOGLE_DRIVE_AUTH_ERROR') {
-          console.error('❌ Google Drive authentication failed:', event.data.error);
-          setError(event.data.error || 'Authentication failed');
-          authWindow.close();
-          window.removeEventListener('message', messageListener);
         }
       };
 
+      // Listen for messages from the popup
       window.addEventListener('message', messageListener);
 
-      // Handle window close
-      const checkClosed = setInterval(() => {
-        if (authWindow.closed) {
-          clearInterval(checkClosed);
-          window.removeEventListener('message', messageListener);
-          setIsLoading(false);
+      // Fallback: Monitor popup window status
+      const checkWindowStatus = setInterval(() => {
+        try {
+          if (authWindow.closed) {
+            console.log('🔍 Auth window was closed');
+            clearInterval(checkWindowStatus);
+            window.removeEventListener('message', messageListener);
+            setIsLoading(false);
+            
+            // Check if we got tokens in the meantime
+            const tokens = localStorage.getItem('drive_auth_tokens');
+            if (!tokens) {
+              setError('Authentication was cancelled or failed');
+            }
+          }
+        } catch (e) {
+          // COOP policy might prevent access to authWindow.closed
+          console.log('Cannot check window status due to COOP policy');
         }
       }, 1000);
+
+      // Timeout after 5 minutes
+      setTimeout(() => {
+        clearInterval(checkWindowStatus);
+        window.removeEventListener('message', messageListener);
+        try {
+          if (!authWindow.closed) {
+            authWindow.close();
+          }
+        } catch (e) {
+          console.log('Could not close auth window on timeout:', e);
+        }
+        setIsLoading(false);
+        setError('Authentication timed out. Please try again.');
+      }, 300000); // 5 minutes
 
     } catch (error) {
       console.error('❌ Google Drive connection error:', error);
@@ -166,7 +192,55 @@ const GoogleDriveConnectorRefactored = () => {
         description: error instanceof Error ? error.message : 'Failed to connect to Google Drive',
         variant: "destructive"
       });
-    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const exchangeCodeForTokens = async (authCode: string) => {
+    try {
+      console.log('🔄 Exchanging authorization code for tokens...');
+      
+      const { data, error } = await supabase.functions.invoke('google-auth', {
+        body: {
+          authCode: authCode,
+          redirectUri: `${window.location.origin}/oauth/callback`
+        }
+      });
+
+      if (error) {
+        throw new Error(`Token exchange failed: ${error.message}`);
+      }
+
+      if (!data?.accessToken) {
+        throw new Error('No access token received');
+      }
+
+      // Store tokens
+      const tokens = {
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        expiresIn: data.expiresIn,
+        scope: data.scope
+      };
+
+      localStorage.setItem('drive_auth_tokens', JSON.stringify(tokens));
+      setIsConnected(true);
+      setError(null);
+      setIsLoading(false);
+      
+      toast({
+        title: "Connected to Google Drive",
+        description: "Successfully connected to your Google Drive account",
+      });
+
+      // Auto-load files after successful connection
+      setTimeout(() => {
+        loadFiles();
+      }, 1000);
+
+    } catch (error) {
+      console.error('❌ Token exchange failed:', error);
+      setError(error instanceof Error ? error.message : 'Token exchange failed');
       setIsLoading(false);
     }
   };
