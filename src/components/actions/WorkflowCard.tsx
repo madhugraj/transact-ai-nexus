@@ -32,10 +32,18 @@ interface WorkflowCardProps {
   workflow: WorkflowConfig;
   onEdit?: (workflow: WorkflowConfig) => void;
   onDelete?: (workflowId: string) => void;
+  onExecute?: (workflow: WorkflowConfig) => void;
+  isExecuting?: boolean;
 }
 
-const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onEdit, onDelete }) => {
-  const { updateWorkflow, executeWorkflow, isExecuting } = useWorkflow();
+const WorkflowCard: React.FC<WorkflowCardProps> = ({ 
+  workflow, 
+  onEdit, 
+  onDelete, 
+  onExecute,
+  isExecuting = false 
+}) => {
+  const { updateWorkflow, executeWorkflow } = useWorkflow();
   const { toast } = useToast();
   const [showPreview, setShowPreview] = useState(false);
   
@@ -44,16 +52,23 @@ const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onEdit, onDelete 
   };
   
   const handleExecute = () => {
-    executeWorkflow(workflow.id);
-    toast({
-      title: "Workflow Execution Started",
-      description: `${workflow.name} is now running...`,
-    });
+    if (onExecute) {
+      // Use the provided onExecute handler (from SavedWorkflowsTab)
+      onExecute(workflow);
+    } else {
+      // Fallback to the hook's executeWorkflow
+      executeWorkflow(workflow.id);
+      toast({
+        title: "Workflow Execution Started",
+        description: `${workflow.name} is now running...`,
+      });
+    }
   };
 
   const handleDelete = () => {
     if (onDelete) {
       onDelete(workflow.id);
+    } else {
       toast({
         title: "Workflow Deleted",
         description: `"${workflow.name}" has been removed`,
@@ -99,9 +114,9 @@ const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onEdit, onDelete 
                 key={step.id} 
                 variant="outline" 
                 className={
-                  step.type === 'document-source' ? 'bg-blue-50 text-blue-800' :
-                  step.type === 'comparison' ? 'bg-amber-50 text-amber-800' :
-                  step.type === 'report-generation' ? 'bg-green-50 text-green-800' :
+                  step.type === 'data-source' ? 'bg-blue-50 text-blue-800' :
+                  step.type === 'document-processing' ? 'bg-amber-50 text-amber-800' :
+                  step.type === 'data-storage' ? 'bg-green-50 text-green-800' :
                   step.type === 'notification' ? 'bg-purple-50 text-purple-800' :
                   'bg-gray-50 text-gray-800'
                 }
@@ -115,6 +130,12 @@ const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onEdit, onDelete 
           {workflow.lastRun && (
             <div className="text-xs text-muted-foreground mt-3">
               Last executed: {new Date(workflow.lastRun).toLocaleString()}
+            </div>
+          )}
+          
+          {workflow.successRate !== undefined && (
+            <div className="text-xs text-muted-foreground">
+              Success rate: {workflow.successRate}% ({workflow.totalRuns || 0} runs)
             </div>
           )}
         </CardContent>
@@ -199,7 +220,9 @@ const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onEdit, onDelete 
                   <PlayIcon className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Run Now</TooltipContent>
+              <TooltipContent>
+                {isExecuting ? 'Running...' : 'Run Now'}
+              </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </CardFooter>

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { GoogleAuthService } from '@/services/auth/googleAuthService';
@@ -35,11 +36,70 @@ const GoogleDriveConnectorRefactored: React.FC = () => {
     redirectUri: `${window.location.origin}/oauth/callback`  // Use current domain
   }, 'drive_auth_tokens');
 
+  // Enhanced authentication check with better persistence and auto-loading
+  React.useEffect(() => {
+    console.log('🔧 GoogleDrive connector mounted, checking for stored tokens...');
+    
+    const checkStoredAuth = async () => {
+      const hasValidTokens = authService.hasValidTokens();
+      const tokens = authService.getStoredTokens();
+      
+      console.log('🔍 Auth check results:', { hasValidTokens, hasAccessToken: !!tokens.accessToken });
+      
+      if (hasValidTokens && tokens.accessToken) {
+        console.log('✅ Found valid stored tokens, setting connected state');
+        setIsConnected(true);
+        
+        // Auto-load files when connection is restored
+        try {
+          console.log('📁 Auto-loading files from Google Drive...');
+          const fileList = await authService.listFiles();
+          setFiles(fileList);
+          console.log(`📁 Auto-loaded ${fileList.length} files from Google Drive`);
+        } catch (error) {
+          console.error('❌ Error auto-loading files:', error);
+          // If file loading fails, token might be expired
+          if (error instanceof Error && error.message.includes('401')) {
+            console.log('🔄 Token expired, clearing auth state');
+            authService.clearTokens();
+            setIsConnected(false);
+          }
+        }
+      } else {
+        console.log('❌ No valid tokens found, user needs to authenticate');
+        setIsConnected(false);
+      }
+    };
+
+    // Check immediately
+    checkStoredAuth();
+    
+    // Listen for storage changes (in case user authenticates in another tab)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'drive_auth_tokens') {
+        console.log('🔄 Storage changed, rechecking auth...');
+        checkStoredAuth();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []); // Only run once on mount
+
   const handleConnect = async () => {
     try {
       setIsLoading(true);
+      console.log('🔗 Starting Google Drive authentication...');
+      
       await authService.signInWithGoogle();
       setIsConnected(true);
+      
+      // Load files immediately after connection
+      await loadFiles();
+      
       toast({
         title: "Connected to Google Drive",
         description: "Successfully connected to your Google Drive account.",
