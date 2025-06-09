@@ -36,6 +36,18 @@ export class RealWorkflowEngine {
       }
     }
 
+    // Check for Google Drive authentication if workflow uses Google Drive
+    const hasDriveStep = workflow.steps.some(step => 
+      step.type === 'data-source' && step.config?.driveConfig?.source === 'google-drive'
+    );
+    
+    if (hasDriveStep) {
+      const tokens = localStorage.getItem('drive_auth_tokens');
+      if (!tokens) {
+        errors.push('Google Drive authentication required. Please connect your Google Drive account.');
+      }
+    }
+
     // Check for database storage steps
     const hasStorageStep = workflow.steps.some(step => step.type === 'data-storage');
     if (hasStorageStep) {
@@ -131,6 +143,7 @@ export class RealWorkflowEngine {
   private async executeDataSourceStep(step: WorkflowStep): Promise<any> {
     const config = step.config || {};
     
+    // Handle Gmail configuration
     if (config.emailConfig) {
       console.log('📧 Fetching Gmail data with config:', config.emailConfig);
       
@@ -261,7 +274,106 @@ export class RealWorkflowEngine {
       }
       
       return gmailData;
-    } else {
+    }
+    
+    // Handle Google Drive configuration
+    else if (config.driveConfig) {
+      console.log('💿 Fetching Google Drive data with config:', config.driveConfig);
+      
+      try {
+        const tokens = JSON.parse(localStorage.getItem('drive_auth_tokens') || '{}');
+        if (!tokens.accessToken) {
+          throw new Error('Google Drive access token not found. Please connect your Google Drive account.');
+        }
+
+        // Fetch files from Google Drive
+        const { data: driveData } = await supabase.functions.invoke('google-drive', {
+          body: {
+            action: 'list',
+            accessToken: tokens.accessToken,
+            folderId: config.driveConfig.folderPath || null
+          }
+        });
+
+        if (!driveData || !driveData.success) {
+          throw new Error('Failed to fetch files from Google Drive');
+        }
+
+        const files = driveData.data || [];
+        console.log(`💿 Found ${files.length} files in Google Drive`);
+
+        // Filter for PDF files if specified
+        const pdfFiles = config.driveConfig.fileTypes?.includes('pdf') 
+          ? files.filter(f => f.mimeType === 'application/pdf')
+          : files;
+
+        console.log(`📄 Processing ${pdfFiles.length} PDF files from Google Drive`);
+
+        const processedResults = [];
+        
+        // Process each PDF file (limit to first 3)
+        for (const file of pdfFiles.slice(0, 3)) {
+          try {
+            console.log(`📄 Processing file: ${file.name}`);
+            
+            // Download file content
+            const { data: fileData } = await supabase.functions.invoke('google-drive', {
+              body: {
+                action: 'download',
+                accessToken: tokens.accessToken,
+                fileId: file.id
+              }
+            });
+
+            if (fileData) {
+              // Convert blob to File object
+              const fileObject = new File([fileData], file.name, { type: 'application/pdf' });
+
+              // Process with Gemini
+              console.log(`🤖 Processing ${file.name} with Gemini...`);
+              const { classifyDocument } = await import('@/components/document-comparison/upload/DocumentClassifier');
+              
+              const extractedData = await classifyDocument(fileObject);
+              console.log(`✅ Extracted data from ${file.name}:`, extractedData);
+              
+              processedResults.push({
+                file: file,
+                filename: file.name,
+                extractedData: extractedData,
+                success: true
+              });
+
+            } else {
+              console.error(`❌ Failed to download file: ${file.name}`);
+            }
+          } catch (error) {
+            console.error(`❌ Error processing file ${file.name}:`, error);
+          }
+        }
+
+        return {
+          source: 'google-drive',
+          files: pdfFiles,
+          processedResults: processedResults,
+          totalFiles: pdfFiles.length,
+          processedCount: processedResults.length,
+          successCount: processedResults.filter(r => r.success).length,
+          extractedData: processedResults.filter(r => r.success).map(r => ({
+            filename: r.filename,
+            data: r.extractedData,
+            file: r.file,
+            success: true
+          }))
+        };
+
+      } catch (error) {
+        console.error('❌ Google Drive processing error:', error);
+        throw error;
+      }
+    }
+    
+    // If no valid configuration found
+    else {
       throw new Error('Data source configuration not found');
     }
   }
