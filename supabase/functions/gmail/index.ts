@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { accessToken, action, messageId, query, maxResults, attachmentId } = await req.json();
+    const { accessToken, action, messageId, query, maxResults, attachmentId, filters } = await req.json();
     
     if (!accessToken) {
       throw new Error('Access token is required');
@@ -20,14 +20,18 @@ serve(async (req) => {
 
     let url = 'https://gmail.googleapis.com/gmail/v1/users/me';
     
-    if (action === 'list') {
+    if (action === 'list' || action === 'listMessages') {
       url += '/messages';
       const queryParams = new URLSearchParams({
         maxResults: maxResults || '50',
       });
-      if (query) {
-        queryParams.set('q', query);
+      
+      // Handle both query and filters parameters
+      const searchQuery = query || (filters && filters.length > 0 ? filters.join(' OR ') : '');
+      if (searchQuery) {
+        queryParams.set('q', searchQuery);
       }
+      
       url += `?${queryParams}`;
     } else if (action === 'get' && messageId) {
       url += `/messages/${messageId}`;
@@ -56,7 +60,7 @@ serve(async (req) => {
 
     const data = await response.json();
 
-    if (action === 'list') {
+    if (action === 'list' || action === 'listMessages') {
       // Get detailed info for each message
       const messages = data.messages || [];
       const detailedMessages = [];
