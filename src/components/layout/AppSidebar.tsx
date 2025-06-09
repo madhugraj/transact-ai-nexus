@@ -57,7 +57,7 @@ const NavItem = ({ icon: Icon, label, href, active, collapsed, onClick }: NavIte
 // Main sidebar component
 const AppSidebar = () => {
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, profile, logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
   const navItems = [
@@ -123,15 +123,17 @@ const AppSidebar = () => {
         {!collapsed && (
           <div className="flex items-center gap-2">
             <Avatar className="h-8 w-8">
-              <AvatarImage src={user?.avatar} />
-              <AvatarFallback>{user?.name?.[0] || 'U'}</AvatarFallback>
+              <AvatarImage src={profile?.avatar_url} />
+              <AvatarFallback>
+                {profile?.full_name?.[0] || profile?.email?.[0] || 'U'}
+              </AvatarFallback>
             </Avatar>
             <div className="flex flex-col">
               <span className="text-sm font-medium text-sidebar-foreground truncate max-w-[120px]">
-                {user?.name}
+                {profile?.full_name || profile?.email || 'User'}
               </span>
               <span className="text-xs text-sidebar-foreground/70 truncate max-w-[120px]">
-                {user?.role.replace('_', ' ')}
+                {profile?.role?.replace('_', ' ') || 'Finance Analyst'}
               </span>
             </div>
           </div>
