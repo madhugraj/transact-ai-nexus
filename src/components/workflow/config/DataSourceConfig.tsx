@@ -17,7 +17,7 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
   onConfigUpdate
 }) => {
   const handleEmailFiltersChange = (value: string) => {
-    console.log('Input value:', value);
+    console.log('📧 Email filters input value:', value);
     
     // Split by comma and clean up each filter
     const filters = value
@@ -25,7 +25,7 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
       .map(filter => filter.trim())
       .filter(filter => filter.length > 0);
     
-    console.log('Parsed filters:', filters);
+    console.log('📧 Parsed email filters:', filters);
     
     onConfigUpdate('emailConfig', {
       ...step.config.emailConfig,
@@ -35,7 +35,9 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
 
   const getCurrentFiltersValue = () => {
     if (step.config.emailConfig?.filters && Array.isArray(step.config.emailConfig.filters)) {
-      return step.config.emailConfig.filters.join(', ');
+      const joinedFilters = step.config.emailConfig.filters.join(', ');
+      console.log('📧 Current filters display value:', joinedFilters);
+      return joinedFilters;
     }
     return '';
   };

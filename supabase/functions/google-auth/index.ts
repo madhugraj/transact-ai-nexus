@@ -15,6 +15,12 @@ serve(async (req) => {
   try {
     const { authCode, scope, redirectUri } = await req.json();
     
+    console.log('🔧 Google Auth function called with:', { 
+      hasAuthCode: !!authCode, 
+      redirectUri, 
+      timestamp: new Date().toISOString() 
+    });
+    
     if (!authCode) {
       throw new Error('Authorization code is required');
     }
@@ -30,13 +36,13 @@ serve(async (req) => {
     const REDIRECT_URI = redirectUri;
 
     if (!CLIENT_SECRET) {
+      console.error('❌ Google client secret not configured');
       console.error('Available environment variables:', Object.keys(Deno.env.toObject()));
       throw new Error('Google client secret not configured');
     }
 
-    console.log('Exchanging auth code for tokens...');
-    console.log('Using redirect URI:', REDIRECT_URI);
-    console.log('Client secret found:', CLIENT_SECRET ? 'Yes' : 'No');
+    console.log('✅ Client secret found, proceeding with token exchange');
+    console.log('🔧 Using redirect URI:', REDIRECT_URI);
 
     // Exchange authorization code for access token
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -55,12 +61,12 @@ serve(async (req) => {
 
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.text();
-      console.error('Token exchange error:', errorData);
+      console.error('❌ Token exchange error:', errorData);
       throw new Error(`Token exchange failed: ${tokenResponse.status} - ${errorData}`);
     }
 
     const tokenData = await tokenResponse.json();
-    console.log('Token exchange successful');
+    console.log('✅ Token exchange successful');
 
     return new Response(
       JSON.stringify({
@@ -77,7 +83,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Google auth error:', error);
+    console.error('❌ Google auth error:', error);
     return new Response(
       JSON.stringify({
         success: false,
