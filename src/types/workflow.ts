@@ -101,6 +101,7 @@ export interface WorkflowConfig {
   lastRun?: Date;
   totalRuns?: number;
   successRate?: number;
+  processingType?: string; // Added this property to fix the TypeScript error
 }
 
 export interface WorkflowConnection {

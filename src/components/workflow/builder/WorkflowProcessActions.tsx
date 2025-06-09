@@ -60,7 +60,7 @@ export const WorkflowProcessActions: React.FC<WorkflowProcessActionsProps> = ({
     }
 
     // Add processing configuration to workflow
-    const enhancedWorkflow = {
+    const enhancedWorkflow: WorkflowConfig = {
       ...workflow,
       processingType: selectedProcess,
       steps: workflow.steps.map(step => {
@@ -70,11 +70,11 @@ export const WorkflowProcessActions: React.FC<WorkflowProcessActionsProps> = ({
             config: {
               ...step.config,
               comparisonConfig: {
-                type: selectedProcess,
+                type: 'po-invoice-comparison' as const,
                 fields: selectedProcess === 'po_invoice_comparison' 
                   ? ['vendor_name', 'po_date', 'invoice_date', 'description', 'quantity', 'total_amount', 'gstn']
                   : [],
-                matchingCriteria: 'fuzzy',
+                matchingCriteria: 'fuzzy' as const,
                 tolerance: 0.8
               }
             }
