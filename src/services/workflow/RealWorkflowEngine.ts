@@ -1,4 +1,3 @@
-
 import { WorkflowConfig, WorkflowStep, WorkflowExecutionResult } from '@/types/workflow';
 import { GmailWorkflowService } from './GmailWorkflowService';
 import { DocumentProcessingService } from './DocumentProcessingService';
@@ -68,7 +67,7 @@ export class RealWorkflowEngine {
         const stepResult = {
           stepId: step.id,
           startTime: new Date(),
-          status: 'running' as const,
+          status: 'running' as 'pending' | 'running' | 'completed' | 'failed' | 'skipped',
           endTime: undefined as Date | undefined,
           output: undefined as any,
           error: undefined as string | undefined,
