@@ -2,97 +2,94 @@
 import { supabase } from '@/integrations/supabase/client';
 
 export class DatabaseStorageService {
-  async storeExtractedData(extractedData: any[], tableName: string, action: string): Promise<any> {
-    console.log('💾 Storing', extractedData.length, 'records to table:', tableName, 'with action:', action);
+  async storeData(data: any[], config: any): Promise<any> {
+    console.log('💾 Storing data to database with config:', config);
+    console.log('📄 Data to store:', data);
     
-    const results = {
-      table: tableName,
-      action,
-      totalRecords: extractedData.length,
-      successfulInserts: 0,
-      errors: [] as any[]
-    };
-
-    for (const data of extractedData) {
-      if (data.error) {
-        results.errors.push({
-          fileName: data.fileName,
-          error: data.error
-        });
-        continue;
-      }
-
-      try {
-        let insertData: any = {};
-
-        // Map extracted data to database schema based on table
-        if (tableName === 'invoice_table') {
-          insertData = {
-            invoice_number: parseInt(data.invoiceNumber?.replace('INV-', '') || '0'),
-            invoice_date: data.date,
-            details: {
-              vendor: data.vendor,
-              amount: data.amount,
-              dueDate: data.dueDate,
-              confidence: data.confidence,
-              fileName: data.fileName,
-              source: data.source
-            },
-            attachment_invoice_name: data.fileName
-          };
-        } else if (tableName === 'po_table') {
-          insertData = {
-            po_number: parseInt(data.poNumber?.replace('PO-', '') || '0'),
-            po_date: data.date,
-            file_name: data.fileName,
-            description: {
-              vendor: data.vendor,
-              amount: data.amount,
-              confidence: data.confidence,
-              source: data.source
-            }
-          };
-        } else if (tableName === 'extracted_json') {
-          insertData = {
-            file_name: data.fileName,
-            json_extract: data
-          };
-        } else {
-          // For other tables, store in extracted_json as fallback
-          insertData = {
-            file_name: data.fileName,
-            json_extract: data
-          };
-          tableName = 'extracted_json';
-        }
-
-        console.log('💾 Inserting data to', tableName, ':', insertData);
-
-        const { error } = action === 'upsert' 
-          ? await supabase.from(tableName).upsert(insertData)
-          : await supabase.from(tableName).insert(insertData);
-
-        if (error) {
-          console.error('❌ Database insert error:', error);
-          results.errors.push({
-            fileName: data.fileName,
-            error: error.message
-          });
-        } else {
-          results.successfulInserts++;
-          console.log('✅ Successfully stored:', data.fileName);
-        }
-
-      } catch (error) {
-        console.error('❌ Error storing data for:', data.fileName, error);
-        results.errors.push({
-          fileName: data.fileName,
-          error: error instanceof Error ? error.message : 'Storage failed'
-        });
-      }
+    if (!data || data.length === 0) {
+      console.log('⚠️ No data to store');
+      return {
+        action: config.action || 'insert',
+        table: config.table,
+        recordsProcessed: 0,
+        recordsStored: 0,
+        errors: []
+      };
     }
 
-    console.log('💾 Storage completed:', results);
-    return results;
+    try {
+      const tableName = config.table || 'processed_documents';
+      const action = config.action || 'insert';
+      
+      console.log(`📊 Attempting to ${action} ${data.length} records to table: ${tableName}`);
+      
+      // Transform data for database storage
+      const dbRecords = data.map(item => ({
+        file_name: item.fileName || item.name || 'unknown',
+        source: item.source || 'workflow',
+        type: item.type || 'document',
+        data: item,
+        processed_at: new Date().toISOString(),
+        workflow_id: config.workflowId || null
+      }));
+
+      let result;
+      
+      if (action === 'upsert') {
+        result = await supabase
+          .from(tableName)
+          .upsert(dbRecords, { 
+            onConflict: 'file_name,source',
+            ignoreDuplicates: false 
+          });
+      } else {
+        result = await supabase
+          .from(tableName)
+          .insert(dbRecords);
+      }
+
+      if (result.error) {
+        console.error('❌ Database storage error:', result.error);
+        throw new Error(`Database error: ${result.error.message}`);
+      }
+
+      console.log('✅ Successfully stored data to database');
+      console.log('📊 Storage result:', result);
+
+      return {
+        action,
+        table: tableName,
+        recordsProcessed: data.length,
+        recordsStored: dbRecords.length,
+        errors: [],
+        result: result.data
+      };
+
+    } catch (error) {
+      console.error('❌ Error storing data to database:', error);
+      
+      return {
+        action: config.action || 'insert',
+        table: config.table,
+        recordsProcessed: data.length,
+        recordsStored: 0,
+        errors: [error instanceof Error ? error.message : 'Unknown storage error'],
+        error: error
+      };
+    }
+  }
+
+  async validateTableExists(tableName: string): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*')
+        .limit(1);
+      
+      return !error;
+    } catch (error) {
+      console.error('❌ Error validating table:', error);
+      return false;
+    }
   }
 }

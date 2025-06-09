@@ -120,37 +120,55 @@ const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onEdit, onDelete 
         </CardContent>
         
         <CardFooter className="flex justify-between pt-2">
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-xs"
-              onClick={() => onEdit && onEdit(workflow)}
-            >
-              <Settings2Icon className="h-3.5 w-3.5 mr-1" />
-              Settings
-            </Button>
+          <div className="flex gap-1">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={() => onEdit && onEdit(workflow)}
+                  >
+                    <Settings2Icon className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Settings</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-xs"
-              onClick={() => setShowPreview(true)}
-            >
-              <Eye className="h-3.5 w-3.5 mr-1" />
-              Preview
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={() => setShowPreview(true)}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Preview</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-xs text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-3.5 w-3.5 mr-1" />
-                  Delete
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Delete</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
@@ -169,15 +187,21 @@ const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onEdit, onDelete 
             </AlertDialog>
           </div>
           
-          <Button
-            size="sm"
-            className="text-xs"
-            onClick={handleExecute}
-            disabled={isExecuting}
-          >
-            <PlayIcon className="h-3.5 w-3.5 mr-1" />
-            Run Now
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={handleExecute}
+                  disabled={isExecuting}
+                >
+                  <PlayIcon className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Run Now</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </CardFooter>
       </Card>
 
