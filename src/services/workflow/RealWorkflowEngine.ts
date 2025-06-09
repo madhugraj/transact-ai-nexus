@@ -1,10 +1,16 @@
 import { WorkflowConfig, WorkflowExecution, WorkflowStep, WorkflowStepResult } from '@/types/workflow';
 import { GoogleAuthService } from '@/services/auth/googleAuthService';
+import { GmailWorkflowService } from './GmailWorkflowService';
+import { DocumentProcessingService } from './DocumentProcessingService';
+import { DatabaseStorageService } from './DatabaseStorageService';
 import { toast } from '@/hooks/use-toast';
 
 export class RealWorkflowEngine {
   private executions = new Map<string, WorkflowExecution>();
   private googleAuthService: GoogleAuthService;
+  private gmailService: GmailWorkflowService;
+  private documentService: DocumentProcessingService;
+  private storageService: DatabaseStorageService;
 
   constructor() {
     this.googleAuthService = new GoogleAuthService({
@@ -12,6 +18,10 @@ export class RealWorkflowEngine {
       scopes: ['https://www.googleapis.com/auth/drive.readonly', 'https://www.googleapis.com/auth/gmail.readonly'],
       redirectUri: `${window.location.origin}/oauth/callback`
     });
+    
+    this.gmailService = new GmailWorkflowService();
+    this.documentService = new DocumentProcessingService();
+    this.storageService = new DatabaseStorageService();
   }
 
   async validateWorkflowRequirements(workflow: WorkflowConfig): Promise<{ valid: boolean; errors: string[] }> {
@@ -90,17 +100,21 @@ export class RealWorkflowEngine {
     this.executions.set(execution.id, execution);
 
     try {
-      // Execute steps in order
+      let previousStepOutput: any = null;
+
+      // Execute steps in order, passing data between them
       for (const step of workflow.steps) {
-        await this.executeStep(step, execution);
+        const stepOutput = await this.executeStep(step, execution, previousStepOutput);
+        previousStepOutput = stepOutput;
       }
       
       execution.status = 'completed';
       execution.endTime = new Date();
+      execution.processedDocuments = previousStepOutput?.processedCount || execution.processedDocuments;
       
       toast({
         title: "Workflow Completed",
-        description: `${workflow.name} executed successfully`,
+        description: `${workflow.name} executed successfully. Processed ${execution.processedDocuments} items.`,
       });
 
       return execution;
@@ -119,7 +133,7 @@ export class RealWorkflowEngine {
     }
   }
 
-  private async executeStep(step: WorkflowStep, execution: WorkflowExecution): Promise<any> {
+  private async executeStep(step: WorkflowStep, execution: WorkflowExecution, previousOutput?: any): Promise<any> {
     const stepResult: WorkflowStepResult = {
       stepId: step.id,
       status: 'running',
@@ -139,10 +153,10 @@ export class RealWorkflowEngine {
           output = await this.executeDataSource(step);
           break;
         case 'document-processing':
-          output = await this.executeDocumentProcessing(step, execution);
+          output = await this.executeDocumentProcessing(step, previousOutput);
           break;
         case 'data-storage':
-          output = await this.executeDataStorage(step, execution);
+          output = await this.executeDataStorage(step, previousOutput);
           break;
         case 'analytics':
           output = await this.executeAnalytics(step, execution);
@@ -171,87 +185,53 @@ export class RealWorkflowEngine {
 
   private async executeDataSource(step: WorkflowStep): Promise<any> {
     if (step.config.emailConfig) {
-      return await this.fetchGmailData(step.config.emailConfig);
+      const result = await this.gmailService.fetchEmailsWithAttachments(
+        step.config.emailConfig.filters || []
+      );
+      
+      // Process attachments from emails
+      const files = await this.gmailService.processEmailAttachments(result.emails);
+      
+      return {
+        ...result,
+        files,
+        processedCount: files.length
+      };
     } else if (step.config.driveConfig) {
-      return await this.fetchDriveData(step.config.driveConfig);
+      // For now, return simulated Drive data
+      console.log('📁 Drive processing not yet implemented, using simulation');
+      return {
+        source: 'drive',
+        files: [],
+        processedCount: 0
+      };
     }
     throw new Error('No data source configuration found');
   }
 
-  private async fetchGmailData(config: any): Promise<any> {
-    console.log('📧 Fetching Gmail data with config:', config);
-    const tokens = localStorage.getItem('gmail_auth_tokens');
-    if (!tokens) throw new Error('Gmail not authenticated');
+  private async executeDocumentProcessing(step: WorkflowStep, previousOutput?: any): Promise<any> {
+    if (!previousOutput?.files) {
+      throw new Error('No files to process from previous step');
+    }
 
-    const { accessToken } = JSON.parse(tokens);
-    
-    // Actual Gmail API call would go here
-    // For now, simulate the call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    return {
-      source: 'gmail',
-      emails: [
-        { id: '1', subject: 'Invoice #INV-001', hasAttachment: true },
-        { id: '2', subject: 'Purchase Order #PO-123', hasAttachment: true }
-      ],
-      count: 2
-    };
-  }
-
-  private async fetchDriveData(config: any): Promise<any> {
-    console.log('📁 Fetching Drive data with config:', config);
-    const tokens = localStorage.getItem('google_auth_tokens');
-    if (!tokens) throw new Error('Google Drive not authenticated');
-
-    // Actual Drive API call would go here
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    return {
-      source: 'drive',
-      files: [
-        { id: '1', name: 'invoice_001.pdf', mimeType: 'application/pdf' },
-        { id: '2', name: 'po_123.pdf', mimeType: 'application/pdf' }
-      ],
-      count: 2
-    };
-  }
-
-  private async executeDocumentProcessing(step: WorkflowStep, execution: WorkflowExecution): Promise<any> {
-    console.log('🔄 Processing documents with config:', step.config.processingConfig);
-    
-    // Actual document processing would go here
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
     const processingType = step.config.processingConfig?.type || 'general-ocr';
     
-    return {
-      processingType,
-      extractedData: {
-        invoiceNumber: 'INV-001',
-        amount: 1250.00,
-        vendor: 'ACME Corp',
-        date: '2024-01-15'
-      },
-      confidence: 0.95,
-      processedCount: 2
-    };
+    return await this.documentService.processDocuments(previousOutput.files, processingType);
   }
 
-  private async executeDataStorage(step: WorkflowStep, execution: WorkflowExecution): Promise<any> {
-    console.log('💾 Storing data with config:', step.config.storageConfig);
+  private async executeDataStorage(step: WorkflowStep, previousOutput?: any): Promise<any> {
+    if (!previousOutput?.extractedData) {
+      throw new Error('No extracted data to store from previous step');
+    }
+
+    const table = step.config.storageConfig?.table || 'extracted_json';
+    const action = step.config.storageConfig?.action || 'insert';
     
-    // Actual database storage would go here
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const table = step.config.storageConfig?.table || 'documents';
-    
-    return {
+    return await this.storageService.storeExtractedData(
+      previousOutput.extractedData,
       table,
-      action: 'insert',
-      recordsStored: 2,
-      status: 'success'
-    };
+      action
+    );
   }
 
   private async executeAnalytics(step: WorkflowStep, execution: WorkflowExecution): Promise<any> {

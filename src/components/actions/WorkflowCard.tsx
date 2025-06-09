@@ -4,7 +4,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { PlayIcon, Settings2Icon, Eye } from "lucide-react";
+import { PlayIcon, Settings2Icon, Eye, Trash2 } from "lucide-react";
 import { WorkflowConfig } from "@/types/workflow";
 import { useWorkflow } from "@/hooks/useWorkflow";
 import { useToast } from "@/hooks/use-toast";
@@ -14,15 +14,27 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import WorkflowVisualizer from "./WorkflowVisualizer";
 
 interface WorkflowCardProps {
   workflow: WorkflowConfig;
   onEdit?: (workflow: WorkflowConfig) => void;
+  onDelete?: (workflowId: string) => void;
 }
 
-const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onEdit }) => {
+const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onEdit, onDelete }) => {
   const { updateWorkflow, executeWorkflow, isExecuting } = useWorkflow();
   const { toast } = useToast();
   const [showPreview, setShowPreview] = useState(false);
@@ -37,6 +49,16 @@ const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onEdit }) => {
       title: "Workflow Execution Started",
       description: `${workflow.name} is now running...`,
     });
+  };
+
+  const handleDelete = () => {
+    if (onDelete) {
+      onDelete(workflow.id);
+      toast({
+        title: "Workflow Deleted",
+        description: `"${workflow.name}" has been removed`,
+      });
+    }
   };
 
   return (
@@ -118,6 +140,33 @@ const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onEdit }) => {
               <Eye className="h-3.5 w-3.5 mr-1" />
               Preview
             </Button>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />
+                  Delete
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Workflow</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete "{workflow.name}"? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
           
           <Button

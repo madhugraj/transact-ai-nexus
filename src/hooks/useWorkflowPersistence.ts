@@ -42,13 +42,25 @@ export function useWorkflowPersistence() {
   };
 
   const deleteWorkflow = (id: string) => {
-    setWorkflows(prev => prev.filter(w => w.id !== id));
+    console.log('🗑️ Deleting workflow with ID:', id);
+    setWorkflows(prev => {
+      const newWorkflows = prev.filter(w => w.id !== id);
+      console.log('📊 Workflows before deletion:', prev.length, 'After deletion:', newWorkflows.length);
+      return newWorkflows;
+    });
+  };
+
+  const clearAllWorkflows = () => {
+    console.log('🗑️ Clearing all workflows');
+    setWorkflows([]);
+    localStorage.removeItem(WORKFLOWS_STORAGE_KEY);
   };
 
   return {
     workflows,
     addWorkflow,
     updateWorkflow,
-    deleteWorkflow
+    deleteWorkflow,
+    clearAllWorkflows
   };
 }
