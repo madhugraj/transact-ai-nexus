@@ -142,18 +142,29 @@ export class RealWorkflowEngine {
         
         // Step 2: Process attachments using the tested email processor
         const emails = gmailData.emails || [];
-        const processedResults = {
-          source: 'gmail',
-          emails: [],
-          attachments: [],
-          invoiceValidation: [],
-          extractedData: [],
-          processedCount: 0,
-          successCount: 0
-        };
+        const allResults = [];
 
         for (const email of emails.slice(0, 5)) { // Process first 5 emails
           console.log(`📧 Processing email: ${email.subject}`);
+          
+          // Create a processing result for this email
+          const emailResult = {
+            email: email,
+            emailContext: {
+              isLikelyInvoice: true,
+              context: {
+                attachmentCount: email.attachments?.length || 0,
+                hasInvoiceKeywords: true,
+                hasFinancialKeywords: true,
+                hasBusinessKeywords: true,
+                analysis: `Processing email: ${email.subject}`
+              }
+            },
+            attachments: email.attachments || [],
+            invoiceValidation: [],
+            extractedData: [],
+            status: 'processing' as 'processing' | 'completed' | 'error'
+          };
           
           if (email.attachments && email.attachments.length > 0) {
             for (const attachment of email.attachments) {
@@ -181,24 +192,37 @@ export class RealWorkflowEngine {
                     attachmentData,
                     email,
                     emailContext,
-                    processedResults
+                    emailResult
                   );
 
-                  if (processed) {
-                    processedResults.successCount++;
-                  }
-                  processedResults.processedCount++;
+                  console.log(`✅ Processed attachment: ${attachment.filename}, success: ${processed}`);
 
                 } catch (error) {
                   console.error(`❌ Error processing attachment ${attachment.filename}:`, error);
+                  emailResult.status = 'error';
                 }
               }
             }
           }
+          
+          emailResult.status = 'completed';
+          allResults.push(emailResult);
         }
         
-        console.log(`✅ Processed ${processedResults.processedCount} attachments, ${processedResults.successCount} successful`);
-        return processedResults;
+        // Return aggregated results
+        const aggregatedResults = {
+          source: 'gmail',
+          emails: emails,
+          processedResults: allResults,
+          totalEmails: emails.length,
+          processedCount: allResults.length,
+          successCount: allResults.filter(r => r.status === 'completed').length,
+          extractedData: allResults.flatMap(r => r.extractedData),
+          invoiceValidation: allResults.flatMap(r => r.invoiceValidation)
+        };
+        
+        console.log(`✅ Processed ${aggregatedResults.processedCount} emails, ${aggregatedResults.successCount} successful`);
+        return aggregatedResults;
       }
       
       return gmailData;
