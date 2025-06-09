@@ -32,33 +32,32 @@ export const DatabaseConfig: React.FC<DatabaseConfigProps> = ({
     setError(null);
     
     try {
-      // Query to get all user tables from the public schema
-      const { data, error: queryError } = await supabase.rpc('get_public_tables');
+      console.log('Fetching database tables...');
       
-      if (queryError) {
-        // Fallback: try to get tables from information_schema
-        console.log('Fallback: querying information_schema directly');
-        const fallbackTables = [
-          'invoice_table',
-          'po_table', 
-          'extracted_tables',
-          'uploaded_files',
-          'Doc_Compare_results',
-          'compare_source_document',
-          'compare_target_docs',
-          'extracted_json'
-        ];
-        
-        setTables(fallbackTables.map(name => ({ 
-          table_name: name, 
-          table_schema: 'public' 
-        })));
-      } else {
-        setTables(data || []);
-      }
+      // Since the get_public_tables function doesn't exist, let's use a fallback approach
+      // We'll provide the known tables from your project
+      const knownTables = [
+        'invoice_table',
+        'po_table', 
+        'extracted_tables',
+        'uploaded_files',
+        'Doc_Compare_results',
+        'compare_source_document',
+        'compare_target_docs',
+        'extracted_json'
+      ];
+      
+      const tableList = knownTables.map(name => ({ 
+        table_name: name, 
+        table_schema: 'public' 
+      }));
+      
+      setTables(tableList);
+      console.log(`Successfully loaded ${tableList.length} known tables`);
+      
     } catch (err) {
       console.error('Error fetching tables:', err);
-      setError('Failed to fetch database tables');
+      setError('Using fallback table list');
       
       // Set default tables as fallback
       const defaultTables = [
@@ -120,7 +119,9 @@ export const DatabaseConfig: React.FC<DatabaseConfigProps> = ({
           </div>
           
           {error && (
-            <p className="text-xs text-red-600 mb-2">{error}</p>
+            <p className="text-xs text-yellow-600 mb-2">
+              {error} - showing available tables
+            </p>
           )}
           
           <Select

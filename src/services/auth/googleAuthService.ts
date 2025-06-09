@@ -1,3 +1,4 @@
+
 export interface AuthConfig {
   clientId: string;
   scopes: string[];
@@ -130,9 +131,21 @@ export class GoogleAuthService {
   // Create auth URL for popup with proper redirect URI
   private createAuthUrl(): string {
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    const redirectUri = `${window.location.origin}/oauth/callback`;
+    
+    // Use dynamic redirect URI based on current environment
+    let redirectUri: string;
+    if (window.location.hostname === 'localhost') {
+      redirectUri = 'http://localhost:5173/oauth/callback';
+    } else if (window.location.hostname.includes('lovableproject.com')) {
+      redirectUri = `${window.location.origin}/oauth/callback`;
+    } else {
+      // For published apps
+      redirectUri = `${window.location.origin}/oauth/callback`;
+    }
     
     console.log('🔧 Creating auth URL with redirect URI:', redirectUri);
+    console.log('🔧 Current hostname:', window.location.hostname);
+    console.log('🔧 Current origin:', window.location.origin);
     
     authUrl.searchParams.set('client_id', this.config.clientId);
     authUrl.searchParams.set('response_type', 'code');
@@ -267,7 +280,18 @@ export class GoogleAuthService {
     try {
       console.log('🔄 Exchanging code for tokens using Supabase edge function...');
       
-      const redirectUri = `${window.location.origin}/oauth/callback`;
+      // Use dynamic redirect URI based on current environment
+      let redirectUri: string;
+      if (window.location.hostname === 'localhost') {
+        redirectUri = 'http://localhost:5173/oauth/callback';
+      } else if (window.location.hostname.includes('lovableproject.com')) {
+        redirectUri = `${window.location.origin}/oauth/callback`;
+      } else {
+        // For published apps
+        redirectUri = `${window.location.origin}/oauth/callback`;
+      }
+      
+      console.log('🔄 Using redirect URI for token exchange:', redirectUri);
       
       const { supabase } = await import('@/integrations/supabase/client');
       

@@ -17,16 +17,27 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
   onConfigUpdate
 }) => {
   const handleEmailFiltersChange = (value: string) => {
+    console.log('Input value:', value);
+    
     // Split by comma and clean up each filter
     const filters = value
       .split(',')
       .map(filter => filter.trim())
       .filter(filter => filter.length > 0);
     
+    console.log('Parsed filters:', filters);
+    
     onConfigUpdate('emailConfig', {
       ...step.config.emailConfig,
       filters
     });
+  };
+
+  const getCurrentFiltersValue = () => {
+    if (step.config.emailConfig?.filters && Array.isArray(step.config.emailConfig.filters)) {
+      return step.config.emailConfig.filters.join(', ');
+    }
+    return '';
   };
 
   return (
@@ -71,10 +82,10 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
 
         {step.config.emailConfig && (
           <div className="space-y-2">
-            <Label>Email Filters</Label>
+            <Label>Email Filters (comma-separated)</Label>
             <Input
               placeholder="invoice, billing, purchase order"
-              value={step.config.emailConfig.filters?.join(', ') || ''}
+              value={getCurrentFiltersValue()}
               onChange={(e) => handleEmailFiltersChange(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
