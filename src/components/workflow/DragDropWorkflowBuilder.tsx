@@ -207,8 +207,9 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
   return (
     <div className="h-[700px] flex gap-4">
       {/* Component Palette */}
-      <div className="w-64 bg-white border rounded-lg p-4 overflow-y-auto">
+      <div className="w-64 bg-white border rounded-lg p-4 overflow-y-auto space-y-4">
         <ComponentPalette onDragStart={onDragStart} />
+        
         <WorkflowControls
           workflowName={workflowName}
           onWorkflowNameChange={setWorkflowName}
@@ -218,11 +219,11 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
           edgeCount={edges.length}
         />
         
-        {/* Add Process Actions */}
+        {/* Process Actions - Make sure it's visible */}
         <WorkflowProcessActions
           workflow={{
             id: 'temp',
-            name: workflowName,
+            name: workflowName || 'Unnamed Workflow',
             description: '',
             steps: nodes.map((node) => node.data.step),
             connections: edges.map((edge, index) => ({

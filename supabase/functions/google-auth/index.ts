@@ -13,36 +13,124 @@ serve(async (req) => {
   }
 
   try {
-    const { authCode, scope, redirectUri } = await req.json();
+    const body = await req.json();
+    console.log('🔧 Google Auth function called with action:', body.action);
     
-    console.log('🔧 Google Auth function called with:', { 
-      hasAuthCode: !!authCode, 
-      redirectUri, 
-      timestamp: new Date().toISOString() 
-    });
+    const CLIENT_ID = '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com';
+    const CLIENT_SECRET = Deno.env.get('Client_secret') || 
+                         Deno.env.get('CLIENT_SECRET') || 
+                         Deno.env.get('client_secret') ||
+                         Deno.env.get('Client secret');
+
+    if (!CLIENT_SECRET) {
+      console.error('❌ Google client secret not configured');
+      throw new Error('Google client secret not configured');
+    }
+
+    // Handle different actions
+    if (body.action === 'get_drive_auth_url') {
+      console.log('🔗 Generating Drive auth URL with scopes:', body.scopes);
+      
+      const scopes = body.scopes || ['https://www.googleapis.com/auth/drive.readonly'];
+      const redirectUri = 'https://preview--transact-ai-nexus.lovable.app/oauth/callback';
+      
+      const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      authUrl.searchParams.set('client_id', CLIENT_ID);
+      authUrl.searchParams.set('redirect_uri', redirectUri);
+      authUrl.searchParams.set('response_type', 'code');
+      authUrl.searchParams.set('scope', scopes.join(' '));
+      authUrl.searchParams.set('access_type', 'offline');
+      authUrl.searchParams.set('prompt', 'consent');
+
+      console.log('✅ Auth URL generated successfully');
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          authUrl: authUrl.toString(),
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+
+    // Handle token validation
+    if (body.action === 'validate_drive_token') {
+      console.log('🔍 Validating Drive token');
+      
+      const response = await fetch('https://www.googleapis.com/oauth2/v1/tokeninfo', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${body.accessToken}`,
+        },
+      });
+
+      const valid = response.ok;
+      console.log('🔍 Token validation result:', valid);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          valid: valid,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+
+    // Handle file listing
+    if (body.action === 'list_drive_files') {
+      console.log('📁 Listing Drive files with query:', body.query);
+      
+      const url = new URL('https://www.googleapis.com/drive/v3/files');
+      url.searchParams.set('fields', 'files(id,name,mimeType,size,modifiedTime,webViewLink)');
+      url.searchParams.set('pageSize', '50');
+      
+      if (body.query) {
+        url.searchParams.set('q', body.query);
+      }
+
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Authorization': `Bearer ${body.accessToken}`,
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('❌ Drive API error:', errorData);
+        throw new Error(`Drive API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log(`✅ Found ${data.files?.length || 0} files`);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          files: data.files || [],
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+
+    // Handle legacy token exchange
+    const { authCode, redirectUri } = body;
     
     if (!authCode) {
       throw new Error('Authorization code is required');
     }
 
-    const CLIENT_ID = '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com';
-    // Try different possible secret names to handle any naming variations
-    const CLIENT_SECRET = Deno.env.get('Client_secret') || 
-                         Deno.env.get('CLIENT_SECRET') || 
-                         Deno.env.get('client_secret') ||
-                         Deno.env.get('Client secret');
-    
-    // Use the redirect URI passed from the client (it will be one of the configured ones)
-    const REDIRECT_URI = redirectUri;
-
-    if (!CLIENT_SECRET) {
-      console.error('❌ Google client secret not configured');
-      console.error('Available environment variables:', Object.keys(Deno.env.toObject()));
-      throw new Error('Google client secret not configured');
-    }
-
     console.log('✅ Client secret found, proceeding with token exchange');
-    console.log('🔧 Using redirect URI:', REDIRECT_URI);
+    console.log('🔧 Using redirect URI:', redirectUri);
 
     // Exchange authorization code for access token
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -55,7 +143,7 @@ serve(async (req) => {
         client_secret: CLIENT_SECRET,
         code: authCode,
         grant_type: 'authorization_code',
-        redirect_uri: REDIRECT_URI,
+        redirect_uri: redirectUri,
       }),
     });
 

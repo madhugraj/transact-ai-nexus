@@ -89,8 +89,8 @@ export const WorkflowProcessActions: React.FC<WorkflowProcessActionsProps> = ({
   };
 
   return (
-    <Card className="mt-4">
-      <CardHeader>
+    <Card className="w-full">
+      <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
           <Settings className="h-4 w-4" />
           Process Configuration
@@ -100,14 +100,14 @@ export const WorkflowProcessActions: React.FC<WorkflowProcessActionsProps> = ({
         <div className="space-y-2">
           <label className="text-xs font-medium">Processing Type</label>
           <Select value={selectedProcess} onValueChange={handleProcessSelection}>
-            <SelectTrigger className="h-8">
+            <SelectTrigger className="h-8 text-xs">
               <SelectValue placeholder="Select process type" />
             </SelectTrigger>
             <SelectContent>
               {processOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   <div>
-                    <div className="font-medium">{option.label}</div>
+                    <div className="font-medium text-xs">{option.label}</div>
                     <div className="text-xs text-muted-foreground">{option.description}</div>
                   </div>
                 </SelectItem>
@@ -126,7 +126,7 @@ export const WorkflowProcessActions: React.FC<WorkflowProcessActionsProps> = ({
               <div>• Validates quantities and amounts</div>
               <div>• Checks GST information</div>
             </div>
-            <div className="flex gap-1 mt-2">
+            <div className="flex gap-1 mt-2 flex-wrap">
               <Badge variant="outline" className="text-xs">Source: po_table</Badge>
               <Badge variant="outline" className="text-xs">Target: invoice_table</Badge>
             </div>
@@ -143,8 +143,8 @@ export const WorkflowProcessActions: React.FC<WorkflowProcessActionsProps> = ({
         </Button>
 
         {selectedProcess && (
-          <div className="text-xs text-muted-foreground">
-            <Database className="h-3 w-3 inline mr-1" />
+          <div className="text-xs text-muted-foreground flex items-center gap-1">
+            <Database className="h-3 w-3" />
             Results will be saved to: po_invoice_compare table
           </div>
         )}
