@@ -182,14 +182,29 @@ export class RealWorkflowEngine {
                     });
 
                     if (attachmentData && attachmentData.success) {
+                      // Properly handle base64 data from Gmail API
+                      let base64Data = attachmentData.data.data;
+                      
+                      // Convert URL-safe base64 to regular base64
+                      base64Data = base64Data.replace(/-/g, '+').replace(/_/g, '/');
+                      
+                      // Add padding if needed
+                      while (base64Data.length % 4) {
+                        base64Data += '=';
+                      }
+                      
+                      console.log(`🔧 Cleaned base64 data length: ${base64Data.length}`);
+                      
                       // Convert base64 to blob and create file
-                      const binaryData = atob(attachmentData.data.data);
+                      const binaryData = atob(base64Data);
                       const bytes = new Uint8Array(binaryData.length);
                       for (let i = 0; i < binaryData.length; i++) {
                         bytes[i] = binaryData.charCodeAt(i);
                       }
                       const blob = new Blob([bytes], { type: 'application/pdf' });
                       const file = new File([blob], attachment.filename, { type: 'application/pdf' });
+
+                      console.log(`✅ Created file: ${file.name}, size: ${file.size} bytes`);
 
                       // Process with Gemini
                       console.log(`🤖 Processing ${attachment.filename} with Gemini...`);
@@ -212,6 +227,11 @@ export class RealWorkflowEngine {
                     }
                   } catch (error) {
                     console.error(`❌ Error processing attachment ${attachment.filename}:`, error);
+                    console.error('Error details:', {
+                      name: error.name,
+                      message: error.message,
+                      stack: error.stack
+                    });
                   }
                 }
               }
