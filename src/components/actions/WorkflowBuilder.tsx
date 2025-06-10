@@ -415,15 +415,15 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
         }),
         ...(node.data.type === 'document-processing' && {
           processingConfig: {
-            type: node.data.label?.toLowerCase().includes('po') ? 'po-extraction' : 'invoice-extraction',
+            type: (node.data.label as string)?.toLowerCase().includes('po') ? 'po-extraction' : 'invoice-extraction',
             aiModel: 'gemini',
             confidence: 0.8
           }
         }),
         ...(node.data.type === 'data-storage' && {
           storageConfig: {
-            table: node.data.label?.toLowerCase().includes('comparison') ? 'compare_po_invoice_table' : 
-                   node.data.label?.toLowerCase().includes('po') ? 'po_table' : 'invoice_table',
+            table: (node.data.label as string)?.toLowerCase().includes('comparison') ? 'compare_po_invoice_table' : 
+                   (node.data.label as string)?.toLowerCase().includes('po') ? 'po_table' : 'invoice_table',
             action: 'insert',
             mapping: {}
           }

@@ -1,4 +1,3 @@
-
 import { WorkflowConfig, WorkflowExecution, WorkflowStep, WorkflowStepResult } from '@/types/workflow';
 import { GmailWorkflowService } from './GmailWorkflowService';
 import { DocumentComparisonService } from './DocumentComparisonService';
@@ -514,7 +513,7 @@ export class EnhancedWorkflowEngine {
           };
 
           if (targetTable === 'po_table') {
-            // Store PO data
+            // Store PO data using the correct method name
             await dbStorage.storePOInDatabase(
               item.extractedData,
               emailContext,
