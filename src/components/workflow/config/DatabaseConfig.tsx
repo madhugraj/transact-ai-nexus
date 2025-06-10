@@ -168,6 +168,18 @@ export const DatabaseConfig: React.FC<DatabaseConfigProps> = ({
             </SelectContent>
           </Select>
         </div>
+        
+        {/* Information about what happens when storing data */}
+        <div className="bg-blue-50 p-3 rounded text-sm">
+          <p className="font-medium mb-1">What happens when data is stored:</p>
+          <ul className="text-xs text-blue-700 space-y-1">
+            <li>• Extracted data from previous steps gets stored in the selected table</li>
+            <li>• For invoice data: structured fields like vendor, amount, line items</li>
+            <li>• For PO data: purchase order details, vendor info, delivery dates</li>
+            <li>• Each record includes metadata like processing timestamp and source</li>
+            <li>• Data is automatically linked to your user account (RLS applied)</li>
+          </ul>
+        </div>
       </CardContent>
     </Card>
   );

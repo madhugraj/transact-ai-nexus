@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +25,8 @@ import { ComponentPalette } from './builder/ComponentPalette';
 import { WorkflowConfigDialog } from './WorkflowConfigDialog';
 import { WorkflowConfig, WorkflowStep, WorkflowStepType } from '@/types/workflow';
 import { useToast } from '@/hooks/use-toast';
-import { Save, Play, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useWorkflowPersistence } from '@/hooks/useWorkflowPersistence';
+import { Save, Play, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 
 interface DragDropWorkflowBuilderProps {
   onWorkflowSave: (workflow: WorkflowConfig) => void;
@@ -36,11 +37,14 @@ const nodeTypes = {
   workflowStep: WorkflowNode,
 };
 
+const AUTOSAVE_KEY = 'workflow_draft';
+
 export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = ({
   onWorkflowSave,
   onWorkflowExecute
 }) => {
   const { toast } = useToast();
+  const { addWorkflow } = useWorkflowPersistence();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -50,6 +54,53 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
   const [selectedNode, setSelectedNode] = useState<WorkflowStep | null>(null);
   const [showConfigDialog, setShowConfigDialog] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Load draft on component mount
+  useEffect(() => {
+    const savedDraft = localStorage.getItem(AUTOSAVE_KEY);
+    if (savedDraft) {
+      try {
+        const draft = JSON.parse(savedDraft);
+        setWorkflowName(draft.name || '');
+        setWorkflowDescription(draft.description || '');
+        if (draft.nodes) setNodes(draft.nodes);
+        if (draft.edges) setEdges(draft.edges);
+        console.log('📄 Loaded workflow draft from localStorage');
+        
+        toast({
+          title: "Draft Restored",
+          description: "Your previous work has been restored",
+        });
+      } catch (error) {
+        console.error('❌ Failed to load workflow draft:', error);
+        localStorage.removeItem(AUTOSAVE_KEY);
+      }
+    }
+  }, [setNodes, setEdges]);
+
+  // Autosave functionality
+  useEffect(() => {
+    if (nodes.length > 0 || workflowName || workflowDescription) {
+      const draft = {
+        name: workflowName,
+        description: workflowDescription,
+        nodes,
+        edges,
+        lastSaved: new Date().toISOString()
+      };
+      
+      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(draft));
+      setHasUnsavedChanges(true);
+      console.log('💾 Auto-saved workflow draft');
+    }
+  }, [nodes, edges, workflowName, workflowDescription]);
+
+  const clearDraft = () => {
+    localStorage.removeItem(AUTOSAVE_KEY);
+    setHasUnsavedChanges(false);
+    console.log('🗑️ Cleared workflow draft');
+  };
 
   const onConnect = useCallback((connection: Connection) => {
     setEdges((eds) => addEdge({ ...connection, animated: true }, eds));
@@ -79,7 +130,6 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
 
       const stepId = `node_${Date.now()}`;
       
-      // Create a proper WorkflowStep object
       const workflowStep: WorkflowStep = {
         id: stepId,
         type: nodeType as WorkflowStepType,
@@ -90,7 +140,6 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
           x: position.x,
           y: position.y,
           connectedTo: [],
-          // Initialize config based on step type
           ...(nodeType === 'data-source' && nodeLabel?.toLowerCase().includes('gmail') && {
             emailConfig: {
               source: 'gmail' as const,
@@ -218,7 +267,20 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
     };
 
     console.log('💾 Saving workflow from DragDropWorkflowBuilder:', workflow);
+    
+    // Add to persistent storage
+    addWorkflow(workflow);
+    
+    // Call the parent handler
     onWorkflowSave(workflow);
+    
+    // Clear the draft after successful save
+    clearDraft();
+    
+    toast({
+      title: "Workflow Saved",
+      description: `"${workflow.name}" has been saved successfully and will persist across sessions.`,
+    });
   };
 
   const handleExecuteWorkflow = () => {
@@ -275,7 +337,19 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
               
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Workflow Details</CardTitle>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    Workflow Details
+                    {hasUnsavedChanges && (
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <AlertCircle className="h-3 w-3 text-yellow-500" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Auto-saved draft available</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div>
@@ -358,6 +432,9 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
                   onClick={() => {
                     setNodes([]);
                     setEdges([]);
+                    setWorkflowName('');
+                    setWorkflowDescription('');
+                    clearDraft();
                   }}
                 >
                   Clear Canvas
