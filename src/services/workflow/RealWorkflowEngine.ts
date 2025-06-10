@@ -1,4 +1,5 @@
 
+
 import { WorkflowConfig, WorkflowExecution, WorkflowStep, WorkflowStepResult } from '@/types/workflow';
 import { GmailWorkflowService } from './GmailWorkflowService';
 import { DatabaseStorageService } from './DatabaseStorageService';
@@ -255,11 +256,21 @@ export class RealWorkflowEngine {
           continue;
         }
 
+        // Ensure we have the correct data format - the attachment data should be base64 string
+        const attachmentBase64 = attachmentData.data?.data || attachmentData.data;
+        
+        if (!attachmentBase64 || typeof attachmentBase64 !== 'string') {
+          console.error('❌ Invalid attachment data format for:', file.name);
+          continue;
+        }
+
+        console.log('📄 Processing attachment data for:', file.name, 'Data length:', attachmentBase64.length);
+
         // Process the PDF with Gemini for invoice extraction
         const { data: extractionResult, error: extractionError } = await supabase.functions.invoke('gemini-api', {
           body: {
             action: 'extractInvoiceData',
-            fileData: attachmentData.data,
+            fileData: attachmentBase64,
             fileName: file.name,
             mimeType: file.mimeType
           }
@@ -363,3 +374,4 @@ export class RealWorkflowEngine {
     };
   }
 }
+
