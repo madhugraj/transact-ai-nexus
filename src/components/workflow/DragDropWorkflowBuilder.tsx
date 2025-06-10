@@ -31,6 +31,7 @@ import { Save, Play, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react
 interface DragDropWorkflowBuilderProps {
   onWorkflowSave: (workflow: WorkflowConfig) => void;
   onWorkflowExecute: (workflow: WorkflowConfig) => void;
+  initialWorkflow?: WorkflowConfig | null;
 }
 
 const nodeTypes = {
@@ -41,7 +42,8 @@ const AUTOSAVE_KEY = 'workflow_draft';
 
 export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = ({
   onWorkflowSave,
-  onWorkflowExecute
+  onWorkflowExecute,
+  initialWorkflow
 }) => {
   const { toast } = useToast();
   const { addWorkflow } = useWorkflowPersistence();
@@ -56,8 +58,44 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Load draft on component mount
+  // Load initial workflow when provided
   useEffect(() => {
+    if (initialWorkflow) {
+      console.log('🔄 Loading initial workflow:', initialWorkflow);
+      setWorkflowName(initialWorkflow.name);
+      setWorkflowDescription(initialWorkflow.description);
+      
+      // Convert workflow steps to ReactFlow nodes
+      const flowNodes = initialWorkflow.steps.map((step) => ({
+        id: step.id,
+        type: 'workflowStep',
+        position: step.position,
+        data: {
+          step: step,
+          isEditable: true,
+          onStepDoubleClick: handleNodeConfig,
+          onDelete: handleNodeDelete
+        },
+      }));
+      
+      // Convert connections to ReactFlow edges
+      const flowEdges = initialWorkflow.connections.map((conn) => ({
+        id: conn.id,
+        source: conn.sourceStepId,
+        target: conn.targetStepId,
+        animated: true,
+      }));
+      
+      setNodes(flowNodes);
+      setEdges(flowEdges);
+      
+      // Clear any existing draft since we're loading a template
+      clearDraft();
+      
+      return;
+    }
+    
+    // Load draft only if no initial workflow is provided
     const savedDraft = localStorage.getItem(AUTOSAVE_KEY);
     if (savedDraft) {
       try {
@@ -77,11 +115,11 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
         localStorage.removeItem(AUTOSAVE_KEY);
       }
     }
-  }, [setNodes, setEdges]);
+  }, [initialWorkflow, setNodes, setEdges]);
 
-  // Autosave functionality
+  // Autosave functionality (only if no initial workflow is loaded)
   useEffect(() => {
-    if (nodes.length > 0 || workflowName || workflowDescription) {
+    if (!initialWorkflow && (nodes.length > 0 || workflowName || workflowDescription)) {
       const draft = {
         name: workflowName,
         description: workflowDescription,
@@ -94,7 +132,7 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
       setHasUnsavedChanges(true);
       console.log('💾 Auto-saved workflow draft');
     }
-  }, [nodes, edges, workflowName, workflowDescription]);
+  }, [nodes, edges, workflowName, workflowDescription, initialWorkflow]);
 
   const clearDraft = () => {
     localStorage.removeItem(AUTOSAVE_KEY);
@@ -339,7 +377,7 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm flex items-center gap-2">
                     Workflow Details
-                    {hasUnsavedChanges && (
+                    {hasUnsavedChanges && !initialWorkflow && (
                       <Tooltip>
                         <TooltipTrigger>
                           <AlertCircle className="h-3 w-3 text-yellow-500" />

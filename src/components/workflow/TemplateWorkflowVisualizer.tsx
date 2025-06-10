@@ -6,6 +6,7 @@ import {
   Background,
   Controls,
   MiniMap,
+  MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { WorkflowStepNode } from '../actions/WorkflowNodeTypes';
@@ -34,7 +35,7 @@ const TemplateWorkflowVisualizer: React.FC<TemplateWorkflowVisualizerProps> = ({
       selectable: false,
     }));
 
-    // Create edges from template connections with better styling
+    // Create edges from template connections with proper MarkerType
     const edges = template.connections.map((conn, index) => ({
       id: `edge-${index}`,
       source: conn.sourceStepId,
@@ -45,7 +46,7 @@ const TemplateWorkflowVisualizer: React.FC<TemplateWorkflowVisualizerProps> = ({
         strokeWidth: 2,
       },
       markerEnd: {
-        type: 'arrowclosed',
+        type: MarkerType.ArrowClosed,
         color: '#3b82f6',
       },
     }));
