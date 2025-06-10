@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export class GmailWorkflowService {
@@ -15,12 +14,16 @@ export class GmailWorkflowService {
     
     try {
       // First attempt with current access token
-      const result = await this.callGmailAPI(accessToken, filters, useIntelligentFiltering);
+      const result = await this.callGmailAPIWithRetry(accessToken, filters, useIntelligentFiltering);
       return result;
     } catch (error: any) {
-      // If we get a 401 error, try to refresh the token
-      if (error.message?.includes('401') || error.message?.includes('Invalid Credentials')) {
-        console.log('🔄 Access token expired, attempting refresh...');
+      console.error('❌ Primary Gmail API call failed:', error);
+      
+      // If we get a 401 error or network error, try to refresh the token
+      if (error.message?.includes('401') || 
+          error.message?.includes('Invalid Credentials') ||
+          error.message?.includes('Failed to send a request to the Edge Function')) {
+        console.log('🔄 Attempting token refresh due to error...');
         
         if (!refreshToken) {
           // Clear invalid tokens and throw error
@@ -40,7 +43,7 @@ export class GmailWorkflowService {
           localStorage.setItem('gmail_auth_tokens', JSON.stringify(updatedTokens));
           
           // Retry the API call with new token
-          return await this.callGmailAPI(newAccessToken, filters, useIntelligentFiltering);
+          return await this.callGmailAPIWithRetry(newAccessToken, filters, useIntelligentFiltering);
         } catch (refreshError) {
           console.error('❌ Token refresh failed:', refreshError);
           // Clear invalid tokens
@@ -54,8 +57,28 @@ export class GmailWorkflowService {
     }
   }
 
+  private async callGmailAPIWithRetry(accessToken: string, filters: string[], useIntelligentFiltering: boolean, retries = 3): Promise<any> {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        console.log(`🔄 Gmail API attempt ${attempt}/${retries}`);
+        return await this.callGmailAPI(accessToken, filters, useIntelligentFiltering);
+      } catch (error: any) {
+        console.error(`❌ Gmail API attempt ${attempt} failed:`, error);
+        
+        if (attempt === retries) {
+          throw error;
+        }
+        
+        // Wait before retry (exponential backoff)
+        const delay = Math.pow(2, attempt) * 1000;
+        console.log(`⏳ Waiting ${delay}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
   private async callGmailAPI(accessToken: string, filters: string[], useIntelligentFiltering: boolean): Promise<any> {
-    // Build search query - FIX: Pass the useIntelligentFiltering parameter correctly
+    // Build search query - Pass the useIntelligentFiltering parameter correctly
     let searchQuery = '';
     
     if (useIntelligentFiltering) {
@@ -81,43 +104,54 @@ export class GmailWorkflowService {
 
     console.log('🔍 Gmail search query:', searchQuery);
 
-    const { data, error } = await supabase.functions.invoke('gmail', {
-      body: {
-        action: 'listMessages',
-        accessToken,
-        query: searchQuery,
-        maxResults: useIntelligentFiltering ? 20 : 10 // More results when using AI
+    try {
+      const { data, error } = await supabase.functions.invoke('gmail', {
+        body: {
+          action: 'listMessages',
+          accessToken,
+          query: searchQuery,
+          maxResults: useIntelligentFiltering ? 20 : 10 // More results when using AI
+        }
+      });
+
+      if (error) {
+        console.error('❌ Gmail API error:', error);
+        throw new Error(`Gmail API error: ${error.message}`);
       }
-    });
 
-    if (error) {
-      console.error('❌ Gmail API error:', error);
-      throw new Error(`Gmail API error: ${error.message}`);
+      if (!data || !data.success) {
+        console.error('❌ Gmail API request failed:', data?.error);
+        throw new Error(data?.error || 'Gmail API request failed');
+      }
+
+      console.log('✅ Gmail emails fetched successfully:', data.data?.length || 0, 'emails');
+      
+      let filteredEmails = data.data || [];
+
+      // Apply intelligent filtering if enabled
+      if (useIntelligentFiltering && filteredEmails.length > 0) {
+        console.log('🤖 Applying AI-powered invoice detection...');
+        filteredEmails = await this.applyIntelligentFiltering(filteredEmails);
+      }
+      
+      return {
+        source: 'gmail',
+        emails: filteredEmails,
+        count: filteredEmails.length,
+        filters: filters,
+        intelligentFiltering: useIntelligentFiltering,
+        searchQuery
+      };
+    } catch (networkError: any) {
+      console.error('❌ Network error calling Gmail API:', networkError);
+      
+      // Provide more specific error messages
+      if (networkError.message?.includes('Failed to send a request to the Edge Function')) {
+        throw new Error('Unable to connect to Gmail service. Please check your internet connection and try again.');
+      }
+      
+      throw networkError;
     }
-
-    if (!data.success) {
-      console.error('❌ Gmail API request failed:', data.error);
-      throw new Error(data.error || 'Gmail API request failed');
-    }
-
-    console.log('✅ Gmail emails fetched successfully:', data.data?.length || 0, 'emails');
-    
-    let filteredEmails = data.data || [];
-
-    // Apply intelligent filtering if enabled
-    if (useIntelligentFiltering && filteredEmails.length > 0) {
-      console.log('🤖 Applying AI-powered invoice detection...');
-      filteredEmails = await this.applyIntelligentFiltering(filteredEmails);
-    }
-    
-    return {
-      source: 'gmail',
-      emails: filteredEmails,
-      count: filteredEmails.length,
-      filters: filters,
-      intelligentFiltering: useIntelligentFiltering,
-      searchQuery
-    };
   }
 
   private async applyIntelligentFiltering(emails: any[]): Promise<any[]> {
@@ -241,19 +275,24 @@ export class GmailWorkflowService {
   private async refreshAccessToken(refreshToken: string): Promise<string> {
     console.log('🔄 Refreshing Gmail access token...');
     
-    const { data, error } = await supabase.functions.invoke('google-auth', {
-      body: {
-        action: 'refresh',
-        refreshToken
+    try {
+      const { data, error } = await supabase.functions.invoke('google-auth', {
+        body: {
+          action: 'refresh',
+          refreshToken
+        }
+      });
+
+      if (error || !data?.success) {
+        throw new Error('Failed to refresh access token');
       }
-    });
 
-    if (error || !data.success) {
-      throw new Error('Failed to refresh access token');
+      console.log('✅ Access token refreshed successfully');
+      return data.accessToken;
+    } catch (error: any) {
+      console.error('❌ Error refreshing token:', error);
+      throw new Error('Failed to refresh Gmail authentication. Please reconnect your account.');
     }
-
-    console.log('✅ Access token refreshed successfully');
-    return data.accessToken;
   }
 
   async processEmailAttachments(emails: any[]): Promise<any[]> {
