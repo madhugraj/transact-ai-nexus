@@ -1,8 +1,8 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { RefreshCw, Download, FileText, Image, Table } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { RefreshCw, FileText, Image, File } from 'lucide-react';
 
 interface DriveFile {
   id: string;
@@ -15,16 +15,28 @@ interface DriveFile {
 
 interface FileExplorerProps {
   files: DriveFile[];
+  selectedFiles: string[];
   isLoading: boolean;
+  onFileSelection: (fileId: string, isSelected: boolean) => void;
+  onSelectAll: () => void;
   onRefresh: () => void;
 }
 
-const FileExplorer: React.FC<FileExplorerProps> = ({ files, isLoading, onRefresh }) => {
+const FileExplorer = ({ 
+  files, 
+  selectedFiles,
+  isLoading, 
+  onFileSelection,
+  onSelectAll,
+  onRefresh 
+}: FileExplorerProps) => {
   const getFileIcon = (mimeType: string) => {
-    if (mimeType === 'application/pdf') return <FileText className="h-4 w-4 text-red-500" />;
-    if (mimeType.startsWith('image/')) return <Image className="h-4 w-4 text-blue-500" />;
-    if (mimeType.includes('spreadsheet') || mimeType.includes('csv')) return <Table className="h-4 w-4 text-green-500" />;
-    return <FileText className="h-4 w-4 text-gray-500" />;
+    if (mimeType === 'application/pdf') {
+      return <FileText className="h-4 w-4 text-red-500" />;
+    } else if (mimeType.startsWith('image/')) {
+      return <Image className="h-4 w-4 text-blue-500" />;
+    }
+    return <File className="h-4 w-4 text-gray-500" />;
   };
 
   const formatFileSize = (size?: string) => {
@@ -35,62 +47,102 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ files, isLoading, onRefresh
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  if (files.length === 0 && !isLoading) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+        <p>No files found in your Google Drive</p>
+        <Button 
+          variant="outline" 
+          onClick={onRefresh} 
+          className="mt-2"
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-medium">Files from Google Drive</h3>
-        <Button
+        <div className="flex items-center gap-2">
+          <Checkbox
+            checked={selectedFiles.length === files.length && files.length > 0}
+            onCheckedChange={onSelectAll}
+            id="select-all"
+          />
+          <label htmlFor="select-all" className="text-sm font-medium">
+            Select All ({selectedFiles.length}/{files.length})
+          </label>
+        </div>
+        
+        <Button 
+          variant="outline" 
           size="sm"
-          variant="outline"
           onClick={onRefresh}
           disabled={isLoading}
-          className="gap-2"
         >
-          <RefreshCw className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="text-center py-8 text-muted-foreground">
-          Loading files...
-        </div>
-      ) : files.length === 0 ? (
-        <div className="text-center py-8 text-muted-foreground">
-          No files found. Make sure you have documents in your Google Drive.
-        </div>
-      ) : (
-        <div className="space-y-2 max-h-64 overflow-y-auto">
+      <div className="border rounded-lg">
+        <div className="max-h-96 overflow-y-auto">
           {files.map((file) => (
-            <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div
+              key={file.id}
+              className="flex items-center gap-3 p-3 border-b last:border-b-0 hover:bg-gray-50"
+            >
+              <Checkbox
+                checked={selectedFiles.includes(file.id)}
+                onCheckedChange={(checked) => onFileSelection(file.id, !!checked)}
+                id={file.id}
+              />
+              
+              <div className="flex-shrink-0">
                 {getFileIcon(file.mimeType)}
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">{file.name}</p>
-                  <div className="flex gap-2 mt-1">
-                    <Badge variant="outline" className="text-xs">
-                      {file.mimeType.split('/')[1]?.toUpperCase() || 'FILE'}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      {formatFileSize(file.size)}
-                    </span>
-                  </div>
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm truncate">
+                  {file.name}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {formatFileSize(file.size)} • Modified {formatDate(file.modifiedTime)}
                 </div>
               </div>
               
               {file.webViewLink && (
                 <Button
-                  size="sm"
                   variant="ghost"
-                  onClick={() => window.open(file.webViewLink, '_blank')}
-                  className="gap-1"
+                  size="sm"
+                  asChild
                 >
-                  <Download className="h-3 w-3" />
-                  View
+                  <a 
+                    href={file.webViewLink} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-xs"
+                  >
+                    View
+                  </a>
                 </Button>
               )}
             </div>
           ))}
+        </div>
+      </div>
+
+      {selectedFiles.length > 0 && (
+        <div className="text-sm text-gray-600">
+          {selectedFiles.length} file(s) selected for PO processing
         </div>
       )}
     </div>

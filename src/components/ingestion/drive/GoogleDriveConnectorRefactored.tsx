@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import ConnectionStatus from './ConnectionStatus';
 import FileExplorer from './FileExplorer';
+import { POProcessor } from './processing/POProcessor';
 
 interface DriveFile {
   id: string;
@@ -20,16 +21,15 @@ const GoogleDriveConnectorRefactored = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [files, setFiles] = useState<DriveFile[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
+  const [processingResults, setProcessingResults] = useState<any[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Check connection status on mount and periodically
+  // Check connection status on mount
   useEffect(() => {
     checkConnectionStatus();
-    
-    // Set up periodic token validation every 5 minutes
-    const interval = setInterval(checkConnectionStatus, 5 * 60 * 1000);
-    return () => clearInterval(interval);
   }, []);
 
   const checkConnectionStatus = async () => {
@@ -97,101 +97,46 @@ const GoogleDriveConnectorRefactored = () => {
 
       console.log('🔗 Opening Google Drive auth URL');
       
-      // Use a different approach for popup handling to avoid COOP issues
       const authWindow = window.open(
         data.authUrl,
         'google-drive-auth',
-        'width=600,height=700,scrollbars=yes,resizable=yes,status=yes,toolbar=no,menubar=no,location=no'
+        'width=600,height=700,scrollbars=yes,resizable=yes'
       );
 
       if (!authWindow) {
-        throw new Error('Failed to open authentication window. Please check popup blocker settings.');
+        throw new Error('Failed to open authentication window');
       }
 
-      // Enhanced message listener with better error handling
+      // Listen for messages from the popup
       const messageListener = (event: MessageEvent) => {
-        // Accept messages from any origin to handle COOP restrictions
-        console.log('📨 Received message:', event.data, 'from origin:', event.origin);
-
-        if (event.data && typeof event.data === 'object') {
-          if (event.data.type === 'OAUTH_SUCCESS' && event.data.code) {
-            console.log('✅ OAuth success detected, processing...');
-            
-            // Exchange the code for tokens
-            exchangeCodeForTokens(event.data.code);
-            
-            // Close the popup window
-            try {
-              authWindow.close();
-            } catch (e) {
-              console.log('Could not close auth window:', e);
-            }
-            
-            window.removeEventListener('message', messageListener);
-          } else if (event.data.type === 'OAUTH_ERROR') {
-            console.error('❌ OAuth error:', event.data.error);
-            setError(event.data.error || 'Authentication failed');
-            
-            try {
-              authWindow.close();
-            } catch (e) {
-              console.log('Could not close auth window:', e);
-            }
-            
-            window.removeEventListener('message', messageListener);
-            setIsLoading(false);
-          }
+        if (event.data && event.data.type === 'OAUTH_SUCCESS' && event.data.code) {
+          console.log('✅ OAuth success detected');
+          exchangeCodeForTokens(event.data.code);
+          authWindow.close();
+          window.removeEventListener('message', messageListener);
+        } else if (event.data && event.data.type === 'OAUTH_ERROR') {
+          console.error('❌ OAuth error:', event.data.error);
+          setError(event.data.error || 'Authentication failed');
+          authWindow.close();
+          window.removeEventListener('message', messageListener);
+          setIsLoading(false);
         }
       };
 
-      // Listen for messages from the popup
       window.addEventListener('message', messageListener);
 
-      // Fallback: Monitor popup window status
-      const checkWindowStatus = setInterval(() => {
-        try {
-          if (authWindow.closed) {
-            console.log('🔍 Auth window was closed');
-            clearInterval(checkWindowStatus);
-            window.removeEventListener('message', messageListener);
-            setIsLoading(false);
-            
-            // Check if we got tokens in the meantime
-            const tokens = localStorage.getItem('drive_auth_tokens');
-            if (!tokens) {
-              setError('Authentication was cancelled or failed');
-            }
-          }
-        } catch (e) {
-          // COOP policy might prevent access to authWindow.closed
-          console.log('Cannot check window status due to COOP policy');
-        }
-      }, 1000);
-
-      // Timeout after 5 minutes
+      // Cleanup after timeout
       setTimeout(() => {
-        clearInterval(checkWindowStatus);
         window.removeEventListener('message', messageListener);
-        try {
-          if (!authWindow.closed) {
-            authWindow.close();
-          }
-        } catch (e) {
-          console.log('Could not close auth window on timeout:', e);
+        if (!authWindow.closed) {
+          authWindow.close();
         }
         setIsLoading(false);
-        setError('Authentication timed out. Please try again.');
       }, 300000); // 5 minutes
 
     } catch (error) {
       console.error('❌ Google Drive connection error:', error);
       setError(error instanceof Error ? error.message : 'Connection failed');
-      
-      toast({
-        title: "Connection Failed",
-        description: error instanceof Error ? error.message : 'Failed to connect to Google Drive',
-        variant: "destructive"
-      });
       setIsLoading(false);
     }
   };
@@ -215,7 +160,6 @@ const GoogleDriveConnectorRefactored = () => {
         throw new Error('No access token received');
       }
 
-      // Store tokens
       const tokens = {
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
@@ -233,10 +177,7 @@ const GoogleDriveConnectorRefactored = () => {
         description: "Successfully connected to your Google Drive account",
       });
 
-      // Auto-load files after successful connection
-      setTimeout(() => {
-        loadFiles();
-      }, 1000);
+      loadFiles();
 
     } catch (error) {
       console.error('❌ Token exchange failed:', error);
@@ -249,6 +190,8 @@ const GoogleDriveConnectorRefactored = () => {
     localStorage.removeItem('drive_auth_tokens');
     setIsConnected(false);
     setFiles([]);
+    setSelectedFiles([]);
+    setProcessingResults([]);
     setError(null);
     
     toast({
@@ -258,10 +201,7 @@ const GoogleDriveConnectorRefactored = () => {
   };
 
   const loadFiles = async () => {
-    if (!isConnected) {
-      console.log('⚠️ Not connected to Google Drive');
-      return;
-    }
+    if (!isConnected) return;
 
     setIsLoading(true);
     setError(null);
@@ -273,29 +213,22 @@ const GoogleDriveConnectorRefactored = () => {
       }
 
       const parsedTokens = JSON.parse(tokens);
-      console.log('📁 Loading Google Drive files...');
-
+      
       const { data, error } = await supabase.functions.invoke('google-auth', {
         body: {
           action: 'list_drive_files',
           accessToken: parsedTokens.accessToken,
-          query: "mimeType='application/pdf' or mimeType contains 'image/' or name contains '.csv' or name contains '.xlsx'"
+          query: "mimeType='application/pdf' or mimeType contains 'image/'"
         }
       });
 
       if (error) {
-        // Handle 400 errors specifically
         if (error.message?.includes('400') || error.message?.includes('invalid_grant')) {
-          console.log('🔄 Token expired, clearing and requesting reconnection');
           localStorage.removeItem('drive_auth_tokens');
           setIsConnected(false);
           throw new Error('Authentication expired. Please reconnect to Google Drive.');
         }
         throw new Error(`Failed to load files: ${error.message}`);
-      }
-
-      if (!data?.files) {
-        throw new Error('No files data received');
       }
 
       console.log(`✅ Loaded ${data.files.length} files from Google Drive`);
@@ -321,10 +254,131 @@ const GoogleDriveConnectorRefactored = () => {
     }
   };
 
+  const handleFileSelection = (fileId: string, isSelected: boolean) => {
+    if (isSelected) {
+      setSelectedFiles(prev => [...prev, fileId]);
+    } else {
+      setSelectedFiles(prev => prev.filter(id => id !== fileId));
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedFiles.length === files.length) {
+      setSelectedFiles([]);
+    } else {
+      setSelectedFiles(files.map(file => file.id));
+    }
+  };
+
+  const downloadSelectedFiles = async () => {
+    if (selectedFiles.length === 0) {
+      toast({
+        title: "No Files Selected",
+        description: "Please select files to download",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    const fileObjects: File[] = [];
+
+    try {
+      const tokens = localStorage.getItem('drive_auth_tokens');
+      if (!tokens) throw new Error('No authentication tokens');
+      
+      const parsedTokens = JSON.parse(tokens);
+
+      for (const fileId of selectedFiles) {
+        const file = files.find(f => f.id === fileId);
+        if (!file) continue;
+
+        // Download file content
+        const { data, error } = await supabase.functions.invoke('google-auth', {
+          body: {
+            action: 'download_file',
+            accessToken: parsedTokens.accessToken,
+            fileId: fileId
+          }
+        });
+
+        if (error) {
+          console.error(`Failed to download ${file.name}:`, error);
+          continue;
+        }
+
+        // Convert base64 to File object
+        const binaryString = atob(data.content);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        const fileObject = new File([bytes], file.name, { 
+          type: file.mimeType || 'application/octet-stream' 
+        });
+        
+        fileObjects.push(fileObject);
+      }
+
+      if (fileObjects.length === 0) {
+        throw new Error('No files could be downloaded');
+      }
+
+      console.log(`✅ Downloaded ${fileObjects.length} files successfully`);
+      
+      // Process the downloaded files for PO extraction
+      await processPOFiles(fileObjects);
+
+    } catch (error) {
+      console.error('❌ Download failed:', error);
+      toast({
+        title: "Download Failed",
+        description: error instanceof Error ? error.message : 'Failed to download files',
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const processPOFiles = async (fileObjects: File[]) => {
+    setIsProcessing(true);
+    
+    try {
+      console.log(`🚀 Starting PO processing for ${fileObjects.length} files`);
+      
+      const processor = new POProcessor();
+      const results = await processor.processFiles(fileObjects);
+      
+      setProcessingResults(results);
+      
+      const successCount = results.filter(r => r.status === 'success').length;
+      const errorCount = results.filter(r => r.status === 'error').length;
+      
+      toast({
+        title: "PO Processing Complete",
+        description: `Successfully processed ${successCount} POs, ${errorCount} errors`,
+      });
+
+      console.log(`✅ PO processing complete. Success: ${successCount}, Errors: ${errorCount}`);
+      
+    } catch (error) {
+      console.error('❌ PO processing failed:', error);
+      toast({
+        title: "Processing Failed",
+        description: error instanceof Error ? error.message : 'Failed to process PO files',
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Google Drive Connector</CardTitle>
+        <CardTitle>Google Drive PO Processor</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <ConnectionStatus
@@ -352,11 +406,58 @@ const GoogleDriveConnectorRefactored = () => {
         )}
 
         {isConnected && (
-          <FileExplorer 
-            files={files} 
-            isLoading={isLoading}
-            onRefresh={loadFiles}
-          />
+          <>
+            <FileExplorer 
+              files={files} 
+              selectedFiles={selectedFiles}
+              isLoading={isLoading}
+              onFileSelection={handleFileSelection}
+              onSelectAll={handleSelectAll}
+              onRefresh={loadFiles}
+            />
+
+            {selectedFiles.length > 0 && (
+              <div className="flex gap-2">
+                <Button 
+                  onClick={downloadSelectedFiles}
+                  disabled={isLoading || isProcessing}
+                  className="flex-1"
+                >
+                  {isProcessing ? 'Processing POs...' : `Process ${selectedFiles.length} Selected Files`}
+                </Button>
+              </div>
+            )}
+
+            {processingResults.length > 0 && (
+              <div className="mt-4">
+                <h3 className="font-medium mb-2">Processing Results:</h3>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {processingResults.map((result, index) => (
+                    <div key={index} className={`p-2 rounded text-sm ${
+                      result.status === 'success' ? 'bg-green-50 text-green-800' :
+                      result.status === 'error' ? 'bg-red-50 text-red-800' :
+                      'bg-yellow-50 text-yellow-800'
+                    }`}>
+                      <div className="font-medium">{result.fileName}</div>
+                      {result.status === 'success' && result.isPO && (
+                        <div className="mt-1">
+                          <div>PO Number: {result.extractedData?.po_number || 'N/A'}</div>
+                          <div>Vendor: {result.extractedData?.vendor_code || 'N/A'}</div>
+                          <div>Stored in Database ✓</div>
+                        </div>
+                      )}
+                      {result.status === 'skipped' && (
+                        <div className="text-xs">{result.reason}</div>
+                      )}
+                      {result.error && (
+                        <div className="text-xs text-red-600">{result.error}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
