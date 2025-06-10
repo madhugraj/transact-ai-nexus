@@ -39,6 +39,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { WorkflowStepNode, SidebarNode } from "./WorkflowNodeTypes";
+import { WorkflowStepPalette } from "@/components/workflow/WorkflowStepPalette";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -70,10 +71,10 @@ const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
 
   const getTabContent = () => {
     switch (nodeType) {
-      case 'document-source':
+      case 'data-source':
         return (
           <div className="space-y-4 p-2">
-            <h4 className="text-sm font-medium">Document Source Configuration</h4>
+            <h4 className="text-sm font-medium">Data Source Configuration</h4>
             <div className="space-y-2">
               <Label htmlFor="source-type">Source Type</Label>
               <div className="grid grid-cols-2 gap-2">
@@ -82,45 +83,39 @@ const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
                   <Label htmlFor="email" className="text-sm">Email</Label>
                 </div>
                 <div className="flex items-center space-x-2 border rounded-md p-2">
-                  <input type="checkbox" id="upload" className="h-4 w-4" defaultChecked />
-                  <Label htmlFor="upload" className="text-sm">File Upload</Label>
-                </div>
-                <div className="flex items-center space-x-2 border rounded-md p-2">
-                  <input type="checkbox" id="cloud" className="h-4 w-4" />
-                  <Label htmlFor="cloud" className="text-sm">Cloud Storage</Label>
-                </div>
-                <div className="flex items-center space-x-2 border rounded-md p-2">
-                  <input type="checkbox" id="sap" className="h-4 w-4" />
-                  <Label htmlFor="sap" className="text-sm">SAP Import</Label>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="doc-type">Document Types</Label>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <input type="checkbox" id="invoice" className="h-4 w-4" defaultChecked />
-                  <Label htmlFor="invoice" className="text-sm">Invoices</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <input type="checkbox" id="po" className="h-4 w-4" defaultChecked />
-                  <Label htmlFor="po" className="text-sm">Purchase Orders</Label>
+                  <input type="checkbox" id="drive" className="h-4 w-4" defaultChecked />
+                  <Label htmlFor="drive" className="text-sm">Google Drive</Label>
                 </div>
               </div>
             </div>
           </div>
         );
-      
-      case 'comparison':
+
+      case 'document-processing':
         return (
           <div className="space-y-4 p-2">
-            <h4 className="text-sm font-medium">Document Comparison Configuration</h4>
+            <h4 className="text-sm font-medium">Document Processing Configuration</h4>
+            <div className="space-y-2">
+              <Label htmlFor="processing-type">Processing Type</Label>
+              <select id="processing-type" className="w-full border rounded-md p-2 text-sm">
+                <option value="invoice-extraction">Invoice Extraction</option>
+                <option value="po-extraction">PO Extraction</option>
+                <option value="general-ocr">General OCR</option>
+              </select>
+            </div>
+          </div>
+        );
+      
+      case 'data-comparison':
+        return (
+          <div className="space-y-4 p-2">
+            <h4 className="text-sm font-medium">Process Data Configuration</h4>
             <div className="space-y-2">
               <Label htmlFor="comparison-type">Comparison Type</Label>
               <select id="comparison-type" className="w-full border rounded-md p-2 text-sm">
-                <option value="po-invoice">PO - Invoice Matching</option>
-                <option value="invoice-receipt">Invoice - Receipt Matching</option>
-                <option value="custom">Custom Fields Matching</option>
+                <option value="po-invoice-comparison">PO vs Invoice Comparison</option>
+                <option value="jd-cv-comparison">Job Description vs CV Comparison</option>
+                <option value="custom-comparison">Custom Document Comparison</option>
               </select>
             </div>
             <div className="space-y-2">
@@ -137,9 +132,17 @@ const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
                 <span className="text-sm">80%</span>
               </div>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="source-table">Source Table</Label>
+              <Input id="source-table" placeholder="invoice_table" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="target-table">Target Table</Label>
+              <Input id="target-table" placeholder="po_table" />
+            </div>
           </div>
         );
-      
+
       case 'report-generation':
         return (
           <div className="space-y-4 p-2">
@@ -308,31 +311,8 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
   });
 
   // Initial default nodes and edges for the workflow
-  const initialNodes: Node[] = [
-    {
-      id: 'source',
-      type: 'workflowStep',
-      position: { x: 100, y: 100 },
-      data: { label: 'Document Source', type: 'document-source', description: 'Get documents from sources' },
-    },
-    {
-      id: 'comparison',
-      type: 'workflowStep',
-      position: { x: 400, y: 100 },
-      data: { label: 'Document Comparison', type: 'comparison', description: 'Compare document data' },
-    },
-    {
-      id: 'report',
-      type: 'workflowStep',
-      position: { x: 700, y: 100 },
-      data: { label: 'Report Generation', type: 'report-generation', description: 'Generate reports' },
-    }
-  ];
-
-  const initialEdges: Edge[] = [
-    { id: 'e1-2', source: 'source', target: 'comparison', animated: true },
-    { id: 'e2-3', source: 'comparison', target: 'report', animated: true },
-  ];
+  const initialNodes: Node[] = [];
+  const initialEdges: Edge[] = [];
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -370,7 +350,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
         type: 'workflowStep',
         position,
         data: { 
-          label: nodeDetails.label, 
+          label: nodeDetails.name, 
           type: nodeDetails.type, 
           description: nodeDetails.description 
         },
@@ -443,9 +423,24 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
     }
   };
 
-  const onDragStart = (event: React.DragEvent<HTMLDivElement>, nodeData: any) => {
-    event.dataTransfer.setData('application/reactflow', JSON.stringify(nodeData));
-    event.dataTransfer.effectAllowed = 'move';
+  const handleAddStep = (template: any) => {
+    const position = {
+      x: Math.random() * 400 + 100,
+      y: Math.random() * 300 + 100,
+    };
+
+    const newNode = {
+      id: `node_${Date.now()}`,
+      type: 'workflowStep',
+      position,
+      data: { 
+        label: template.name, 
+        type: template.type, 
+        description: template.description 
+      },
+    };
+
+    setNodes((nds) => nds.concat(newNode));
   };
 
   return (
@@ -462,64 +457,9 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
           </DialogHeader>
           
           <div className="grid grid-cols-12 gap-4 overflow-hidden h-full">
-            {/* Sidebar with draggable nodes */}
+            {/* Sidebar with workflow palette */}
             <div className="col-span-3 border-r pr-4 overflow-y-auto">
-              <Label className="mb-2 block">Available Steps</Label>
-              
-              <div 
-                onDragStart={(event) => onDragStart(event, { type: 'document-source', label: 'Document Source', description: 'Gathers documents from sources' })}
-                draggable
-              >
-                <SidebarNode 
-                  type="document-source" 
-                  label="Document Source" 
-                  description="Gathers documents from sources" 
-                />
-              </div>
-              
-              <div 
-                onDragStart={(event) => onDragStart(event, { type: 'comparison', label: 'Document Comparison', description: 'Compares document data' })}
-                draggable
-              >
-                <SidebarNode 
-                  type="comparison" 
-                  label="Document Comparison" 
-                  description="Compares document data" 
-                />
-              </div>
-              
-              <div 
-                onDragStart={(event) => onDragStart(event, { type: 'report-generation', label: 'Report Generation', description: 'Creates reports' })}
-                draggable
-              >
-                <SidebarNode 
-                  type="report-generation" 
-                  label="Report Generation" 
-                  description="Creates reports" 
-                />
-              </div>
-              
-              <div 
-                onDragStart={(event) => onDragStart(event, { type: 'notification', label: 'Notification', description: 'Sends notifications' })}
-                draggable
-              >
-                <SidebarNode 
-                  type="notification" 
-                  label="Notification" 
-                  description="Sends notifications" 
-                />
-              </div>
-              
-              <div 
-                onDragStart={(event) => onDragStart(event, { type: 'data-storage', label: 'Data Storage', description: 'Stores processed data' })}
-                draggable
-              >
-                <SidebarNode 
-                  type="data-storage" 
-                  label="Data Storage" 
-                  description="Stores processed data" 
-                />
-              </div>
+              <WorkflowStepPalette onAddStep={handleAddStep} />
 
               <Separator className="my-4" />
 
@@ -532,7 +472,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
                       <FormItem>
                         <FormLabel>Workflow Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="PO-Invoice Approval Pipeline" {...field} />
+                          <Input placeholder="PO-Invoice Processing Pipeline" {...field} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -545,7 +485,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
                       <FormItem>
                         <FormLabel>Description</FormLabel>
                         <FormControl>
-                          <Input placeholder="Process PO and invoices for approval" {...field} />
+                          <Input placeholder="Process and compare documents" {...field} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -602,11 +542,11 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
                     variant="outline" 
                     size="sm" 
                     onClick={() => {
-                      setNodes(initialNodes);
-                      setEdges(initialEdges);
+                      setNodes([]);
+                      setEdges([]);
                     }}
                   >
-                    Reset Flow
+                    Clear Canvas
                   </Button>
                 </Panel>
               </ReactFlow>
