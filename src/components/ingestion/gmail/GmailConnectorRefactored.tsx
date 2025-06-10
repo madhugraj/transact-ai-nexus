@@ -155,7 +155,7 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
       const { data, error } = await supabase.functions.invoke('gmail', {
         body: {
           accessToken: token,
-          action: 'list',
+          action: 'listMessages', // Changed from 'list' to 'listMessages'
           query: searchQuery,
           maxResults: parseInt(maxResults)
         }
@@ -175,13 +175,24 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
 
       console.log('Gmail messages loaded:', data);
       if (data.success) {
-        setEmails(data.data);
-        console.log(`Successfully loaded ${data.data.length} emails`);
+        // Process the messages to create proper email objects
+        const emails = data.data.messages ? data.data.messages.map((msg: any) => ({
+          id: msg.id,
+          subject: 'Loading...', // We'll need to get full details for subject
+          from: 'Loading...', // We'll need to get full details for from
+          date: new Date().toISOString(), // Placeholder
+          snippet: '',
+          hasAttachments: false,
+          labels: []
+        })) : [];
+        
+        setEmails(emails);
+        console.log(`Successfully loaded ${emails.length} emails`);
         
         if (forceRefresh) {
           toast({
             title: "Emails refreshed",
-            description: `Loaded ${data.data.length} emails from Gmail`
+            description: `Loaded ${emails.length} emails from Gmail`
           });
         }
       } else {

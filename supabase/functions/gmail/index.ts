@@ -20,6 +20,7 @@ serve(async (req) => {
     let method = 'GET';
     
     switch (action) {
+      case 'list':
       case 'listMessages':
         url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${maxResults}&q=${encodeURIComponent(query)}`;
         break;
