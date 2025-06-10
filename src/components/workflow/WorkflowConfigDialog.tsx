@@ -10,9 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 import { WorkflowStep } from '@/types/workflow';
-import { Settings, FileText, GitCompare } from 'lucide-react';
-import { DataSourceConfig } from './config/DataSourceConfig';
-import { DatabaseConfig } from './config/DatabaseConfig';
+import { Settings, FileText, GitCompare, Database, Mail, HardDrive } from 'lucide-react';
 
 interface WorkflowConfigDialogProps {
   step: WorkflowStep | null;
@@ -62,21 +60,35 @@ export const WorkflowConfigDialog: React.FC<WorkflowConfigDialogProps> = ({
     });
   };
 
+  // All 11 database tables
+  const databaseTables = [
+    'Doc_Compare_results',
+    'compare_po_invoice_table', 
+    'compare_po_multi_invoice',
+    'compare_source_document',
+    'compare_target_docs',
+    'extracted_json',
+    'extracted_tables',
+    'invoice_table',
+    'po_table',
+    'profiles',
+    'uploaded_files'
+  ];
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
-            Configure Step: {editedStep.name}
+            Configure: {editedStep.name}
           </DialogTitle>
         </DialogHeader>
 
         <Tabs defaultValue="basic" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="basic">Basic</TabsTrigger>
-            <TabsTrigger value="config">Configuration</TabsTrigger>
-            <TabsTrigger value="credentials">Credentials</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="basic">Basic Settings</TabsTrigger>
+            <TabsTrigger value="advanced">Advanced Configuration</TabsTrigger>
           </TabsList>
 
           <TabsContent value="basic" className="space-y-4">
@@ -98,19 +110,90 @@ export const WorkflowConfigDialog: React.FC<WorkflowConfigDialogProps> = ({
             </div>
           </TabsContent>
 
-          <TabsContent value="config" className="space-y-4">
+          <TabsContent value="advanced" className="space-y-4">
             {editedStep.type === 'data-source' && (
-              <DataSourceConfig
-                step={editedStep}
-                onConfigUpdate={updateConfig}
-              />
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    Data Source Configuration
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label>Source Type</Label>
+                    <Select
+                      value={editedStep.config.emailConfig?.source || 'gmail'}
+                      onValueChange={(value) => updateConfig('emailConfig', {
+                        ...editedStep.config.emailConfig,
+                        source: value
+                      })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="gmail">Gmail</SelectItem>
+                        <SelectItem value="google-drive">Google Drive</SelectItem>
+                        <SelectItem value="outlook">Outlook</SelectItem>
+                        <SelectItem value="onedrive">OneDrive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
             {editedStep.type === 'data-storage' && (
-              <DatabaseConfig
-                step={editedStep}
-                onConfigUpdate={updateConfig}
-              />
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="h-4 w-4" />
+                    Database Storage Configuration
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label>Target Table</Label>
+                    <Select
+                      value={editedStep.config.storageConfig?.table || ''}
+                      onValueChange={(value) => updateConfig('storageConfig', {
+                        ...editedStep.config.storageConfig,
+                        table: value
+                      })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a table" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {databaseTables.map((table) => (
+                          <SelectItem key={table} value={table}>
+                            {table}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Action</Label>
+                    <Select
+                      value={editedStep.config.storageConfig?.action || 'insert'}
+                      onValueChange={(value) => updateConfig('storageConfig', {
+                        ...editedStep.config.storageConfig,
+                        action: value
+                      })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="insert">Insert New Records</SelectItem>
+                        <SelectItem value="upsert">Insert or Update</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
             {editedStep.type === 'document-processing' && (
@@ -118,7 +201,7 @@ export const WorkflowConfigDialog: React.FC<WorkflowConfigDialogProps> = ({
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <FileText className="h-4 w-4" />
-                    Processing Configuration
+                    Document Processing
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -168,7 +251,7 @@ export const WorkflowConfigDialog: React.FC<WorkflowConfigDialogProps> = ({
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <GitCompare className="h-4 w-4" />
-                    Process Data Configuration
+                    Data Comparison Configuration
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -264,60 +347,50 @@ export const WorkflowConfigDialog: React.FC<WorkflowConfigDialogProps> = ({
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>Source Table</Label>
-                      <Input
+                      <Select
                         value={editedStep.config.comparisonConfig?.sourceTable || 'po_table'}
-                        onChange={(e) => updateConfig('comparisonConfig', {
+                        onValueChange={(value) => updateConfig('comparisonConfig', {
                           ...editedStep.config.comparisonConfig,
-                          sourceTable: e.target.value
+                          sourceTable: value
                         })}
-                        placeholder="po_table"
-                      />
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {databaseTables.map((table) => (
+                            <SelectItem key={table} value={table}>
+                              {table}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
                       <Label>Target Table</Label>
-                      <Input
+                      <Select
                         value={editedStep.config.comparisonConfig?.targetTable || 'invoice_table'}
-                        onChange={(e) => updateConfig('comparisonConfig', {
+                        onValueChange={(value) => updateConfig('comparisonConfig', {
                           ...editedStep.config.comparisonConfig,
-                          targetTable: e.target.value
+                          targetTable: value
                         })}
-                        placeholder="invoice_table"
-                      />
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {databaseTables.map((table) => (
+                            <SelectItem key={table} value={table}>
+                              {table}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
-
-          <TabsContent value="credentials" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Authentication & Credentials</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  <p>For this workflow to access external services, you need to:</p>
-                  <ul className="list-disc list-inside mt-2 space-y-1">
-                    <li><strong>Gmail:</strong> Connect via Google OAuth (handled automatically)</li>
-                    <li><strong>Google Drive:</strong> Connect via Google OAuth (handled automatically)</li>
-                    <li><strong>AI Processing:</strong> Gemini API key configured in project settings</li>
-                  </ul>
-                  <p className="mt-3">
-                    ⚠️ If you're getting 400 errors with Google Drive, ensure your OAuth credentials 
-                    include the correct redirect URI: <code>{window.location.origin}/oauth/callback</code>
-                  </p>
-                </div>
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    window.open('https://console.cloud.google.com/apis/credentials', '_blank');
-                  }}
-                >
-                  Configure Google OAuth Credentials
-                </Button>
-              </CardContent>
-            </Card>
           </TabsContent>
         </Tabs>
 
