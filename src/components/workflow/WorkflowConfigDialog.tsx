@@ -7,8 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Slider } from '@/components/ui/slider';
 import { WorkflowStep } from '@/types/workflow';
-import { Settings, FileText } from 'lucide-react';
+import { Settings, FileText, GitCompare } from 'lucide-react';
 import { DataSourceConfig } from './config/DataSourceConfig';
 import { DatabaseConfig } from './config/DatabaseConfig';
 
@@ -46,6 +48,18 @@ export const WorkflowConfigDialog: React.FC<WorkflowConfigDialogProps> = ({
         [configKey]: value
       }
     } : null);
+  };
+
+  const updateComparisonField = (field: string, checked: boolean) => {
+    const currentFields = editedStep.config.comparisonConfig?.fields || [];
+    const updatedFields = checked 
+      ? [...currentFields, field]
+      : currentFields.filter(f => f !== field);
+    
+    updateConfig('comparisonConfig', {
+      ...editedStep.config.comparisonConfig,
+      fields: updatedFields
+    });
   };
 
   return (
@@ -144,6 +158,132 @@ export const WorkflowConfigDialog: React.FC<WorkflowConfigDialogProps> = ({
                         <SelectItem value="openai">OpenAI</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {editedStep.type === 'data-comparison' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <GitCompare className="h-4 w-4" />
+                    Process Data Configuration
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div>
+                    <Label>Comparison Type</Label>
+                    <Select
+                      value={editedStep.config.comparisonConfig?.type || 'po-invoice-comparison'}
+                      onValueChange={(value) => updateConfig('comparisonConfig', {
+                        ...editedStep.config.comparisonConfig,
+                        type: value
+                      })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="po-invoice-comparison">PO vs Invoice Comparison</SelectItem>
+                        <SelectItem value="jd-cv-comparison">Job Description vs CV Comparison</SelectItem>
+                        <SelectItem value="custom-comparison">Custom Document Comparison</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Matching Criteria</Label>
+                    <Select
+                      value={editedStep.config.comparisonConfig?.matchingCriteria || 'fuzzy'}
+                      onValueChange={(value) => updateConfig('comparisonConfig', {
+                        ...editedStep.config.comparisonConfig,
+                        matchingCriteria: value
+                      })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="exact">Exact Match</SelectItem>
+                        <SelectItem value="fuzzy">Fuzzy Match</SelectItem>
+                        <SelectItem value="threshold">Threshold Based</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Tolerance Level: {editedStep.config.comparisonConfig?.tolerance || 0.8}</Label>
+                    <Slider
+                      value={[editedStep.config.comparisonConfig?.tolerance || 0.8]}
+                      onValueChange={(value) => updateConfig('comparisonConfig', {
+                        ...editedStep.config.comparisonConfig,
+                        tolerance: value[0]
+                      })}
+                      max={1}
+                      min={0}
+                      step={0.05}
+                      className="mt-2"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                      <span>Strict (0.0)</span>
+                      <span>Lenient (1.0)</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-base font-medium">Fields to Compare</Label>
+                    <div className="grid grid-cols-2 gap-3 mt-3">
+                      {[
+                        'vendor_name',
+                        'po_number', 
+                        'invoice_number',
+                        'po_date',
+                        'invoice_date',
+                        'total_amount',
+                        'line_items',
+                        'quantity',
+                        'unit_price',
+                        'gstn',
+                        'description'
+                      ].map((field) => (
+                        <div key={field} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={field}
+                            checked={editedStep.config.comparisonConfig?.fields?.includes(field) || false}
+                            onCheckedChange={(checked) => updateComparisonField(field, !!checked)}
+                          />
+                          <Label htmlFor={field} className="text-sm capitalize">
+                            {field.replace('_', ' ')}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Source Table</Label>
+                      <Input
+                        value={editedStep.config.comparisonConfig?.sourceTable || 'po_table'}
+                        onChange={(e) => updateConfig('comparisonConfig', {
+                          ...editedStep.config.comparisonConfig,
+                          sourceTable: e.target.value
+                        })}
+                        placeholder="po_table"
+                      />
+                    </div>
+                    <div>
+                      <Label>Target Table</Label>
+                      <Input
+                        value={editedStep.config.comparisonConfig?.targetTable || 'invoice_table'}
+                        onChange={(e) => updateConfig('comparisonConfig', {
+                          ...editedStep.config.comparisonConfig,
+                          targetTable: e.target.value
+                        })}
+                        placeholder="invoice_table"
+                      />
+                    </div>
                   </div>
                 </CardContent>
               </Card>

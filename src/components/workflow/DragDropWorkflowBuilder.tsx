@@ -1,85 +1,91 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { ReactFlowProvider, ReactFlow, Background, Controls, useNodesState, useEdgesState, addEdge, Connection, Edge, Node, Panel } from '@xyflow/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { WorkflowNode } from './WorkflowNode';
-import { WorkflowConfigDialog } from './WorkflowConfigDialog';
-import { ComponentPalette } from './builder/ComponentPalette';
-import { WorkflowControls } from './builder/WorkflowControls';
-import { WorkflowProcessActions } from './builder/WorkflowProcessActions';
-import { WorkflowStep, WorkflowConfig, WorkflowConnection } from '@/types/workflow';
-import { useToast } from '@/hooks/use-toast';
-import '@xyflow/react/dist/style.css';
 
-const nodeTypes = {
-  workflowStep: WorkflowNode,
-};
+import React, { useState, useCallback, useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  MiniMap,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+  Connection,
+  Edge,
+  Node,
+  Panel,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+import { WorkflowStepNode } from '@/components/actions/WorkflowNodeTypes';
+import { ComponentPalette } from './builder/ComponentPalette';
+import { WorkflowProcessActions } from './builder/WorkflowProcessActions';
+import { WorkflowConfigDialog } from './WorkflowConfigDialog';
+import { WorkflowConfig, WorkflowStep, WorkflowStepType } from '@/types/workflow';
+import { useToast } from '@/hooks/use-toast';
+import { Save, Play, Settings } from 'lucide-react';
 
 interface DragDropWorkflowBuilderProps {
-  onWorkflowSave?: (workflow: WorkflowConfig) => void;
-  onWorkflowExecute?: (workflow: WorkflowConfig) => void;
+  onWorkflowSave: (workflow: WorkflowConfig) => void;
+  onWorkflowExecute: (workflow: WorkflowConfig) => void;
 }
+
+const nodeTypes = {
+  workflowStep: WorkflowStepNode,
+};
 
 export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = ({
   onWorkflowSave,
   onWorkflowExecute
 }) => {
+  const { toast } = useToast();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [selectedStep, setSelectedStep] = useState<WorkflowStep | null>(null);
-  const [showConfigDialog, setShowConfigDialog] = useState(false);
   const [workflowName, setWorkflowName] = useState('');
-  const { toast } = useToast();
+  const [workflowDescription, setWorkflowDescription] = useState('');
+  const [selectedNode, setSelectedNode] = useState<WorkflowStep | null>(null);
+  const [showConfigDialog, setShowConfigDialog] = useState(false);
 
-  const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
-  );
+  const onConnect = useCallback((connection: Connection) => {
+    setEdges((eds) => addEdge({ ...connection, animated: true }, eds));
+  }, [setEdges]);
 
-  const onDragOver = useCallback((event: React.DragEvent) => {
+  const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
   const onDrop = useCallback(
-    (event: React.DragEvent) => {
+    (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault();
 
       const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
-      if (!reactFlowBounds) return;
+      const nodeType = event.dataTransfer.getData('application/reactflow');
+      const nodeLabel = event.dataTransfer.getData('application/reactflow-label');
 
-      const type = event.dataTransfer.getData('application/reactflow-type');
-      const label = event.dataTransfer.getData('application/reactflow-label');
-
-      if (!type || !label) return;
+      if (typeof nodeType === 'undefined' || !nodeType || !reactFlowBounds) {
+        return;
+      }
 
       const position = {
-        x: event.clientX - reactFlowBounds.left - 100,
-        y: event.clientY - reactFlowBounds.top - 50,
+        x: event.clientX - reactFlowBounds.left,
+        y: event.clientY - reactFlowBounds.top,
       };
 
-      const newStep: WorkflowStep = {
-        id: `node-${Date.now()}`,
-        type: type as any,
-        name: label,
-        position,
-        config: {}
-      };
-
-      const newNode: Node = {
-        id: newStep.id,
+      const newNode = {
+        id: `node_${Date.now()}`,
         type: 'workflowStep',
         position,
-        data: {
-          step: newStep,
-          isEditable: true,
-          onUpdate: handleStepUpdate,
-          onStepDoubleClick: handleStepDoubleClick,
-          onDelete: handleStepDelete
+        data: { 
+          label: nodeLabel || nodeType, 
+          type: nodeType, 
+          description: `${nodeLabel || nodeType} processing step` 
         },
-        deletable: true,
-        draggable: true,
       };
 
       setNodes((nds) => nds.concat(newNode));
@@ -87,162 +93,192 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
     [setNodes]
   );
 
+  const onNodeDoubleClick = useCallback((event: React.MouseEvent, node: Node) => {
+    const workflowStep: WorkflowStep = {
+      id: node.id,
+      type: node.data.type as WorkflowStepType,
+      name: node.data.label as string,
+      description: node.data.description as string,
+      position: { x: node.position.x, y: node.position.y },
+      config: {
+        x: node.position.x,
+        y: node.position.y,
+        connectedTo: edges
+          .filter(edge => edge.source === node.id)
+          .map(edge => edge.target),
+        // Initialize with default config based on type
+        ...(node.data.type === 'data-comparison' && {
+          comparisonConfig: {
+            type: 'po-invoice-comparison' as const,
+            fields: ['vendor_name', 'po_number', 'total_amount'],
+            tolerance: 0.8,
+            matchingCriteria: 'fuzzy' as const,
+            sourceTable: 'po_table',
+            targetTable: 'invoice_table'
+          }
+        })
+      }
+    };
+    
+    setSelectedNode(workflowStep);
+    setShowConfigDialog(true);
+  }, [edges]);
+
+  const handleConfigSave = (updatedStep: WorkflowStep) => {
+    setNodes((nds) => 
+      nds.map((node) => 
+        node.id === updatedStep.id 
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                label: updatedStep.name,
+                description: updatedStep.description
+              },
+              position: updatedStep.position
+            }
+          : node
+      )
+    );
+    
+    toast({
+      title: "Step Updated",
+      description: `"${updatedStep.name}" configuration has been saved.`,
+    });
+  };
+
+  const generateWorkflowSteps = (): WorkflowStep[] => {
+    return nodes.map((node) => ({
+      id: node.id,
+      type: node.data.type as WorkflowStepType,
+      name: node.data.label as string,
+      description: node.data.description as string,
+      position: { x: node.position.x, y: node.position.y },
+      config: {
+        x: node.position.x,
+        y: node.position.y,
+        connectedTo: edges
+          .filter(edge => edge.source === node.id)
+          .map(edge => edge.target),
+      }
+    }));
+  };
+
+  const handleSaveWorkflow = () => {
+    if (!workflowName.trim()) {
+      toast({
+        title: "Workflow Name Required",
+        description: "Please enter a name for your workflow",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (nodes.length === 0) {
+      toast({
+        title: "No Components",
+        description: "Please add at least one component to your workflow",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const workflow: WorkflowConfig = {
+      id: `workflow_${Date.now()}`,
+      name: workflowName,
+      description: workflowDescription,
+      steps: generateWorkflowSteps(),
+      connections: edges.map((edge, index) => ({
+        id: edge.id || `conn-${index}`,
+        sourceStepId: edge.source,
+        targetStepId: edge.target,
+      })),
+      isActive: true,
+      createdAt: new Date(),
+    };
+
+    onWorkflowSave(workflow);
+  };
+
+  const handleExecuteWorkflow = () => {
+    const workflow: WorkflowConfig = {
+      id: `workflow_${Date.now()}`,
+      name: workflowName || 'Untitled Workflow',
+      description: workflowDescription,
+      steps: generateWorkflowSteps(),
+      connections: edges.map((edge, index) => ({
+        id: edge.id || `conn-${index}`,
+        sourceStepId: edge.source,
+        targetStepId: edge.target,
+      })),
+      isActive: true,
+      createdAt: new Date(),
+    };
+
+    onWorkflowExecute(workflow);
+  };
+
   const onDragStart = useCallback((event: React.DragEvent, nodeType: string, label: string) => {
-    event.dataTransfer.setData('application/reactflow-type', nodeType);
+    event.dataTransfer.setData('application/reactflow', nodeType);
     event.dataTransfer.setData('application/reactflow-label', label);
     event.dataTransfer.effectAllowed = 'move';
   }, []);
 
-  const handleStepUpdate = useCallback((updatedStep: WorkflowStep) => {
-    setNodes((nds) =>
-      nds.map((node) =>
-        node.id === updatedStep.id
-          ? { ...node, data: { ...node.data, step: updatedStep } }
-          : node
-      )
-    );
-  }, [setNodes]);
-
-  const handleStepDoubleClick = useCallback((step: WorkflowStep) => {
-    setSelectedStep(step);
-    setShowConfigDialog(true);
-  }, []);
-
-  const handleStepDelete = useCallback((stepId: string) => {
-    setNodes((nds) => nds.filter((node) => node.id !== stepId));
-    setEdges((eds) => eds.filter((edge) => edge.source !== stepId && edge.target !== stepId));
-    toast({
-      title: "Component Deleted",
-      description: "The workflow component has been removed.",
-    });
-  }, [setNodes, setEdges, toast]);
-
-  const handleStepConfigSave = useCallback((updatedStep: WorkflowStep) => {
-    handleStepUpdate(updatedStep);
-    setShowConfigDialog(false);
-    setSelectedStep(null);
-    toast({
-      title: "Configuration Saved",
-      description: `${updatedStep.name} has been configured.`,
-    });
-  }, [handleStepUpdate, toast]);
-
-  const handleSaveWorkflow = useCallback(() => {
-    if (!workflowName.trim()) {
-      toast({
-        title: "Workflow Name Required",
-        description: "Please enter a name for your workflow.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (nodes.length === 0) {
-      toast({
-        title: "No Components",
-        description: "Please add at least one component to your workflow.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const steps: WorkflowStep[] = nodes.map((node) => node.data.step);
-    const connections: WorkflowConnection[] = edges.map((edge, index) => ({
-      id: `conn-${index}`,
-      sourceStepId: edge.source,
-      targetStepId: edge.target,
-    }));
-
-    const workflow: WorkflowConfig = {
-      id: `workflow-${Date.now()}`,
-      name: workflowName,
-      description: `Workflow with ${steps.length} components`,
-      steps,
-      connections,
-      isActive: true,
-      createdAt: new Date(),
-      totalRuns: 0,
-      successRate: 0
-    };
-
-    onWorkflowSave?.(workflow);
-    toast({
-      title: "Workflow Saved",
-      description: `"${workflowName}" has been saved successfully.`,
-    });
-  }, [workflowName, nodes, edges, onWorkflowSave, toast]);
-
-  const handleExecuteWorkflow = useCallback((workflow?: WorkflowConfig) => {
-    if (nodes.length === 0) {
-      toast({
-        title: "No Components",
-        description: "Please add components to execute the workflow.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const steps: WorkflowStep[] = nodes.map((node) => node.data.step);
-    const connections: WorkflowConnection[] = edges.map((edge, index) => ({
-      id: `conn-${index}`,
-      sourceStepId: edge.source,
-      targetStepId: edge.target,
-    }));
-
-    const finalWorkflow = workflow || {
-      id: `temp-workflow-${Date.now()}`,
-      name: workflowName || 'Unnamed Workflow',
-      description: 'Temporary workflow for execution',
-      steps,
-      connections,
-      isActive: true,
-      createdAt: new Date(),
-      totalRuns: 0,
-      successRate: 0
-    };
-
-    onWorkflowExecute?.(finalWorkflow);
-  }, [nodes, edges, workflowName, onWorkflowExecute]);
-
   return (
-    <div className="h-[700px] flex gap-4">
-      {/* Component Palette */}
-      <div className="w-64 bg-white border rounded-lg p-4 overflow-y-auto space-y-4">
+    <div className="grid grid-cols-12 gap-4 h-[70vh]">
+      {/* Left Sidebar - Component Palette */}
+      <div className="col-span-3 space-y-4 overflow-y-auto">
         <ComponentPalette onDragStart={onDragStart} />
         
-        <WorkflowControls
-          workflowName={workflowName}
-          onWorkflowNameChange={setWorkflowName}
-          onSave={handleSaveWorkflow}
-          onExecute={() => handleExecuteWorkflow()}
-          nodeCount={nodes.length}
-          edgeCount={edges.length}
-        />
-        
-        {/* Process Actions - Make sure it's visible */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">Workflow Details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <Label htmlFor="workflow-name" className="text-xs">Name</Label>
+              <Input
+                id="workflow-name"
+                value={workflowName}
+                onChange={(e) => setWorkflowName(e.target.value)}
+                placeholder="PO-Invoice Processing"
+                className="h-8 text-xs"
+              />
+            </div>
+            <div>
+              <Label htmlFor="workflow-desc" className="text-xs">Description</Label>
+              <Input
+                id="workflow-desc"
+                value={workflowDescription}
+                onChange={(e) => setWorkflowDescription(e.target.value)}
+                placeholder="Process and compare documents"
+                className="h-8 text-xs"
+              />
+            </div>
+            <Button onClick={handleSaveWorkflow} className="w-full h-8 text-xs gap-2">
+              <Save className="h-3 w-3" />
+              Save Workflow
+            </Button>
+          </CardContent>
+        </Card>
+
         <WorkflowProcessActions
           workflow={{
             id: 'temp',
-            name: workflowName || 'Unnamed Workflow',
-            description: '',
-            steps: nodes.map((node) => node.data.step),
-            connections: edges.map((edge, index) => ({
-              id: `conn-${index}`,
-              sourceStepId: edge.source,
-              targetStepId: edge.target,
-            })),
+            name: workflowName || 'Current Workflow',
+            description: workflowDescription,
+            steps: generateWorkflowSteps(),
+            connections: [],
             isActive: true,
             createdAt: new Date(),
-            totalRuns: 0,
-            successRate: 0
           }}
           onExecute={handleExecuteWorkflow}
           nodeCount={nodes.length}
         />
       </div>
 
-      {/* Canvas */}
-      <div className="flex-1" ref={reactFlowWrapper}>
+      {/* Right Side - Canvas */}
+      <div className="col-span-9" ref={reactFlowWrapper}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -252,18 +288,28 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
           onDrop={onDrop}
           onDragOver={onDragOver}
           nodeTypes={nodeTypes}
+          onNodeDoubleClick={onNodeDoubleClick}
           fitView
-          className="bg-gray-50 border rounded-lg"
-          deleteKeyCode={['Backspace', 'Delete']}
-          multiSelectionKeyCode={['Meta', 'Ctrl']}
+          className="border rounded-lg"
         >
-          <Background gap={20} size={1} color="#e5e7eb" />
-          <Controls className="bg-white shadow-lg border border-gray-200 rounded-lg" />
+          <Background />
+          <Controls />
+          <MiniMap />
           <Panel position="top-right">
-            <div className="bg-white rounded-lg border p-2 shadow-sm">
+            <div className="flex gap-2">
               <Badge variant="outline" className="text-xs">
-                {nodes.length} components, {edges.length} connections
+                Double-click nodes to configure
               </Badge>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  setNodes([]);
+                  setEdges([]);
+                }}
+              >
+                Clear Canvas
+              </Button>
             </div>
           </Panel>
         </ReactFlow>
@@ -271,13 +317,10 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
 
       {/* Configuration Dialog */}
       <WorkflowConfigDialog
-        step={selectedStep}
+        step={selectedNode}
         isOpen={showConfigDialog}
-        onClose={() => {
-          setShowConfigDialog(false);
-          setSelectedStep(null);
-        }}
-        onSave={handleStepConfigSave}
+        onClose={() => setShowConfigDialog(false)}
+        onSave={handleConfigSave}
       />
     </div>
   );
