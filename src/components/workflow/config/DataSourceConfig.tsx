@@ -113,7 +113,15 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
               } else if (value === 'drive') {
                 onConfigUpdate('driveConfig', { 
                   source: 'google-drive', 
-                  fileTypes: ['pdf'] 
+                  fileTypes: ['pdf'],
+                  folderPath: '',
+                  processSubfolders: true,
+                  nameFilters: [],
+                  dateRange: {
+                    enabled: false,
+                    from: '',
+                    to: ''
+                  }
                 });
                 onConfigUpdate('emailConfig', undefined);
               }
@@ -256,16 +264,67 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
         )}
 
         {step.config.driveConfig && (
-          <div className="space-y-2">
-            <Label>Folder Path</Label>
-            <Input
-              placeholder="/Documents/Invoices"
-              value={step.config.driveConfig.folderPath || ''}
-              onChange={(e) => onConfigUpdate('driveConfig', {
-                ...step.config.driveConfig,
-                folderPath: e.target.value
-              })}
-            />
+          <div className="space-y-4">
+            <div>
+              <Label>Folder Path</Label>
+              <Input
+                placeholder="/Documents/Invoices"
+                value={step.config.driveConfig.folderPath || ''}
+                onChange={(e) => onConfigUpdate('driveConfig', {
+                  ...step.config.driveConfig,
+                  folderPath: e.target.value
+                })}
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="processSubfolders"
+                checked={step.config.driveConfig.processSubfolders !== false}
+                onCheckedChange={(checked) => onConfigUpdate('driveConfig', {
+                  ...step.config.driveConfig,
+                  processSubfolders: checked
+                })}
+              />
+              <Label htmlFor="processSubfolders">Process subfolders</Label>
+            </div>
+
+            <div>
+              <Label>File Types</Label>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {['pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx'].map((type) => (
+                  <Badge 
+                    key={type}
+                    variant={step.config.driveConfig?.fileTypes?.includes(type) ? "default" : "outline"}
+                    className="cursor-pointer"
+                    onClick={() => {
+                      const currentTypes = step.config.driveConfig?.fileTypes || [];
+                      const updatedTypes = currentTypes.includes(type)
+                        ? currentTypes.filter(t => t !== type)
+                        : [...currentTypes, type];
+                      
+                      onConfigUpdate('driveConfig', {
+                        ...step.config.driveConfig,
+                        fileTypes: updatedTypes
+                      });
+                    }}
+                  >
+                    {type.toUpperCase()}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            {/* Summary */}
+            <div className="bg-gray-50 p-3 rounded text-sm">
+              <p className="font-medium mb-1">Configuration Summary:</p>
+              <ul className="text-xs text-muted-foreground space-y-1">
+                <li>• Source: Google Drive</li>
+                <li>• Folder: {step.config.driveConfig?.folderPath || 'Root'}</li>
+                <li>• Include subfolders: {step.config.driveConfig?.processSubfolders !== false ? 'Yes' : 'No'}</li>
+                <li>• File types: {step.config.driveConfig?.fileTypes?.join(', ') || 'PDF'}</li>
+              </ul>
+            </div>
           </div>
         )}
       </CardContent>

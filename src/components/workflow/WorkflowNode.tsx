@@ -14,7 +14,8 @@ import {
   GitBranch,
   Zap,
   Settings,
-  Trash2
+  Trash2,
+  GitCompare
 } from 'lucide-react';
 import { WorkflowStep } from '@/types/workflow';
 
@@ -26,6 +27,8 @@ const getStepIcon = (type: string) => {
       return <FileText className="h-4 w-4" />;
     case 'data-storage':
       return <Database className="h-4 w-4" />;
+    case 'data-comparison':
+      return <GitCompare className="h-4 w-4" />;
     case 'analytics':
       return <BarChart3 className="h-4 w-4" />;
     case 'notification':
@@ -62,19 +65,26 @@ const getStepColors = (type: string) => {
         icon: 'text-purple-600',
         badge: 'bg-purple-50 text-purple-700 border-purple-200'
       };
-    case 'analytics':
+    case 'data-comparison':
       return {
         bg: 'bg-white',
         border: 'border-orange-200',
         icon: 'text-orange-600',
         badge: 'bg-orange-50 text-orange-700 border-orange-200'
       };
-    case 'notification':
+    case 'analytics':
       return {
         bg: 'bg-white',
         border: 'border-yellow-200',
         icon: 'text-yellow-600',
         badge: 'bg-yellow-50 text-yellow-700 border-yellow-200'
+      };
+    case 'notification':
+      return {
+        bg: 'bg-white',
+        border: 'border-pink-200',
+        icon: 'text-pink-600',
+        badge: 'bg-pink-50 text-pink-700 border-pink-200'
       };
     default:
       return {
@@ -110,22 +120,15 @@ export const WorkflowNode: React.FC<NodeProps> = ({ data, selected }) => {
     }
   };
   
-  const handleDoubleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isEditable && onStepDoubleClick) {
-      onStepDoubleClick(step);
-    }
-  };
-  
   return (
-    <div className="relative group" onDoubleClick={handleDoubleClick}>
+    <div className="relative group">
       <Handle
         type="target"
         position={Position.Left}
         className="w-3 h-3 !bg-blue-500 border-2 border-white shadow-md"
       />
       
-      <Card className={`w-52 ${colors.bg} ${colors.border} border shadow-sm transition-all duration-200 hover:shadow-md ${selected ? 'ring-2 ring-blue-500' : ''} ${isEditable ? 'cursor-pointer' : ''}`}>
+      <Card className={`w-52 ${colors.bg} ${colors.border} border shadow-sm transition-all duration-200 hover:shadow-md ${selected ? 'ring-2 ring-blue-500' : ''}`}>
         <CardContent className="p-3">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -143,7 +146,7 @@ export const WorkflowNode: React.FC<NodeProps> = ({ data, selected }) => {
             </div>
             
             {isEditable && (
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+              <div className="flex gap-1 flex-shrink-0">
                 <Button
                   variant="ghost"
                   size="sm"
