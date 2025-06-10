@@ -23,6 +23,51 @@ Extract the following fields:
 
 Return ONLY valid JSON without any markdown formatting or explanations.`;
 
+// Enhanced JSON parsing function
+const parseGeminiResponse = (responseText: string): any => {
+  console.log("Raw Gemini response:", responseText);
+  
+  // First try direct JSON parsing
+  try {
+    const parsed = JSON.parse(responseText.trim());
+    console.log("Direct JSON parsing successful");
+    return parsed;
+  } catch (error) {
+    console.log("Direct JSON parsing failed, trying code block extraction...");
+  }
+  
+  // Try to extract JSON from markdown code blocks
+  const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/i;
+  const codeBlockMatch = responseText.match(codeBlockRegex);
+  
+  if (codeBlockMatch) {
+    try {
+      const extractedJson = JSON.parse(codeBlockMatch[1].trim());
+      console.log("Successfully extracted JSON from code block");
+      return extractedJson;
+    } catch (error) {
+      console.error("Failed to parse JSON from code block:", error);
+    }
+  }
+  
+  // Try to find JSON object using regex
+  const jsonRegex = /\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}/;
+  const jsonMatch = responseText.match(jsonRegex);
+  
+  if (jsonMatch) {
+    try {
+      const extractedJson = JSON.parse(jsonMatch[0]);
+      console.log("Successfully extracted JSON using regex");
+      return extractedJson;
+    } catch (error) {
+      console.error("Failed to parse extracted JSON:", error);
+    }
+  }
+  
+  console.error("All parsing methods failed for response:", responseText);
+  throw new Error(`Unable to extract valid JSON from response: ${responseText.substring(0, 200)}...`);
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -74,14 +119,8 @@ serve(async (req) => {
         throw new Error('No response from Gemini API');
       }
       
-      // Parse the JSON response
-      let extractedData;
-      try {
-        extractedData = JSON.parse(extractedText.trim());
-      } catch (parseError) {
-        console.error('Failed to parse Gemini response:', extractedText);
-        throw new Error('Invalid JSON response from Gemini');
-      }
+      // Parse the JSON response using enhanced parsing
+      const extractedData = parseGeminiResponse(extractedText);
       
       console.log('Successfully extracted invoice data:', extractedData);
       
