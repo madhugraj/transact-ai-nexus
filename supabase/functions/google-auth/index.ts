@@ -32,7 +32,12 @@ serve(async (req) => {
       console.log('🔗 Generating Drive auth URL with scopes:', body.scopes);
       
       const scopes = body.scopes || ['https://www.googleapis.com/auth/drive.readonly'];
-      const redirectUri = 'https://preview--transact-ai-nexus.lovable.app/oauth/callback';
+      
+      // Get the origin from request headers to determine the correct redirect URI
+      const origin = req.headers.get('origin') || 'https://79d72649-d878-4ff4-9672-26026a4d9011.lovableproject.com';
+      const redirectUri = `${origin}/oauth/callback`;
+      
+      console.log('🔧 Using redirect URI:', redirectUri);
       
       const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
       authUrl.searchParams.set('client_id', CLIENT_ID);
@@ -114,6 +119,37 @@ serve(async (req) => {
         JSON.stringify({
           success: true,
           files: data.files || [],
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+
+    // Handle file download
+    if (body.action === 'download_file') {
+      console.log('📥 Downloading file:', body.fileId);
+      
+      const response = await fetch(`https://www.googleapis.com/drive/v3/files/${body.fileId}?alt=media`, {
+        headers: {
+          'Authorization': `Bearer ${body.accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('❌ File download error:', errorData);
+        throw new Error(`File download error: ${response.status}`);
+      }
+
+      const fileContent = await response.arrayBuffer();
+      const base64Content = btoa(String.fromCharCode(...new Uint8Array(fileContent)));
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          content: base64Content,
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

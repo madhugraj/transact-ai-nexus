@@ -147,10 +147,13 @@ const GoogleDriveConnectorRefactored = () => {
     try {
       console.log('🔄 Exchanging authorization code for tokens...');
       
+      // Use the current window location for redirect URI
+      const redirectUri = `${window.location.origin}/oauth/callback`;
+      
       const { data, error } = await supabase.functions.invoke('google-auth', {
         body: {
           authCode: authCode,
-          redirectUri: `${window.location.origin}/oauth/callback`
+          redirectUri: redirectUri
         }
       });
 
