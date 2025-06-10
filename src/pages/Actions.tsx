@@ -194,8 +194,6 @@ const Actions = () => {
 
           <TabsContent value="workflows" className="space-y-4">
             <SavedWorkflowsTab
-              workflows={workflows}
-              onExecuteWorkflow={executeWorkflow}
               onCreateFirst={() => setActiveTab('builder')}
               isExecuting={isExecuting}
             />

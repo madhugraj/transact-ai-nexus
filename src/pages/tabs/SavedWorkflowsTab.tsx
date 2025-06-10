@@ -10,21 +10,18 @@ import { useToast } from '@/hooks/use-toast';
 import { RealWorkflowEngine } from '@/services/workflow/RealWorkflowEngine';
 
 interface SavedWorkflowsTabProps {
-  workflows: WorkflowConfig[];
-  onExecuteWorkflow: (workflow: WorkflowConfig) => void;
   onCreateFirst: () => void;
   onEditWorkflow?: (workflow: WorkflowConfig) => void;
   isExecuting: boolean;
 }
 
 export const SavedWorkflowsTab: React.FC<SavedWorkflowsTabProps> = ({
-  workflows,
-  onExecuteWorkflow,
   onCreateFirst,
   onEditWorkflow,
   isExecuting
 }) => {
-  const { deleteWorkflow, clearAllWorkflows, updateWorkflow, debugStorage } = useWorkflowPersistence();
+  // Use the persistence hook directly to get real-time updates
+  const { workflows, deleteWorkflow, clearAllWorkflows, updateWorkflow, debugStorage } = useWorkflowPersistence();
   const { toast } = useToast();
   const workflowEngine = new RealWorkflowEngine();
 
@@ -115,6 +112,17 @@ export const SavedWorkflowsTab: React.FC<SavedWorkflowsTabProps> = ({
     }
   };
 
+  const handleToggleWorkflow = (workflowId: string) => {
+    const workflow = workflows.find(w => w.id === workflowId);
+    if (workflow) {
+      updateWorkflow(workflowId, { isActive: !workflow.isActive });
+      toast({
+        title: workflow.isActive ? "Workflow Deactivated" : "Workflow Activated",
+        description: `${workflow.name} is now ${workflow.isActive ? 'inactive' : 'active'}`,
+      });
+    }
+  };
+
   const handleClearAll = () => {
     console.log('🗑️ Clearing all workflows');
     clearAllWorkflows();
@@ -182,6 +190,7 @@ export const SavedWorkflowsTab: React.FC<SavedWorkflowsTabProps> = ({
             onEdit={onEditWorkflow}
             onDelete={handleDeleteWorkflow}
             onExecute={handleExecuteWorkflow}
+            onToggle={handleToggleWorkflow}
           />
         ))}
       </div>

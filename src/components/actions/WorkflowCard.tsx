@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { PlayIcon, Settings2Icon, Eye, Trash2 } from "lucide-react";
 import { WorkflowConfig } from "@/types/workflow";
-import { useWorkflow } from "@/hooks/useWorkflow";
 import { useToast } from "@/hooks/use-toast";
 import {
   Tooltip,
@@ -33,28 +32,28 @@ interface WorkflowCardProps {
   onEdit?: (workflow: WorkflowConfig) => void;
   onDelete?: (workflowId: string) => void;
   onExecute?: (workflow: WorkflowConfig) => void;
+  onToggle?: (workflowId: string) => void;
 }
 
-const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onEdit, onDelete, onExecute }) => {
-  const { updateWorkflow, executeWorkflow, isExecuting } = useWorkflow();
+const WorkflowCard: React.FC<WorkflowCardProps> = ({ 
+  workflow, 
+  onEdit, 
+  onDelete, 
+  onExecute,
+  onToggle 
+}) => {
   const { toast } = useToast();
   const [showPreview, setShowPreview] = useState(false);
   
   const handleToggleActive = () => {
-    updateWorkflow(workflow.id, { isActive: !workflow.isActive });
+    if (onToggle) {
+      onToggle(workflow.id);
+    }
   };
   
   const handleExecute = () => {
     if (onExecute) {
-      // Use the parent's execute function if provided
       onExecute(workflow);
-    } else {
-      // Fallback to the hook's execute function
-      executeWorkflow(workflow.id);
-      toast({
-        title: "Workflow Execution Started",
-        description: `${workflow.name} is now running...`,
-      });
     }
   };
 
@@ -200,7 +199,6 @@ const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, onEdit, onDelete,
                   size="sm"
                   className="h-8 w-8 p-0"
                   onClick={handleExecute}
-                  disabled={isExecuting}
                 >
                   <PlayIcon className="h-4 w-4" />
                 </Button>
