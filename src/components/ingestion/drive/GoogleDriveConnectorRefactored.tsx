@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,12 +36,14 @@ const GoogleDriveConnectorRefactored = () => {
       const tokens = localStorage.getItem('drive_auth_tokens');
       if (!tokens) {
         setIsConnected(false);
+        setError(null);
         return;
       }
 
       const parsedTokens = JSON.parse(tokens);
       if (!parsedTokens.accessToken) {
         setIsConnected(false);
+        setError(null);
         return;
       }
 
@@ -70,6 +71,7 @@ const GoogleDriveConnectorRefactored = () => {
     } catch (error) {
       console.error('❌ Connection check failed:', error);
       setIsConnected(false);
+      setError('Connection check failed. Please try again.');
     }
   };
 
@@ -384,26 +386,11 @@ const GoogleDriveConnectorRefactored = () => {
         <ConnectionStatus
           isConnected={isConnected}
           isLoading={isLoading}
+          error={error}
           onConnect={handleConnect}
           onDisconnect={handleDisconnect}
           onLoadFiles={loadFiles}
         />
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-3">
-            <p className="text-sm text-red-700">{error}</p>
-            {error.includes('expired') && (
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="mt-2"
-                onClick={handleConnect}
-              >
-                Reconnect
-              </Button>
-            )}
-          </div>
-        )}
 
         {isConnected && (
           <>
