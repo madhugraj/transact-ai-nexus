@@ -28,7 +28,7 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
 
   const currentFilters = step.config.emailConfig?.filters || [];
 
-  // Determine the source type based on the step name
+  // Determine the source type based on the step name or existing config
   const getSourceTypeFromStepName = (stepName: string) => {
     const lowerName = stepName.toLowerCase();
     if (lowerName.includes('gmail') || lowerName.includes('email')) {
@@ -40,7 +40,8 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
   };
 
   const sourceType = getSourceTypeFromStepName(step.name);
-  const currentSourceValue = step.config.emailConfig ? 'email' : step.config.driveConfig ? 'drive' : sourceType;
+  const hasEmailConfig = !!step.config.emailConfig;
+  const hasDriveConfig = !!step.config.driveConfig;
 
   const addFilter = () => {
     if (newFilter.trim() && !currentFilters.includes(newFilter.trim())) {
@@ -106,65 +107,55 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          {sourceType === 'email' ? <Mail className="h-4 w-4" /> : <HardDrive className="h-4 w-4" />}
+          {(sourceType === 'email' || hasEmailConfig) ? <Mail className="h-4 w-4" /> : <HardDrive className="h-4 w-4" />}
           Data Source Configuration
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div>
-          <Label htmlFor="sourceType">Source Type</Label>
-          <Select
-            value={currentSourceValue}
-            onValueChange={(value) => {
-              if (value === 'email') {
-                onConfigUpdate('emailConfig', { 
-                  source: 'gmail', 
-                  filters: [], 
-                  attachmentTypes: ['pdf'],
-                  useIntelligentFiltering: false
-                });
-                onConfigUpdate('driveConfig', undefined);
-              } else if (value === 'drive') {
-                onConfigUpdate('driveConfig', { 
-                  source: 'google-drive', 
-                  fileTypes: ['pdf'],
-                  folderPath: '',
-                  processSubfolders: true,
-                  nameFilters: [],
-                  dateRange: {
-                    enabled: false,
-                    from: '',
-                    to: ''
-                  }
-                });
-                onConfigUpdate('emailConfig', undefined);
-              }
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select source type" />
-            </SelectTrigger>
-            <SelectContent>
-              {sourceType === 'email' ? (
-                <>
-                  <SelectItem value="email">Email</SelectItem>
-                </>
-              ) : sourceType === 'drive' ? (
-                <>
-                  <SelectItem value="drive">Drive</SelectItem>
-                </>
-              ) : (
-                <>
-                  <SelectItem value="email">Email</SelectItem>
-                  <SelectItem value="drive">Drive</SelectItem>
-                </>
-              )}
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Only show source type selection if it's not predetermined */}
+        {!sourceType && !hasEmailConfig && !hasDriveConfig && (
+          <div>
+            <Label htmlFor="sourceType">Source Type</Label>
+            <Select
+              onValueChange={(value) => {
+                if (value === 'email') {
+                  onConfigUpdate('emailConfig', { 
+                    source: 'gmail', 
+                    filters: [], 
+                    attachmentTypes: ['pdf'],
+                    useIntelligentFiltering: false
+                  });
+                  onConfigUpdate('driveConfig', undefined);
+                } else if (value === 'drive') {
+                  onConfigUpdate('driveConfig', { 
+                    source: 'google-drive', 
+                    fileTypes: ['pdf'],
+                    folderPath: '',
+                    processSubfolders: true,
+                    nameFilters: [],
+                    dateRange: {
+                      enabled: false,
+                      from: '',
+                      to: ''
+                    }
+                  });
+                  onConfigUpdate('emailConfig', undefined);
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select source type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="email">Email</SelectItem>
+                <SelectItem value="drive">Drive</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {/* Email Source Configuration */}
-        {(step.config.emailConfig || sourceType === 'email') && (
+        {(hasEmailConfig || sourceType === 'email') && (
           <div className="space-y-4">
             {/* Email Service Selection */}
             <div>
@@ -311,7 +302,7 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
         )}
 
         {/* Drive Source Configuration */}
-        {(step.config.driveConfig || sourceType === 'drive') && (
+        {(hasDriveConfig || sourceType === 'drive') && (
           <div className="space-y-4">
             {/* Drive Service Selection */}
             <div>

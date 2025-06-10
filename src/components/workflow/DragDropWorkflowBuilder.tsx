@@ -20,7 +20,7 @@ import {
   Panel,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { WorkflowStepNode } from '@/components/actions/WorkflowNodeTypes';
+import { WorkflowNode } from './WorkflowNode';
 import { ComponentPalette } from './builder/ComponentPalette';
 import { WorkflowConfigDialog } from './WorkflowConfigDialog';
 import { WorkflowConfig, WorkflowStep, WorkflowStepType } from '@/types/workflow';
@@ -33,7 +33,7 @@ interface DragDropWorkflowBuilderProps {
 }
 
 const nodeTypes = {
-  workflowStep: WorkflowStepNode,
+  workflowStep: WorkflowNode,
 };
 
 export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = ({
@@ -77,14 +77,61 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
         y: event.clientY - reactFlowBounds.top,
       };
 
+      const stepId = `node_${Date.now()}`;
+      
+      // Create a proper WorkflowStep object
+      const workflowStep: WorkflowStep = {
+        id: stepId,
+        type: nodeType as WorkflowStepType,
+        name: nodeLabel || nodeType,
+        description: `${nodeLabel || nodeType} processing step`,
+        position,
+        config: {
+          x: position.x,
+          y: position.y,
+          connectedTo: [],
+          // Initialize config based on step type
+          ...(nodeType === 'data-source' && nodeLabel?.toLowerCase().includes('gmail') && {
+            emailConfig: {
+              source: 'gmail' as const,
+              filters: [],
+              attachmentTypes: ['pdf'],
+              useIntelligentFiltering: false
+            }
+          }),
+          ...(nodeType === 'data-source' && nodeLabel?.toLowerCase().includes('drive') && {
+            driveConfig: {
+              source: 'google-drive' as const,
+              fileTypes: ['pdf'],
+              folderPath: '',
+              processSubfolders: true,
+              nameFilters: [],
+              dateRange: {
+                enabled: false,
+                from: '',
+                to: ''
+              }
+            }
+          }),
+          ...(nodeType === 'data-comparison' && {
+            comparisonConfig: {
+              type: 'po-invoice-comparison' as const,
+              fields: ['vendor_name', 'po_number', 'total_amount'],
+              tolerance: 0.8,
+              matchingCriteria: 'fuzzy' as const,
+              sourceTable: 'po_table',
+              targetTable: 'invoice_table'
+            }
+          })
+        }
+      };
+
       const newNode = {
-        id: `node_${Date.now()}`,
+        id: stepId,
         type: 'workflowStep',
         position,
         data: { 
-          label: nodeLabel || nodeType, 
-          type: nodeType, 
-          description: `${nodeLabel || nodeType} processing step`,
+          step: workflowStep,
           isEditable: true,
           onStepDoubleClick: handleNodeConfig,
           onDelete: handleNodeDelete
@@ -107,36 +154,6 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
     setEdges((eds) => eds.filter(e => e.source !== stepId && e.target !== stepId));
   }, [setNodes, setEdges]);
 
-  const onNodeDoubleClick = useCallback((event: React.MouseEvent, node: Node) => {
-    const workflowStep: WorkflowStep = {
-      id: node.id,
-      type: node.data.type as WorkflowStepType,
-      name: node.data.label as string,
-      description: node.data.description as string,
-      position: { x: node.position.x, y: node.position.y },
-      config: {
-        x: node.position.x,
-        y: node.position.y,
-        connectedTo: edges
-          .filter(edge => edge.source === node.id)
-          .map(edge => edge.target),
-        ...(node.data.type === 'data-comparison' && {
-          comparisonConfig: {
-            type: 'po-invoice-comparison' as const,
-            fields: ['vendor_name', 'po_number', 'total_amount'],
-            tolerance: 0.8,
-            matchingCriteria: 'fuzzy' as const,
-            sourceTable: 'po_table',
-            targetTable: 'invoice_table'
-          }
-        })
-      }
-    };
-    
-    setSelectedNode(workflowStep);
-    setShowConfigDialog(true);
-  }, [edges]);
-
   const handleConfigSave = (updatedStep: WorkflowStep) => {
     setNodes((nds) => 
       nds.map((node) => 
@@ -145,8 +162,11 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
               ...node,
               data: {
                 ...node.data,
-                label: updatedStep.name,
-                description: updatedStep.description
+                step: {
+                  ...updatedStep,
+                  name: updatedStep.name,
+                  description: updatedStep.description
+                }
               },
               position: updatedStep.position
             }
@@ -161,20 +181,7 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
   };
 
   const generateWorkflowSteps = (): WorkflowStep[] => {
-    return nodes.map((node) => ({
-      id: node.id,
-      type: node.data.type as WorkflowStepType,
-      name: node.data.label as string,
-      description: node.data.description as string,
-      position: { x: node.position.x, y: node.position.y },
-      config: {
-        x: node.position.x,
-        y: node.position.y,
-        connectedTo: edges
-          .filter(edge => edge.source === node.id)
-          .map(edge => edge.target),
-      }
-    }));
+    return nodes.map((node) => node.data.step as WorkflowStep);
   };
 
   const handleSaveWorkflow = () => {
@@ -337,7 +344,6 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
             onDrop={onDrop}
             onDragOver={onDragOver}
             nodeTypes={nodeTypes}
-            onNodeDoubleClick={onNodeDoubleClick}
             fitView
             className="border-none"
           >
@@ -346,9 +352,6 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
             <MiniMap />
             <Panel position="top-right">
               <div className="flex gap-2">
-                <Badge variant="outline" className="text-xs">
-                  Click component icons to configure
-                </Badge>
                 <Button 
                   variant="outline" 
                   size="sm" 
