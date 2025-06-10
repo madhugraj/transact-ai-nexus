@@ -9,6 +9,66 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      compare_po_invoice_table: {
+        Row: {
+          compare_bill_details: Json | null
+          compare_item_details: Json | null
+          compare_summary_individual: string | null
+          created_at: string
+          id: number
+          invoice_date: string | null
+          invoice_file_name: string | null
+          po_date: string | null
+          po_file_name: string | null
+        }
+        Insert: {
+          compare_bill_details?: Json | null
+          compare_item_details?: Json | null
+          compare_summary_individual?: string | null
+          created_at?: string
+          id?: number
+          invoice_date?: string | null
+          invoice_file_name?: string | null
+          po_date?: string | null
+          po_file_name?: string | null
+        }
+        Update: {
+          compare_bill_details?: Json | null
+          compare_item_details?: Json | null
+          compare_summary_individual?: string | null
+          created_at?: string
+          id?: number
+          invoice_date?: string | null
+          invoice_file_name?: string | null
+          po_date?: string | null
+          po_file_name?: string | null
+        }
+        Relationships: []
+      }
+      compare_po_multi_invoice: {
+        Row: {
+          compaison_summary_all: Json | null
+          created_at: string
+          id: number
+          invoice_file_names: Json | null
+          po_file_name: string | null
+        }
+        Insert: {
+          compaison_summary_all?: Json | null
+          created_at?: string
+          id?: number
+          invoice_file_names?: Json | null
+          po_file_name?: string | null
+        }
+        Update: {
+          compaison_summary_all?: Json | null
+          created_at?: string
+          id?: number
+          invoice_file_names?: Json | null
+          po_file_name?: string | null
+        }
+        Relationships: []
+      }
       compare_source_document: {
         Row: {
           created_at: string

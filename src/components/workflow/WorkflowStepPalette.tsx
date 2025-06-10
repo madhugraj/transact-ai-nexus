@@ -11,7 +11,8 @@ import {
   Bell,
   GitBranch,
   Zap,
-  Plus
+  Plus,
+  GitCompare
 } from 'lucide-react';
 import { WorkflowStepType } from '@/types/workflow';
 
@@ -56,6 +57,14 @@ const stepTemplates: StepTemplate[] = [
     icon: <FileText className="h-5 w-5" />,
     category: 'Processing',
     color: 'from-purple-50 to-purple-100 border-purple-200'
+  },
+  {
+    type: 'data-comparison',
+    name: 'Process Data',
+    description: 'Compare documents intelligently (PO vs Invoice, JD vs CV)',
+    icon: <GitCompare className="h-5 w-5" />,
+    category: 'Processing',
+    color: 'from-amber-50 to-amber-100 border-amber-200'
   },
   {
     type: 'data-validation',

@@ -1,9 +1,10 @@
+
 // Enhanced workflow step types for the complete pipeline
 export type WorkflowStepType = 
   | "data-source"           // Email, Drive, Upload, SAP
   | "document-processing"   // Extract Invoice, Extract PO
   | "data-validation"       // Validate extracted data
-  | "data-comparison"       // Compare PO vs Invoice
+  | "data-comparison"       // Compare PO vs Invoice, JD vs CV
   | "data-storage"         // Store in database
   | "analytics"            // Generate analytics
   | "notification"         // Send notifications
@@ -54,10 +55,12 @@ export interface WorkflowStepConfig {
   
   // Comparison configurations
   comparisonConfig?: {
-    type: 'po-invoice-comparison';
+    type: 'po-invoice-comparison' | 'jd-cv-comparison' | 'custom-comparison';
     fields?: string[];
     tolerance?: number;
     matchingCriteria?: 'exact' | 'fuzzy' | 'threshold';
+    sourceTable?: string;
+    targetTable?: string;
   };
   
   // Storage configurations

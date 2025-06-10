@@ -1,11 +1,16 @@
-
-
 import { WorkflowConfig, WorkflowExecution, WorkflowStep, WorkflowStepResult } from '@/types/workflow';
 import { GmailWorkflowService } from './GmailWorkflowService';
 import { DatabaseStorageService } from './DatabaseStorageService';
+import { DocumentComparisonService } from './DocumentComparisonService';
 import { supabase } from '@/integrations/supabase/client';
 
 export class RealWorkflowEngine {
+  private comparisonService: DocumentComparisonService;
+
+  constructor() {
+    this.comparisonService = new DocumentComparisonService();
+  }
+
   async validateWorkflowRequirements(workflow: WorkflowConfig): Promise<{ valid: boolean; errors: string[] }> {
     const errors: string[] = [];
     
@@ -68,13 +73,13 @@ export class RealWorkflowEngine {
     };
 
     try {
-      let processedData: any = { files: [], emails: [] };
+      let processedData: any = { files: [], emails: [], extractedInvoices: [], extractedPOs: [] };
       
       for (const step of workflow.steps) {
         console.log('⚙️ Executing step:', step.name, `(${step.type})`);
         const stepResult = await this.executeStep(step, execution, processedData);
         
-        // Pass data between steps - ensure files array is properly passed
+        // Pass data between steps - ensure proper data flow
         if (stepResult.output) {
           if (step.type === 'data-source') {
             processedData = {
@@ -86,10 +91,22 @@ export class RealWorkflowEngine {
               fileCount: processedData.files?.length || 0
             });
           } else if (step.type === 'document-processing') {
+            // Determine if this is PO or Invoice processing based on step name
+            if (step.name.toLowerCase().includes('po')) {
+              processedData = {
+                ...processedData,
+                extractedPOs: stepResult.output.extractedInvoices || stepResult.output.processedData || []
+              };
+            } else {
+              processedData = {
+                ...processedData,
+                extractedInvoices: stepResult.output.extractedInvoices || stepResult.output.processedData || []
+              };
+            }
+          } else if (step.type === 'data-comparison') {
             processedData = {
               ...processedData,
-              ...stepResult.output,
-              extractedInvoices: stepResult.output.extractedInvoices || stepResult.output.processedData || []
+              comparisonResults: stepResult.output.comparisonResults || []
             };
           }
         }
@@ -132,6 +149,10 @@ export class RealWorkflowEngine {
 
         case 'document-processing':
           output = await this.executeDocumentProcessingStep(step, inputData);
+          break;
+
+        case 'data-comparison':
+          output = await this.executeDataComparisonStep(step, inputData);
           break;
 
         case 'data-storage':
@@ -308,6 +329,236 @@ export class RealWorkflowEngine {
     };
   }
 
+  private async executeDataComparisonStep(step: WorkflowStep, inputData: any): Promise<any> {
+    console.log('🔄 Data comparison step - comparing documents intelligently');
+    console.log('📊 Input data for comparison:', {
+      hasExtractedInvoices: !!inputData?.extractedInvoices,
+      invoiceCount: inputData?.extractedInvoices?.length || 0,
+      hasExtractedPOs: !!inputData?.extractedPOs,
+      poCount: inputData?.extractedPOs?.length || 0
+    });
+
+    const comparisonConfig = step.config.comparisonConfig || {
+      type: 'po-invoice-comparison',
+      fields: ['po_number', 'vendor', 'line_items', 'total_amount'],
+      tolerance: 5,
+      matchingCriteria: 'fuzzy'
+    };
+
+    const extractedInvoices = inputData?.extractedInvoices || [];
+    const extractedPOs = inputData?.extractedPOs || [];
+
+    if (extractedInvoices.length === 0 && extractedPOs.length === 0) {
+      console.log('⚠️ No invoices or POs found for comparison');
+      return {
+        message: 'No documents available for comparison',
+        comparisonResults: []
+      };
+    }
+
+    // If we have both POs and Invoices, perform comparison
+    if (extractedPOs.length > 0 && extractedInvoices.length > 0) {
+      return await this.performPoInvoiceComparison(extractedPOs, extractedInvoices, comparisonConfig);
+    }
+
+    // If we only have invoices or POs from database, fetch the counterparts
+    if (extractedInvoices.length > 0) {
+      return await this.compareInvoicesWithStoredPOs(extractedInvoices, comparisonConfig);
+    }
+
+    if (extractedPOs.length > 0) {
+      return await this.comparePOsWithStoredInvoices(extractedPOs, comparisonConfig);
+    }
+
+    return {
+      message: 'No valid comparison scenario found',
+      comparisonResults: []
+    };
+  }
+
+  private async performPoInvoiceComparison(pos: any[], invoices: any[], config: any): Promise<any> {
+    console.log('🔄 Performing PO vs Invoice comparison:', { poCount: pos.length, invoiceCount: invoices.length });
+    
+    const comparisonResults = [];
+
+    for (const po of pos) {
+      const matchingInvoices = invoices.filter(inv => 
+        inv.extractedData?.po_number === po.extractedData?.po_number ||
+        this.fuzzyMatchPONumber(po.extractedData?.po_number, inv.extractedData?.po_number)
+      );
+
+      if (matchingInvoices.length === 1) {
+        // Single PO vs Single Invoice
+        const result = await this.comparisonService.comparePoWithInvoice(
+          po.extractedData, 
+          matchingInvoices[0].extractedData
+        );
+        
+        await this.comparisonService.storeComparisonResult(
+          'single',
+          result,
+          po.fileName,
+          matchingInvoices[0].fileName
+        );
+
+        comparisonResults.push({
+          type: 'single',
+          po: po.fileName,
+          invoice: matchingInvoices[0].fileName,
+          result
+        });
+
+      } else if (matchingInvoices.length > 1) {
+        // Single PO vs Multiple Invoices
+        const result = await this.comparisonService.comparePoWithMultipleInvoices(
+          po.extractedData, 
+          matchingInvoices.map(inv => inv.extractedData)
+        );
+
+        await this.comparisonService.storeComparisonResult(
+          'multiple',
+          result,
+          po.fileName,
+          matchingInvoices.map(inv => inv.fileName)
+        );
+
+        comparisonResults.push({
+          type: 'multiple',
+          po: po.fileName,
+          invoices: matchingInvoices.map(inv => inv.fileName),
+          result
+        });
+      } else {
+        console.log('⚠️ No matching invoices found for PO:', po.extractedData?.po_number);
+      }
+    }
+
+    return {
+      message: `Successfully compared ${comparisonResults.length} PO-Invoice pairs`,
+      comparisonResults,
+      totalComparisons: comparisonResults.length
+    };
+  }
+
+  private async compareInvoicesWithStoredPOs(invoices: any[], config: any): Promise<any> {
+    console.log('🔄 Comparing invoices with stored POs from database');
+    
+    const comparisonResults = [];
+
+    for (const invoice of invoices) {
+      const poNumber = invoice.extractedData?.po_number;
+      if (!poNumber) continue;
+
+      // Fetch matching PO from database
+      const { data: matchingPOs } = await supabase
+        .from('po_table')
+        .select('*')
+        .eq('po_number', poNumber);
+
+      if (matchingPOs && matchingPOs.length > 0) {
+        const result = await this.comparisonService.comparePoWithInvoice(
+          matchingPOs[0], 
+          invoice.extractedData
+        );
+
+        await this.comparisonService.storeComparisonResult(
+          'single',
+          result,
+          matchingPOs[0].file_name,
+          invoice.fileName
+        );
+
+        comparisonResults.push({
+          type: 'single',
+          po: matchingPOs[0].file_name,
+          invoice: invoice.fileName,
+          result
+        });
+      }
+    }
+
+    return {
+      message: `Successfully compared ${comparisonResults.length} invoices with stored POs`,
+      comparisonResults,
+      totalComparisons: comparisonResults.length
+    };
+  }
+
+  private async comparePOsWithStoredInvoices(pos: any[], config: any): Promise<any> {
+    console.log('🔄 Comparing POs with stored invoices from database');
+    
+    const comparisonResults = [];
+
+    for (const po of pos) {
+      const poNumber = po.extractedData?.po_number;
+      if (!poNumber) continue;
+
+      // Fetch matching invoices from database
+      const { data: matchingInvoices } = await supabase
+        .from('invoice_table')
+        .select('*')
+        .eq('po_number', poNumber);
+
+      if (matchingInvoices && matchingInvoices.length > 0) {
+        if (matchingInvoices.length === 1) {
+          const result = await this.comparisonService.comparePoWithInvoice(
+            po.extractedData, 
+            matchingInvoices[0].details
+          );
+
+          await this.comparisonService.storeComparisonResult(
+            'single',
+            result,
+            po.fileName,
+            matchingInvoices[0].attachment_invoice_name
+          );
+
+          comparisonResults.push({
+            type: 'single',
+            po: po.fileName,
+            invoice: matchingInvoices[0].attachment_invoice_name,
+            result
+          });
+        } else {
+          const result = await this.comparisonService.comparePoWithMultipleInvoices(
+            po.extractedData, 
+            matchingInvoices.map(inv => inv.details)
+          );
+
+          await this.comparisonService.storeComparisonResult(
+            'multiple',
+            result,
+            po.fileName,
+            matchingInvoices.map(inv => inv.attachment_invoice_name)
+          );
+
+          comparisonResults.push({
+            type: 'multiple',
+            po: po.fileName,
+            invoices: matchingInvoices.map(inv => inv.attachment_invoice_name),
+            result
+          });
+        }
+      }
+    }
+
+    return {
+      message: `Successfully compared ${comparisonResults.length} POs with stored invoices`,
+      comparisonResults,
+      totalComparisons: comparisonResults.length
+    };
+  }
+
+  private fuzzyMatchPONumber(po1: string, po2: string): boolean {
+    if (!po1 || !po2) return false;
+    
+    // Remove common prefixes/suffixes and compare
+    const clean1 = po1.toString().replace(/[^\d]/g, '');
+    const clean2 = po2.toString().replace(/[^\d]/g, '');
+    
+    return clean1 === clean2 && clean1.length > 0;
+  }
+
   private async executeDataStorageStep(step: WorkflowStep, inputData: any, execution: WorkflowExecution): Promise<any> {
     console.log('💾 Storing extracted invoice data with config:', step.config.storageConfig);
     console.log('📄 Input data for storage:', inputData);
@@ -374,4 +625,3 @@ export class RealWorkflowEngine {
     };
   }
 }
-

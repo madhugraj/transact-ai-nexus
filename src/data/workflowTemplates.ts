@@ -3,29 +3,30 @@ import { WorkflowTemplate } from '@/types/workflow';
 
 export const workflowTemplates: WorkflowTemplate[] = [
   {
-    id: 'invoice-processing-template',
-    name: 'Complete Invoice Processing',
-    description: 'Email → Extract Invoices → Validate → Store → Analytics',
+    id: 'invoice-processing-basic',
+    name: 'Basic Invoice Processing',
+    description: 'Extract invoice data from emails and store in database',
     category: 'invoice-processing',
     steps: [
       {
         type: 'data-source',
-        name: 'Email Source',
-        description: 'Monitor Gmail for new emails with attachments',
+        name: 'Gmail Source',
+        description: 'Fetch emails with invoice attachments',
         position: { x: 100, y: 100 },
         config: {
           emailConfig: {
             source: 'gmail',
-            attachmentTypes: ['pdf', 'png', 'jpg'],
-            filters: ['invoice', 'billing']
+            filters: ['invoice', 'billing', 'payment'],
+            attachmentTypes: ['pdf'],
+            useIntelligentFiltering: true
           }
         }
       },
       {
         type: 'document-processing',
         name: 'Extract Invoice Data',
-        description: 'Use AI to extract structured data from invoices',
-        position: { x: 300, y: 100 },
+        description: 'Extract structured data from invoice PDFs',
+        position: { x: 400, y: 100 },
         config: {
           processingConfig: {
             type: 'invoice-extraction',
@@ -35,16 +36,9 @@ export const workflowTemplates: WorkflowTemplate[] = [
         }
       },
       {
-        type: 'data-validation',
-        name: 'Validate Data',
-        description: 'Validate extracted invoice data',
-        position: { x: 500, y: 100 },
-        config: {}
-      },
-      {
         type: 'data-storage',
-        name: 'Store in Database',
-        description: 'Store validated invoice data',
+        name: 'Store Invoice Data',
+        description: 'Store extracted invoice data in database',
         position: { x: 700, y: 100 },
         config: {
           storageConfig: {
@@ -52,138 +46,51 @@ export const workflowTemplates: WorkflowTemplate[] = [
             action: 'insert'
           }
         }
-      },
-      {
-        type: 'analytics',
-        name: 'Generate Analytics',
-        description: 'Create invoice analytics and reports',
-        position: { x: 900, y: 100 },
-        config: {
-          analyticsConfig: {
-            type: 'summary',
-            parameters: { period: 'monthly' }
-          }
-        }
       }
     ],
     connections: [
       { sourceStepId: '0', targetStepId: '1' },
-      { sourceStepId: '1', targetStepId: '2' },
-      { sourceStepId: '2', targetStepId: '3' },
-      { sourceStepId: '3', targetStepId: '4' }
+      { sourceStepId: '1', targetStepId: '2' }
     ]
   },
   {
-    id: 'po-processing-template',
-    name: 'Purchase Order Processing',
-    description: 'Drive → Extract POs → Validate → Store → Compare with Invoices',
-    category: 'po-processing',
+    id: 'po-invoice-comparison',
+    name: 'PO vs Invoice Comparison',
+    description: 'Compare Purchase Orders with Invoices for approval workflow',
+    category: 'invoice-processing',
     steps: [
       {
         type: 'data-source',
-        name: 'Google Drive Source',
-        description: 'Monitor Google Drive for PO documents',
-        position: { x: 100, y: 200 },
-        config: {
-          driveConfig: {
-            source: 'google-drive',
-            fileTypes: ['pdf'],
-            folderPath: '/POs'
-          }
-        }
-      },
-      {
-        type: 'document-processing',
-        name: 'Extract PO Data',
-        description: 'Extract structured data from Purchase Orders',
-        position: { x: 300, y: 200 },
-        config: {
-          processingConfig: {
-            type: 'po-extraction',
-            aiModel: 'gemini',
-            confidence: 0.85
-          }
-        }
-      },
-      {
-        type: 'data-storage',
-        name: 'Store PO Data',
-        description: 'Store PO data in database',
-        position: { x: 500, y: 200 },
-        config: {
-          storageConfig: {
-            table: 'po_table',
-            action: 'upsert'
-          }
-        }
-      },
-      {
-        type: 'analytics',
-        name: 'PO vs Invoice Analysis',
-        description: 'Compare POs with received invoices',
-        position: { x: 700, y: 200 },
-        config: {
-          analyticsConfig: {
-            type: 'comparison',
-            parameters: { compareWith: 'invoices' }
-          }
-        }
-      }
-    ],
-    connections: [
-      { sourceStepId: '0', targetStepId: '1' },
-      { sourceStepId: '1', targetStepId: '2' },
-      { sourceStepId: '2', targetStepId: '3' }
-    ]
-  },
-  {
-    id: 'complete-workflow-template',
-    name: 'Complete Document Workflow',
-    description: 'Multi-source → Process All Document Types → Store → Analytics → Notifications',
-    category: 'general',
-    steps: [
-      {
-        type: 'data-source',
-        name: 'Email Monitor',
-        description: 'Monitor Gmail for documents',
-        position: { x: 50, y: 100 },
+        name: 'Gmail Source',
+        description: 'Fetch emails with invoice attachments',
+        position: { x: 100, y: 100 },
         config: {
           emailConfig: {
             source: 'gmail',
-            attachmentTypes: ['pdf', 'png', 'jpg']
+            filters: ['invoice', 'billing'],
+            attachmentTypes: ['pdf'],
+            useIntelligentFiltering: true
           }
         }
       },
       {
         type: 'data-source',
-        name: 'Drive Monitor',
-        description: 'Monitor Google Drive for documents',
-        position: { x: 50, y: 250 },
+        name: 'Drive Source',
+        description: 'Fetch PO documents from Drive',
+        position: { x: 100, y: 300 },
         config: {
           driveConfig: {
             source: 'google-drive',
+            folderPath: '/PO Documents',
             fileTypes: ['pdf']
           }
         }
       },
       {
-        type: 'conditional',
-        name: 'Document Type Router',
-        description: 'Route documents based on type',
-        position: { x: 300, y: 175 },
-        config: {
-          conditionalConfig: {
-            condition: 'isInvoice',
-            trueStepId: '3',
-            falseStepId: '4'
-          }
-        }
-      },
-      {
         type: 'document-processing',
-        name: 'Invoice Processing',
-        description: 'Process invoice documents',
-        position: { x: 500, y: 100 },
+        name: 'Extract Invoice Data',
+        description: 'Extract data from invoice documents',
+        position: { x: 400, y: 100 },
         config: {
           processingConfig: {
             type: 'invoice-extraction',
@@ -193,9 +100,9 @@ export const workflowTemplates: WorkflowTemplate[] = [
       },
       {
         type: 'document-processing',
-        name: 'PO Processing',
-        description: 'Process PO documents',
-        position: { x: 500, y: 250 },
+        name: 'Extract PO Data',
+        description: 'Extract data from PO documents',
+        position: { x: 400, y: 300 },
         config: {
           processingConfig: {
             type: 'po-extraction',
@@ -204,38 +111,103 @@ export const workflowTemplates: WorkflowTemplate[] = [
         }
       },
       {
-        type: 'data-storage',
-        name: 'Store All Data',
-        description: 'Store processed data in appropriate tables',
-        position: { x: 700, y: 175 },
+        type: 'data-comparison',
+        name: 'Process Data',
+        description: 'Compare PO and Invoice data intelligently',
+        position: { x: 700, y: 200 },
         config: {
-          storageConfig: {
-            table: 'dynamic',
-            action: 'upsert'
+          comparisonConfig: {
+            type: 'po-invoice-comparison',
+            fields: ['po_number', 'vendor', 'line_items', 'total_amount'],
+            tolerance: 5,
+            matchingCriteria: 'fuzzy'
           }
         }
       },
       {
-        type: 'analytics',
-        name: 'Comprehensive Analytics',
-        description: 'Generate comprehensive business analytics',
-        position: { x: 900, y: 175 },
+        type: 'data-storage',
+        name: 'Store Comparison Results',
+        description: 'Store comparison results in database',
+        position: { x: 1000, y: 200 },
         config: {
-          analyticsConfig: {
-            type: 'trends',
-            parameters: { includeAll: true }
+          storageConfig: {
+            table: 'compare_po_invoice_table',
+            action: 'insert'
           }
         }
       }
     ],
     connections: [
       { sourceStepId: '0', targetStepId: '2' },
+      { sourceStepId: '1', targetStepId: '3' },
+      { sourceStepId: '2', targetStepId: '4' },
+      { sourceStepId: '3', targetStepId: '4' },
+      { sourceStepId: '4', targetStepId: '5' }
+    ]
+  },
+  {
+    id: 'multi-invoice-processing',
+    name: 'Multi-Invoice vs PO Processing',
+    description: 'Process multiple invoices against single PO for consolidation',
+    category: 'invoice-processing',
+    steps: [
+      {
+        type: 'data-source',
+        name: 'Gmail Source',
+        description: 'Fetch multiple invoice emails',
+        position: { x: 100, y: 100 },
+        config: {
+          emailConfig: {
+            source: 'gmail',
+            filters: ['invoice', 'billing'],
+            attachmentTypes: ['pdf'],
+            useIntelligentFiltering: true
+          }
+        }
+      },
+      {
+        type: 'document-processing',
+        name: 'Extract Invoice Data',
+        description: 'Extract data from multiple invoices',
+        position: { x: 400, y: 100 },
+        config: {
+          processingConfig: {
+            type: 'invoice-extraction',
+            aiModel: 'gemini'
+          }
+        }
+      },
+      {
+        type: 'data-comparison',
+        name: 'Process Data',
+        description: 'Compare multiple invoices with stored POs',
+        position: { x: 700, y: 100 },
+        config: {
+          comparisonConfig: {
+            type: 'po-invoice-comparison',
+            fields: ['po_number', 'vendor', 'line_items'],
+            tolerance: 3,
+            matchingCriteria: 'exact'
+          }
+        }
+      },
+      {
+        type: 'data-storage',
+        name: 'Store Multi-Invoice Results',
+        description: 'Store consolidated comparison results',
+        position: { x: 1000, y: 100 },
+        config: {
+          storageConfig: {
+            table: 'compare_po_multi_invoice',
+            action: 'insert'
+          }
+        }
+      }
+    ],
+    connections: [
+      { sourceStepId: '0', targetStepId: '1' },
       { sourceStepId: '1', targetStepId: '2' },
-      { sourceStepId: '2', targetStepId: '3', condition: 'isInvoice' },
-      { sourceStepId: '2', targetStepId: '4', condition: 'isPO' },
-      { sourceStepId: '3', targetStepId: '5' },
-      { sourceStepId: '4', targetStepId: '5' },
-      { sourceStepId: '5', targetStepId: '6' }
+      { sourceStepId: '2', targetStepId: '3' }
     ]
   }
 ];
