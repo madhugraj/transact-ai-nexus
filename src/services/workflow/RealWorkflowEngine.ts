@@ -120,7 +120,7 @@ export class RealWorkflowEngine {
           break;
 
         case 'data-storage':
-          output = await this.executeDataStorageStep(step, inputData);
+          output = await this.executeDataStorageStep(step, inputData, execution);
           break;
 
         default:
@@ -204,7 +204,7 @@ export class RealWorkflowEngine {
     };
   }
 
-  private async executeDataStorageStep(step: WorkflowStep, inputData: any): Promise<any> {
+  private async executeDataStorageStep(step: WorkflowStep, inputData: any, execution: WorkflowExecution): Promise<any> {
     console.log('💾 Storing data with config:', step.config.storageConfig);
     console.log('📄 Input data for storage:', inputData);
     
