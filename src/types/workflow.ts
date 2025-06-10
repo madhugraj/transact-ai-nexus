@@ -1,4 +1,3 @@
-
 // Enhanced workflow step types for the complete pipeline
 export type WorkflowStepType = 
   | "data-source"           // Email, Drive, Upload, SAP
@@ -33,6 +32,12 @@ export interface WorkflowStepConfig {
     source: 'gmail' | 'outlook';
     filters?: string[];
     attachmentTypes?: string[];
+    useIntelligentFiltering?: boolean;
+    intelligentRules?: {
+      detectInvoices: boolean;
+      checkAttachments: boolean;
+      aiConfidenceThreshold: number;
+    };
   };
   driveConfig?: {
     source: 'google-drive' | 'onedrive';
