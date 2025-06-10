@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 import { WorkflowStep } from '@/types/workflow';
 import { Settings, FileText, GitCompare, Database, Mail, HardDrive } from 'lucide-react';
+import { DataSourceConfig } from './config/DataSourceConfig';
 
 interface WorkflowConfigDialogProps {
   step: WorkflowStep | null;
@@ -112,36 +112,10 @@ export const WorkflowConfigDialog: React.FC<WorkflowConfigDialogProps> = ({
 
           <TabsContent value="advanced" className="space-y-4">
             {editedStep.type === 'data-source' && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    Data Source Configuration
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label>Source Type</Label>
-                    <Select
-                      value={editedStep.config.emailConfig?.source || 'gmail'}
-                      onValueChange={(value) => updateConfig('emailConfig', {
-                        ...editedStep.config.emailConfig,
-                        source: value
-                      })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="gmail">Gmail</SelectItem>
-                        <SelectItem value="google-drive">Google Drive</SelectItem>
-                        <SelectItem value="outlook">Outlook</SelectItem>
-                        <SelectItem value="onedrive">OneDrive</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardContent>
-              </Card>
+              <DataSourceConfig
+                step={editedStep}
+                onConfigUpdate={updateConfig}
+              />
             )}
 
             {editedStep.type === 'data-storage' && (
