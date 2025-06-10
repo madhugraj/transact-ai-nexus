@@ -160,12 +160,15 @@ export class RealWorkflowEngine {
         step.config.emailConfig.useIntelligentFiltering || false
       );
 
-      // Process attachments from emails
-      const processedFiles = await gmailService.processEmailAttachments(result.emails);
+      // Process attachments from emails - make sure emails is an array
+      const emailsArray = Array.isArray(result.emails) ? result.emails : [];
+      console.log('📧 Processing emails array:', emailsArray.length, 'emails');
+      
+      const processedFiles = await gmailService.processEmailAttachments(emailsArray);
       
       return {
         source: 'gmail',
-        emails: result.emails,
+        emails: emailsArray,
         files: processedFiles,
         count: result.count,
         processedData: processedFiles

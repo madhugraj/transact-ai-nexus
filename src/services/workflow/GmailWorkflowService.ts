@@ -1,4 +1,5 @@
 
+
 import { supabase } from '@/integrations/supabase/client';
 
 export class GmailWorkflowService {
@@ -297,6 +298,12 @@ export class GmailWorkflowService {
   }
 
   async processEmailAttachments(emails: any[]): Promise<any[]> {
+    // Defensive check to ensure emails is an array
+    if (!Array.isArray(emails)) {
+      console.error('❌ processEmailAttachments received non-array input:', typeof emails, emails);
+      return [];
+    }
+    
     console.log('📎 Processing email attachments for', emails.length, 'emails');
     
     const processedFiles = [];
@@ -384,3 +391,4 @@ export class GmailWorkflowService {
     return attachments;
   }
 }
+
