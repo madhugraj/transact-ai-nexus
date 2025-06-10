@@ -6,16 +6,21 @@ import { useWorkflowPersistence } from '@/hooks/useWorkflowPersistence';
 import { useToast } from '@/hooks/use-toast';
 import { EnhancedWorkflowEngine } from '@/services/workflow/EnhancedWorkflowEngine';
 import { WorkflowConfig } from '@/types/workflow';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, FileText } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface WorkflowBuilderTabProps {
   onWorkflowSave: (workflow: WorkflowConfig) => void;
   onWorkflowExecute: (workflow: WorkflowConfig) => Promise<void>;
+  currentWorkflow?: WorkflowConfig | null;
+  onClearCurrentWorkflow?: () => void;
 }
 
 export const WorkflowBuilderTab: React.FC<WorkflowBuilderTabProps> = ({
   onWorkflowSave,
-  onWorkflowExecute
+  onWorkflowExecute,
+  currentWorkflow,
+  onClearCurrentWorkflow
 }) => {
   const { workflows } = useWorkflowPersistence();
   const { toast } = useToast();
@@ -62,8 +67,41 @@ export const WorkflowBuilderTab: React.FC<WorkflowBuilderTabProps> = ({
     }
   };
 
+  const handleClearTemplate = () => {
+    if (onClearCurrentWorkflow) {
+      onClearCurrentWorkflow();
+      toast({
+        title: "Template Cleared",
+        description: "You can now create a new workflow from scratch.",
+      });
+    }
+  };
+
   return (
     <div className="space-y-4">
+      {/* Current Template/Workflow Info */}
+      {currentWorkflow && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-blue-600" />
+              <div>
+                <h3 className="font-medium text-blue-900">Editing: {currentWorkflow.name}</h3>
+                <p className="text-sm text-blue-700">{currentWorkflow.description}</p>
+              </div>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleClearTemplate}
+              className="text-blue-700 border-blue-300 hover:bg-blue-100"
+            >
+              Clear & Start Fresh
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Validation Errors */}
       {validationErrors.length > 0 && (
         <Alert variant="destructive">
@@ -85,6 +123,7 @@ export const WorkflowBuilderTab: React.FC<WorkflowBuilderTabProps> = ({
       <DragDropWorkflowBuilder
         onWorkflowSave={handleWorkflowSave}
         onWorkflowExecute={handleWorkflowExecute}
+        initialWorkflow={currentWorkflow}
       />
     </div>
   );

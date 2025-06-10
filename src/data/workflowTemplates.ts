@@ -6,7 +6,7 @@ export const workflowTemplates: WorkflowTemplate[] = [
     id: 'basic-invoice-processing',
     name: 'Basic Invoice Processing',
     description: 'Simple workflow to extract and store invoice data from email attachments',
-    category: 'invoice-processing', // Correct category
+    category: 'invoice-processing',
     steps: [
       {
         type: 'data-source',
@@ -61,7 +61,7 @@ export const workflowTemplates: WorkflowTemplate[] = [
     id: 'po-invoice-comparison',
     name: 'PO vs Invoice Comparison',
     description: 'Compare Purchase Orders with received invoices for discrepancy analysis',
-    category: 'comparison-analysis', // Different category
+    category: 'po-processing',
     steps: [
       {
         type: 'data-source',
@@ -158,7 +158,7 @@ export const workflowTemplates: WorkflowTemplate[] = [
     id: 'multi-invoice-processing',
     name: 'Multi-Invoice Processing',
     description: 'Batch process multiple invoices against stored PO database',
-    category: 'batch-processing', // Different category
+    category: 'analytics',
     steps: [
       {
         type: 'data-source',
