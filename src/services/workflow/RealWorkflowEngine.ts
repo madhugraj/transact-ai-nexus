@@ -1,3 +1,4 @@
+
 import { WorkflowConfig, WorkflowExecution, WorkflowStep, WorkflowStepResult } from '@/types/workflow';
 import { GmailWorkflowService } from './GmailWorkflowService';
 import { DatabaseStorageService } from './DatabaseStorageService';
@@ -72,10 +73,23 @@ export class RealWorkflowEngine {
         console.log('⚙️ Executing step:', step.name, `(${step.type})`);
         const stepResult = await this.executeStep(step, execution, processedData);
         
-        // Pass data between steps
+        // Pass data between steps - ensure files array is properly passed
         if (stepResult.output) {
           if (step.type === 'data-source') {
-            processedData = stepResult.output;
+            processedData = {
+              ...stepResult.output,
+              files: stepResult.output.files || stepResult.output.processedFiles || []
+            };
+            console.log('📊 Data passed to next step:', {
+              emailCount: processedData.emails?.length || 0,
+              fileCount: processedData.files?.length || 0
+            });
+          } else if (step.type === 'document-processing') {
+            processedData = {
+              ...processedData,
+              ...stepResult.output,
+              extractedInvoices: stepResult.output.extractedInvoices || stepResult.output.processedData || []
+            };
           }
         }
       }
@@ -160,18 +174,22 @@ export class RealWorkflowEngine {
         step.config.emailConfig.useIntelligentFiltering || false
       );
 
-      // Process attachments from emails - make sure emails is an array
-      const emailsArray = Array.isArray(result.emails) ? result.emails : [];
-      console.log('📧 Processing emails array:', emailsArray.length, 'emails');
-      
-      const processedFiles = await gmailService.processEmailAttachments(emailsArray);
+      console.log('📧 Gmail result structure:', {
+        emails: result.emails?.length || 0,
+        files: result.files?.length || 0,
+        processedFiles: result.processedFiles?.length || 0
+      });
+
+      // Ensure we return the files array properly
+      const files = result.files || result.processedFiles || [];
       
       return {
         source: 'gmail',
-        emails: emailsArray,
-        files: processedFiles,
-        count: result.count,
-        processedData: processedFiles
+        emails: result.emails || [],
+        files: files,
+        processedFiles: files, // Alias for backward compatibility
+        count: result.count || 0,
+        processedData: files
       };
     }
 
@@ -180,19 +198,31 @@ export class RealWorkflowEngine {
 
   private async executeDocumentProcessingStep(step: WorkflowStep, inputData: any): Promise<any> {
     console.log('🔄 Document processing step - extracting invoice data from PDFs');
+    console.log('📊 Input data structure:', {
+      hasFiles: !!inputData?.files,
+      filesLength: inputData?.files?.length || 0,
+      hasProcessedData: !!inputData?.processedData,
+      processedDataLength: inputData?.processedData?.length || 0,
+      inputDataKeys: Object.keys(inputData || {})
+    });
     
-    const files = inputData?.files || inputData?.processedData || [];
+    // Get files from multiple possible locations in the input data
+    const files = inputData?.files || 
+                  inputData?.processedFiles || 
+                  inputData?.processedData || 
+                  [];
+    
+    console.log('📄 Processing', files.length, 'files for invoice extraction');
     
     if (files.length === 0) {
-      console.log('⚠️ No files to process');
+      console.log('⚠️ No files to process - checking input data structure');
+      console.log('📊 Full input data:', inputData);
       return {
         message: 'No files found to process',
         processedData: []
       };
     }
 
-    console.log('📄 Processing', files.length, 'PDF files for invoice extraction');
-    
     const extractedInvoices = [];
     const tokens = localStorage.getItem('gmail_auth_tokens');
     
