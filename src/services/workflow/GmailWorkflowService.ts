@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export class GmailWorkflowService {
@@ -299,27 +300,87 @@ export class GmailWorkflowService {
     console.log('📎 Processing email attachments for', emails.length, 'emails');
     
     const processedFiles = [];
+    const tokens = localStorage.getItem('gmail_auth_tokens');
+    if (!tokens) {
+      console.error('❌ No Gmail tokens available for attachment processing');
+      return [];
+    }
+
+    const { accessToken } = JSON.parse(tokens);
     
-    for (const email of emails.slice(0, 3)) { // Limit to first 3 emails
-      if (email.attachments && email.attachments.length > 0) {
-        for (const attachment of email.attachments) {
-          if (attachment.mimeType === 'application/pdf') {
+    for (const email of emails.slice(0, 5)) { // Limit to first 5 emails
+      console.log('📧 Processing email:', email.id, 'Subject:', email.subject);
+      
+      try {
+        // Get full email details with attachments
+        const { data, error } = await supabase.functions.invoke('gmail', {
+          body: {
+            action: 'get',
+            accessToken,
+            messageId: email.id
+          }
+        });
+
+        if (error || !data?.success) {
+          console.error('❌ Failed to get email details for:', email.id, error || data?.error);
+          continue;
+        }
+
+        const fullEmail = data.data;
+        console.log('📧 Full email retrieved for:', email.id);
+
+        // Extract attachments from email parts
+        const attachments = this.extractAttachmentsFromParts(fullEmail.payload?.parts || []);
+        console.log('📎 Found attachments in email:', attachments.length);
+
+        for (const attachment of attachments) {
+          if (attachment.mimeType === 'application/pdf' || 
+              attachment.mimeType?.toLowerCase().includes('pdf')) {
             processedFiles.push({
               id: attachment.attachmentId,
               name: attachment.filename,
               source: 'gmail',
               emailId: email.id,
+              emailSubject: email.subject,
               mimeType: attachment.mimeType,
               size: attachment.size,
               aiConfidence: email.aiConfidence,
               aiReason: email.aiReason
             });
+            console.log('📄 Added PDF attachment:', attachment.filename);
           }
         }
+      } catch (error) {
+        console.error('❌ Error processing email attachments for:', email.id, error);
       }
     }
     
-    console.log('📎 Found', processedFiles.length, 'PDF attachments');
+    console.log('📎 Found', processedFiles.length, 'PDF attachments total');
     return processedFiles;
+  }
+
+  private extractAttachmentsFromParts(parts: any[]): any[] {
+    const attachments: any[] = [];
+    
+    for (const part of parts) {
+      // Check if this part has an attachment
+      if (part.body?.attachmentId && part.filename) {
+        attachments.push({
+          filename: part.filename,
+          mimeType: part.mimeType,
+          size: part.body.size || 0,
+          attachmentId: part.body.attachmentId
+        });
+        console.log('📎 Found attachment in part:', part.filename, part.mimeType);
+      }
+      
+      // Recursively check nested parts
+      if (part.parts && Array.isArray(part.parts)) {
+        const nestedAttachments = this.extractAttachmentsFromParts(part.parts);
+        attachments.push(...nestedAttachments);
+      }
+    }
+    
+    return attachments;
   }
 }
