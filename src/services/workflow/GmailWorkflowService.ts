@@ -1,5 +1,3 @@
-
-
 import { supabase } from '@/integrations/supabase/client';
 
 export class GmailWorkflowService {
@@ -80,28 +78,20 @@ export class GmailWorkflowService {
   }
 
   private async callGmailAPI(accessToken: string, filters: string[], useIntelligentFiltering: boolean): Promise<any> {
-    // Build search query - Pass the useIntelligentFiltering parameter correctly
+    // Build search query - make it less restrictive to find emails
     let searchQuery = '';
     
     if (useIntelligentFiltering) {
-      // Enhanced query for invoice detection
-      const invoiceKeywords = [
-        'invoice', 'billing', 'payment', 'receipt', 'statement', 
-        'purchase order', 'PO', 'remittance', 'payable', 
-        'due', 'amount', 'total', 'tax', 'vat'
-      ];
-      
-      // Combine user filters with AI-enhanced keywords
-      const allKeywords = [...new Set([...filters, ...invoiceKeywords])];
-      searchQuery = `(${allKeywords.join(' OR ')}) AND has:attachment`;
-      console.log('🤖 Using AI-enhanced search with attachments filter');
+      // Start with a broader search first
+      searchQuery = 'has:attachment';
+      console.log('🤖 Using broad search first to find all emails with attachments');
     } else if (filters.length > 0) {
       searchQuery = `(${filters.join(' OR ')}) AND has:attachment`;
       console.log('📧 Using manual filters with attachments filter');
     } else {
-      // Default fallback
-      searchQuery = '(invoice OR billing) AND has:attachment';
-      console.log('🔄 Using default search with attachments filter');
+      // Very broad fallback
+      searchQuery = 'has:attachment';
+      console.log('🔄 Using very broad search for any emails with attachments');
     }
 
     console.log('🔍 Gmail search query:', searchQuery);
@@ -112,7 +102,7 @@ export class GmailWorkflowService {
           action: 'listMessages',
           accessToken,
           query: searchQuery,
-          maxResults: useIntelligentFiltering ? 20 : 10 // More results when using AI
+          maxResults: 50 // Increase to get more results
         }
       });
 
@@ -126,11 +116,36 @@ export class GmailWorkflowService {
         throw new Error(data?.error || 'Gmail API request failed');
       }
 
-      console.log('✅ Gmail emails fetched successfully:', data.data?.length || 0, 'emails');
+      console.log('✅ Gmail API raw response:', data);
       
-      let filteredEmails = data.data || [];
+      // Parse the response correctly
+      let emails = [];
+      if (data.data && data.data.messages) {
+        // Gmail API returns messages in this format
+        emails = data.data.messages.map((msg: any) => ({
+          id: msg.id,
+          subject: msg.snippet || 'No subject', // Use snippet as fallback
+          from: 'Unknown sender',
+          date: new Date().toISOString(),
+          snippet: msg.snippet || '',
+          hasAttachments: true, // We're filtering for attachments
+          labels: msg.labelIds || []
+        }));
+        console.log('📧 Converted Gmail messages to email objects:', emails.length);
+      } else if (data.data && Array.isArray(data.data)) {
+        // If data is already in array format
+        emails = data.data;
+        console.log('📧 Using data array directly:', emails.length);
+      } else {
+        console.log('⚠️ No messages found in Gmail response');
+        emails = [];
+      }
 
-      // Apply intelligent filtering if enabled
+      console.log('✅ Gmail emails fetched successfully:', emails.length, 'emails');
+      
+      let filteredEmails = emails;
+
+      // Apply intelligent filtering if enabled and we have emails
       if (useIntelligentFiltering && filteredEmails.length > 0) {
         console.log('🤖 Applying AI-powered invoice detection...');
         filteredEmails = await this.applyIntelligentFiltering(filteredEmails);
@@ -391,4 +406,3 @@ export class GmailWorkflowService {
     return attachments;
   }
 }
-
