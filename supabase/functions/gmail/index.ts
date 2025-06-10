@@ -1,10 +1,10 @@
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -12,126 +12,61 @@ serve(async (req) => {
   }
 
   try {
-    const { accessToken, action, messageId, query, maxResults, attachmentId, filters } = await req.json();
+    const { action, accessToken, query, maxResults, messageId, attachmentId } = await req.json();
     
-    if (!accessToken) {
-      throw new Error('Access token is required');
-    }
-
-    let url = 'https://gmail.googleapis.com/gmail/v1/users/me';
+    console.log(`Making Gmail API request for action: ${action}`);
     
-    if (action === 'list' || action === 'listMessages') {
-      url += '/messages';
-      const queryParams = new URLSearchParams({
-        maxResults: maxResults || '50',
-      });
-      
-      // Handle both query and filters parameters
-      const searchQuery = query || (filters && filters.length > 0 ? filters.join(' OR ') : '');
-      if (searchQuery) {
-        queryParams.set('q', searchQuery);
-      }
-      
-      url += `?${queryParams}`;
-    } else if (action === 'get' && messageId) {
-      url += `/messages/${messageId}`;
-      const queryParams = new URLSearchParams({
-        format: 'full',
-      });
-      url += `?${queryParams}`;
-    } else if (action === 'attachment' && messageId && attachmentId) {
-      url += `/messages/${messageId}/attachments/${attachmentId}`;
+    let url: string;
+    let method = 'GET';
+    
+    switch (action) {
+      case 'listMessages':
+        url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${maxResults}&q=${encodeURIComponent(query)}`;
+        break;
+      case 'get':
+        url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`;
+        break;
+      case 'getAttachment':
+        url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${attachmentId}`;
+        break;
+      default:
+        throw new Error(`Unknown action: ${action}`);
     }
-
+    
     console.log(`Making Gmail API request: ${url}`);
-
+    
     const response = await fetch(url, {
+      method,
       headers: {
         'Authorization': `Bearer ${accessToken}`,
-        'Accept': 'application/json',
+        'Content-Type': 'application/json',
       },
     });
-
+    
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error('Gmail API error:', errorData);
-      throw new Error(`Gmail API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`Gmail API error: ${response.status} ${response.statusText}`, errorText);
+      throw new Error(`Gmail API error: ${response.status} ${response.statusText}`);
     }
-
+    
     const data = await response.json();
-
-    if (action === 'list' || action === 'listMessages') {
-      // Get detailed info for each message
-      const messages = data.messages || [];
-      const detailedMessages = [];
-
-      for (const message of messages.slice(0, 10)) { // Limit to first 10 for performance
-        const detailResponse = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,
-          {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Accept': 'application/json',
-            },
-          }
-        );
-
-        if (detailResponse.ok) {
-          const detailData = await detailResponse.json();
-          const headers = detailData.payload?.headers || [];
-          
-          const subject = headers.find(h => h.name === 'Subject')?.value || 'No Subject';
-          const from = headers.find(h => h.name === 'From')?.value || 'Unknown Sender';
-          const date = headers.find(h => h.name === 'Date')?.value || new Date().toISOString();
-          
-          detailedMessages.push({
-            id: message.id,
-            subject,
-            from,
-            date,
-            snippet: detailData.snippet || '',
-            hasAttachments: (detailData.payload?.parts || []).some(part => 
-              part.filename && part.filename.length > 0
-            ),
-            labels: detailData.labelIds || [],
-          });
-        }
-      }
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          data: detailedMessages,
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
-    } else {
-      return new Response(
-        JSON.stringify({
-          success: true,
-          data,
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
-    }
-
+    
+    return new Response(JSON.stringify({
+      success: true,
+      data: data
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+    
   } catch (error) {
-    console.error('Gmail error:', error);
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message,
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
-    );
+    console.error('Gmail function error:', error);
+    return new Response(JSON.stringify({
+      success: false,
+      error: error.message
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });

@@ -1,6 +1,7 @@
 
 import { WorkflowConfig, WorkflowExecution, WorkflowStep, WorkflowStepResult } from '@/types/workflow';
 import { GmailWorkflowService } from './GmailWorkflowService';
+import { DatabaseStorageService } from './DatabaseStorageService';
 import { supabase } from '@/integrations/supabase/client';
 
 export class RealWorkflowEngine {
@@ -176,7 +177,7 @@ export class RealWorkflowEngine {
   }
 
   private async executeDocumentProcessingStep(step: WorkflowStep, inputData: any): Promise<any> {
-    console.log('🔄 Document processing step - data already processed in data source step');
+    console.log('🔄 Document processing step - extracting invoice data from PDFs');
     
     const files = inputData?.files || inputData?.processedData || [];
     
@@ -188,56 +189,141 @@ export class RealWorkflowEngine {
       };
     }
 
-    console.log('📄 Processing', files.length, 'files');
+    console.log('📄 Processing', files.length, 'PDF files for invoice extraction');
     
-    // Simulate processing
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const extractedInvoices = [];
+    const tokens = localStorage.getItem('gmail_auth_tokens');
+    
+    if (!tokens) {
+      console.error('❌ No Gmail tokens available for PDF processing');
+      return {
+        message: 'Gmail authentication required for PDF processing',
+        processedData: []
+      };
+    }
+
+    const { accessToken } = JSON.parse(tokens);
+
+    for (const file of files) {
+      try {
+        console.log('📄 Extracting data from:', file.name);
+        
+        // Get the attachment data from Gmail
+        const { data: attachmentData, error } = await supabase.functions.invoke('gmail', {
+          body: {
+            action: 'getAttachment',
+            accessToken,
+            messageId: file.emailId,
+            attachmentId: file.id
+          }
+        });
+
+        if (error || !attachmentData?.success) {
+          console.error('❌ Failed to get attachment:', file.name, error || attachmentData?.error);
+          continue;
+        }
+
+        // Process the PDF with Gemini for invoice extraction
+        const { data: extractionResult, error: extractionError } = await supabase.functions.invoke('gemini-api', {
+          body: {
+            action: 'extractInvoiceData',
+            fileData: attachmentData.data,
+            fileName: file.name,
+            mimeType: file.mimeType
+          }
+        });
+
+        if (extractionError || !extractionResult?.success) {
+          console.error('❌ Failed to extract data from:', file.name, extractionError || extractionResult?.error);
+          continue;
+        }
+
+        const extractedData = extractionResult.data;
+        console.log('✅ Extracted invoice data from:', file.name);
+
+        extractedInvoices.push({
+          fileName: file.name,
+          emailId: file.emailId,
+          emailSubject: file.emailSubject,
+          attachmentId: file.id,
+          extractedData: extractedData,
+          confidence: extractedData.extraction_confidence || 0.8,
+          source: 'gmail'
+        });
+
+      } catch (error) {
+        console.error('❌ Error processing file:', file.name, error);
+      }
+    }
+    
+    console.log('✅ Invoice extraction completed:', extractedInvoices.length, 'invoices processed');
     
     return {
-      message: `Successfully processed ${files.length} files`,
-      processedData: files,
-      extractedData: files.map(f => ({
-        filename: f.name,
-        type: 'invoice',
-        confidence: f.aiConfidence || 0.8
-      }))
+      message: `Successfully extracted data from ${extractedInvoices.length}/${files.length} files`,
+      processedData: extractedInvoices,
+      extractedInvoices: extractedInvoices
     };
   }
 
   private async executeDataStorageStep(step: WorkflowStep, inputData: any, execution: WorkflowExecution): Promise<any> {
-    console.log('💾 Storing data with config:', step.config.storageConfig);
+    console.log('💾 Storing extracted invoice data with config:', step.config.storageConfig);
     console.log('📄 Input data for storage:', inputData);
     
     if (!step.config.storageConfig) {
       throw new Error('No storage configuration found');
     }
 
-    const config = {
-      ...step.config.storageConfig,
-      workflowId: execution.id
-    };
-
-    const dataToStore = inputData?.processedData || inputData?.extractedData || [];
+    // Get the extracted invoice data
+    const extractedInvoices = inputData?.extractedInvoices || inputData?.processedData || [];
     
-    console.log('💾 Storing data to database with config:', config);
-    console.log('📄 Data to store:', dataToStore);
-
-    if (dataToStore.length === 0) {
-      console.log('⚠️ No data to store');
+    if (extractedInvoices.length === 0) {
+      console.log('⚠️ No extracted invoice data to store');
       return {
-        message: 'No data to store',
+        message: 'No invoice data to store',
         stored: 0
       };
     }
 
-    // Here you would typically store to Supabase
-    // For now, we'll simulate the storage
-    await new Promise(resolve => setTimeout(resolve, 500));
+    console.log('💾 Storing', extractedInvoices.length, 'extracted invoices to database');
+
+    let storedCount = 0;
+    const errors = [];
+
+    // Import the database storage service for invoice processing
+    const { DatabaseStorage } = await import('@/services/email/databaseStorage');
+    const dbStorage = new DatabaseStorage();
+
+    for (const invoice of extractedInvoices) {
+      try {
+        // Create a mock email object for the storage function
+        const emailContext = {
+          id: invoice.emailId,
+          subject: invoice.emailSubject,
+          date: new Date().toISOString()
+        };
+
+        await dbStorage.storeInvoiceInDatabase(
+          invoice.extractedData,
+          emailContext,
+          invoice.fileName,
+          emailContext
+        );
+
+        storedCount++;
+        console.log('✅ Stored invoice:', invoice.fileName);
+
+      } catch (error) {
+        console.error('❌ Error storing invoice:', invoice.fileName, error);
+        errors.push(`Failed to store ${invoice.fileName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
 
     return {
-      message: `Successfully stored ${dataToStore.length} records`,
-      stored: dataToStore.length,
-      table: config.table
+      message: `Successfully stored ${storedCount}/${extractedInvoices.length} invoices`,
+      stored: storedCount,
+      total: extractedInvoices.length,
+      errors: errors,
+      table: step.config.storageConfig.table
     };
   }
 }
