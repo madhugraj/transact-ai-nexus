@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -115,11 +114,6 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
           title: "Connected to Gmail",
           description: "Successfully authenticated with your Gmail account. Connection will persist across navigation."
         });
-        
-        // Don't navigate away - stay on the same page to maintain workflow context
-        // setTimeout(() => {
-        //   navigate('/actions');
-        // }, 2000);
       } else {
         console.error('Authentication failed:', result.error);
         setAuthError(result.error || 'Authentication failed');
@@ -148,15 +142,21 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
     });
   };
 
+  const extractHeaderValue = (headers: any[], name: string): string => {
+    const header = headers.find(h => h.name.toLowerCase() === name.toLowerCase());
+    return header?.value || '';
+  };
+
   const loadGmailMessages = async (token: string, forceRefresh: boolean = false) => {
     console.log('Loading Gmail messages...', forceRefresh ? '(forced refresh)' : '');
     setIsLoading(true);
     try {
+      // First, get the list of message IDs
       const { data, error } = await supabase.functions.invoke('gmail', {
         body: {
           accessToken: token,
-          action: 'listMessages', // Changed from 'list' to 'listMessages'
-          query: searchQuery,
+          action: 'listMessages',
+          query: searchQuery || 'has:attachment',
           maxResults: parseInt(maxResults)
         }
       });
@@ -173,30 +173,63 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
         throw error;
       }
 
-      console.log('Gmail messages loaded:', data);
-      if (data.success) {
-        // Process the messages to create proper email objects
-        const emails = data.data.messages ? data.data.messages.map((msg: any) => ({
-          id: msg.id,
-          subject: 'Loading...', // We'll need to get full details for subject
-          from: 'Loading...', // We'll need to get full details for from
-          date: new Date().toISOString(), // Placeholder
-          snippet: '',
-          hasAttachments: false,
-          labels: []
-        })) : [];
+      console.log('Gmail messages response:', data);
+      if (data.success && data.data?.messages) {
+        const messageIds = data.data.messages.map((msg: any) => msg.id);
+        console.log(`Found ${messageIds.length} message IDs, fetching full details...`);
         
-        setEmails(emails);
-        console.log(`Successfully loaded ${emails.length} emails`);
+        // Fetch full details for each message
+        const emailPromises = messageIds.slice(0, 10).map(async (messageId: string) => {
+          try {
+            const { data: emailData, error: emailError } = await supabase.functions.invoke('gmail', {
+              body: {
+                accessToken: token,
+                action: 'get',
+                messageId
+              }
+            });
+
+            if (emailError || !emailData?.success) {
+              console.error('Failed to get email details for:', messageId, emailError || emailData?.error);
+              return null;
+            }
+
+            const fullEmail = emailData.data;
+            const headers = fullEmail.payload?.headers || [];
+            
+            // Check for attachments
+            const hasAttachments = checkForAttachments(fullEmail.payload);
+            
+            return {
+              id: messageId,
+              subject: extractHeaderValue(headers, 'subject') || 'No Subject',
+              from: extractHeaderValue(headers, 'from') || 'Unknown Sender',
+              date: new Date(parseInt(fullEmail.internalDate)).toISOString(),
+              snippet: fullEmail.snippet || '',
+              hasAttachments,
+              labels: fullEmail.labelIds || []
+            };
+          } catch (error) {
+            console.error('Error processing email:', messageId, error);
+            return null;
+          }
+        });
+
+        const emailResults = await Promise.all(emailPromises);
+        const validEmails = emailResults.filter(email => email !== null) as GmailMessage[];
+        
+        setEmails(validEmails);
+        console.log(`Successfully loaded ${validEmails.length} emails with full details`);
         
         if (forceRefresh) {
           toast({
             title: "Emails refreshed",
-            description: `Loaded ${emails.length} emails from Gmail`
+            description: `Loaded ${validEmails.length} emails from Gmail`
           });
         }
       } else {
-        throw new Error(data.error);
+        console.log('No messages found or API call failed');
+        setEmails([]);
       }
     } catch (error) {
       console.error('Error loading emails:', error);
@@ -208,6 +241,28 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const checkForAttachments = (payload: any): boolean => {
+    if (!payload) return false;
+    
+    // Check if payload has parts
+    if (payload.parts && Array.isArray(payload.parts)) {
+      return payload.parts.some((part: any) => {
+        // Check if this part has an attachment
+        if (part.body?.attachmentId && part.filename) {
+          return true;
+        }
+        // Recursively check nested parts
+        if (part.parts) {
+          return checkForAttachments({ parts: part.parts });
+        }
+        return false;
+      });
+    }
+    
+    // Check if the main payload itself is an attachment
+    return !!(payload.body?.attachmentId && payload.filename);
   };
 
   const toggleEmailSelection = (email: GmailMessage) => {
