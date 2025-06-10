@@ -1,4 +1,3 @@
-
 import { WorkflowConfig, WorkflowExecution, WorkflowStep, WorkflowStepResult } from '@/types/workflow';
 import { GmailWorkflowService } from './GmailWorkflowService';
 import { DatabaseStorageService } from './DatabaseStorageService';
@@ -295,11 +294,15 @@ export class RealWorkflowEngine {
 
     for (const invoice of extractedInvoices) {
       try {
-        // Create a mock email object for the storage function
+        // Create a proper email context object that matches GmailMessage interface
         const emailContext = {
           id: invoice.emailId,
-          subject: invoice.emailSubject,
-          date: new Date().toISOString()
+          subject: invoice.emailSubject || 'Unknown Subject',
+          from: 'Unknown Sender',
+          date: new Date().toISOString(),
+          snippet: '',
+          hasAttachments: true,
+          labels: []
         };
 
         await dbStorage.storeInvoiceInDatabase(
