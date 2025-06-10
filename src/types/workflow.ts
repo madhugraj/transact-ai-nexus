@@ -6,6 +6,7 @@ export type WorkflowStepType =
   | "data-validation"       // Validate extracted data
   | "data-comparison"       // Compare PO vs Invoice, JD vs CV
   | "data-storage"         // Store in database
+  | "database-storage"     // Legacy alias for data-storage
   | "analytics"            // Generate analytics
   | "notification"         // Send notifications
   | "conditional"          // Conditional logic
@@ -18,8 +19,7 @@ export type WorkflowStepType =
   | "document_source"
   | "document_comparison"
   | "report_generation"
-  | "approval_notification"
-  | "database_storage";
+  | "approval_notification";
 
 // Enhanced step configuration
 export interface WorkflowStepConfig {
@@ -68,6 +68,7 @@ export interface WorkflowStepConfig {
     matchingCriteria?: 'exact' | 'fuzzy' | 'threshold';
     sourceTable?: string;
     targetTable?: string;
+    useIntelligentMatching?: boolean;
   };
   
   // Storage configurations

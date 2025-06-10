@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, AlertTriangle, ExternalLink } from "lucide-react";
+import { Plus, AlertTriangle, ExternalLink, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { WorkflowBuilderTab } from "./tabs/WorkflowBuilderTab";
 import { SavedWorkflowsTab } from "./tabs/SavedWorkflowsTab";
@@ -16,6 +16,7 @@ import { RealWorkflowEngine } from "@/services/workflow/RealWorkflowEngine";
 import { workflowTemplates } from "@/data/workflowTemplates";
 import { useWorkflowPersistence } from "@/hooks/useWorkflowPersistence";
 import { WorkflowConfig, WorkflowTemplate, WorkflowStep } from "@/types/workflow";
+import TemplateWorkflowVisualizer from "@/components/workflow/TemplateWorkflowVisualizer";
 
 const Actions = () => {
   const navigate = useNavigate();
@@ -24,6 +25,8 @@ const Actions = () => {
   const [selectedStep, setSelectedStep] = useState<WorkflowStep | null>(null);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [showConfigDialog, setShowConfigDialog] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate | null>(null);
+  const [showTemplatePreview, setShowTemplatePreview] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionResults, setExecutionResults] = useState<any>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -60,6 +63,11 @@ const Actions = () => {
       title: "Workflow Created",
       description: `${template.name} workflow has been created from template.`
     });
+  };
+
+  const handlePreviewTemplate = (template: WorkflowTemplate) => {
+    setSelectedTemplate(template);
+    setShowTemplatePreview(true);
   };
 
   const executeWorkflow = async (workflow: WorkflowConfig) => {
@@ -210,13 +218,28 @@ const Actions = () => {
                     <p className="text-sm text-muted-foreground mb-4">
                       {template.description}
                     </p>
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center mb-3">
                       <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
                         {template.category}
                       </span>
+                      <span className="text-xs text-muted-foreground">
+                        {template.steps.length} steps
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePreviewTemplate(template)}
+                        className="flex-1 gap-1"
+                      >
+                        <Eye className="h-3 w-3" />
+                        Preview
+                      </Button>
                       <Button
                         size="sm"
                         onClick={() => createWorkflowFromTemplate(template)}
+                        className="flex-1"
                       >
                         Use Template
                       </Button>
@@ -292,6 +315,36 @@ const Actions = () => {
                 </Card>
               ))}
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Template Preview Dialog */}
+        <Dialog open={showTemplatePreview} onOpenChange={setShowTemplatePreview}>
+          <DialogContent className="max-w-6xl max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle>
+                Template Preview: {selectedTemplate?.name}
+              </DialogTitle>
+            </DialogHeader>
+            {selectedTemplate && (
+              <div className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  {selectedTemplate.description}
+                </div>
+                <TemplateWorkflowVisualizer template={selectedTemplate} />
+                <div className="flex justify-end gap-2 pt-4 border-t">
+                  <Button variant="outline" onClick={() => setShowTemplatePreview(false)}>
+                    Close
+                  </Button>
+                  <Button onClick={() => {
+                    createWorkflowFromTemplate(selectedTemplate);
+                    setShowTemplatePreview(false);
+                  }}>
+                    Use This Template
+                  </Button>
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
 
