@@ -1,122 +1,68 @@
-
-import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Check, Cloud, Database, File, FileSearch, Mail } from 'lucide-react';
-import { WorkflowConfig, WorkflowStep } from '@/types/workflow';
+import React, { useState } from "react";
+import { CheckCircle, Circle, ChevronsRight } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 interface WorkflowPipelineProps {
-  workflow?: WorkflowConfig;
-  activeStep?: string;
+  onStepClick: (stepId: number) => void;
 }
 
-const WorkflowPipeline: React.FC<WorkflowPipelineProps> = ({
-  workflow,
-  activeStep
-}) => {
-  // Default steps if no workflow is provided
-  const defaultSteps: Partial<WorkflowStep>[] = [
-    {
-      id: 'source',
-      name: 'Document Source',
-      type: 'document_source',
-      position: { x: 0, y: 0 }
-    },
-    {
-      id: 'compare',
-      name: 'Document Comparison',
-      type: 'document_comparison',
-      position: { x: 0, y: 0 }
-    },
-    {
-      id: 'report',
-      name: 'Report Generation',
-      type: 'report_generation',
-      position: { x: 0, y: 0 }
-    },
-    {
-      id: 'notify',
-      name: 'Approval Notification',
-      type: 'approval_notification',
-      position: { x: 0, y: 0 }
-    },
-    {
-      id: 'store',
-      name: 'Database Storage',
-      type: 'database_storage',
-      position: { x: 0, y: 0 }
-    }
+const WorkflowPipeline = ({ onStepClick }: WorkflowPipelineProps) => {
+  const [currentStep, setCurrentStep] = useState(1);
+  const { toast } = useToast();
+
+  const steps = [
+    { id: 1, name: "Data Source", type: "data-source", status: "completed" },
+    { id: 2, name: "Document Processing", type: "document-processing", status: "current" },
+    { id: 3, name: "Data Validation", type: "data-validation", status: "pending" },
+    { id: 4, name: "Database Storage", type: "data-storage", status: "pending" }, // Fixed: changed from "database_storage" to "data-storage"
+    { id: 5, name: "Analytics", type: "analytics", status: "pending" },
   ];
-  
-  const steps = workflow?.steps || defaultSteps;
-  
-  // Get icon based on step type
-  const getStepIcon = (type?: string) => {
-    switch (type) {
-      case 'document_source':
-        return <Cloud className="h-4 w-4" />;
-      case 'document_comparison':
-        return <FileSearch className="h-4 w-4" />;
-      case 'report_generation':
-        return <File className="h-4 w-4" />;
-      case 'approval_notification':
-      case 'email_notification':
-        return <Mail className="h-4 w-4" />;
-      case 'database_storage':
-        return <Database className="h-4 w-4" />;
-      default:
-        return <File className="h-4 w-4" />;
-    }
+
+  const handleStepClick = (stepId: number) => {
+    setCurrentStep(stepId);
+    onStepClick(stepId);
+
+    toast({
+      title: `Step ${stepId} Clicked`,
+      description: `Navigating to step ${stepId}: ${steps.find(step => step.id === stepId)?.name}`,
+    });
   };
-  
-  // Get color based on step type
-  const getStepColor = (type?: string) => {
-    switch (type) {
-      case 'document_source':
-        return 'bg-blue-500';
-      case 'document_comparison':
-        return 'bg-amber-500';
-      case 'report_generation':
-        return 'bg-green-500';
-      case 'approval_notification':
-      case 'email_notification':
-        return 'bg-purple-500';
-      case 'database_storage':
-        return 'bg-gray-500';
-      default:
-        return 'bg-slate-500';
-    }
-  };
-  
+
   return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="relative">
-          {/* Connector line */}
-          <div className="absolute top-0 left-6 w-[2px] h-full bg-muted-foreground/20"></div>
-          
-          <div className="space-y-6">
-            {steps.map((step, index) => (
-              <div key={step.id || index} className="flex relative">
-                <div className={`${getStepColor(step.type as string)} rounded-full h-3 w-3 mt-1.5 z-10 ${activeStep === step.id ? 'ring-2 ring-offset-2' : ''}`}>
-                  {activeStep === step.id && (
-                    <Check className="h-3 w-3 text-white" />
-                  )}
-                </div>
-                <div className="ml-8">
-                  <div className="font-medium text-sm flex items-center">
-                    {getStepIcon(step.type as string)}
-                    <span className="ml-2">{step.name}</span>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Step {index + 1}
-                  </div>
-                </div>
-              </div>
-            ))}
+    <div className="w-full">
+      <div className="flex items-center justify-between mb-4">
+        {steps.map((step) => (
+          <div
+            key={step.id}
+            className="flex items-center"
+          >
+            <button
+              onClick={() => handleStepClick(step.id)}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors",
+                step.status === "completed"
+                  ? "bg-green-100 text-green-800 hover:bg-green-200"
+                  : step.status === "current"
+                    ? "bg-blue-100 text-blue-800 hover:bg-blue-200"
+                    : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+              )}
+            >
+              {step.status === "completed" ? (
+                <CheckCircle className="h-4 w-4" />
+              ) : (
+                <Circle className="h-4 w-4" />
+              )}
+              {step.name}
+            </button>
+            {step.id < steps.length && <ChevronsRight className="h-4 w-4 text-gray-500" />}
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        ))}
+      </div>
+      <div className="mt-4">
+        <p>Current Step: {currentStep}</p>
+      </div>
+    </div>
   );
 };
 

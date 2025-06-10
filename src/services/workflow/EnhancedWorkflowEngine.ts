@@ -1,11 +1,47 @@
-
-import { WorkflowConfig, WorkflowStep } from '@/types/workflow';
+import { WorkflowConfig, WorkflowExecution, WorkflowStep } from '@/types/workflow';
 import { supabase } from '@/integrations/supabase/client';
 import { intelligentMatchingService } from './IntelligentMatchingService';
 import { DatabaseStorage } from '@/services/email/databaseStorage';
 
 export class EnhancedWorkflowEngine {
   private databaseStorage = new DatabaseStorage();
+
+  async validateWorkflowRequirements(workflow: WorkflowConfig): Promise<{ valid: boolean; errors: string[] }> {
+    const errors: string[] = [];
+    
+    // Check if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      errors.push('User must be authenticated to run workflows');
+      return { valid: false, errors };
+    }
+
+    // Validate each step's requirements
+    for (const step of workflow.steps) {
+      if (step.type === 'data-source') {
+        if (step.config.emailConfig && !step.config.emailConfig.source) {
+          errors.push(`Step "${step.name}": Email source not configured`);
+        }
+        if (step.config.driveConfig && !step.config.driveConfig.source) {
+          errors.push(`Step "${step.name}": Drive source not configured`);
+        }
+      }
+      
+      if (step.type === 'data-comparison') {
+        if (!step.config.comparisonConfig?.type) {
+          errors.push(`Step "${step.name}": Comparison type not specified`);
+        }
+      }
+      
+      if (step.type === 'database-storage' || step.type === 'data-storage') {
+        if (!step.config.storageConfig?.table) {
+          errors.push(`Step "${step.name}": Storage table not specified`);
+        }
+      }
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
 
   async executeWorkflow(workflow: WorkflowConfig): Promise<{ success: boolean; results: any; error?: string }> {
     console.log('🚀 Starting enhanced workflow execution:', workflow.name);
@@ -312,3 +348,5 @@ export class EnhancedWorkflowEngine {
 }
 
 export const enhancedWorkflowEngine = new EnhancedWorkflowEngine();
+
+export default enhancedWorkflowEngine;

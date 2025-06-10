@@ -58,16 +58,22 @@ const Actions = () => {
 
     addWorkflow(workflow);
     setShowTemplateDialog(false);
+    setShowTemplatePreview(false); // Close preview if open
+    setActiveTab('builder'); // Switch to builder tab
     
     toast({
       title: "Workflow Created",
-      description: `${template.name} workflow has been created from template.`
+      description: `${template.name} workflow has been created and opened in the builder.`
     });
   };
 
   const handlePreviewTemplate = (template: WorkflowTemplate) => {
     setSelectedTemplate(template);
     setShowTemplatePreview(true);
+  };
+
+  const handleEditTemplate = (template: WorkflowTemplate) => {
+    createWorkflowFromTemplate(template);
   };
 
   const executeWorkflow = async (workflow: WorkflowConfig) => {
@@ -335,6 +341,14 @@ const Actions = () => {
                 <div className="flex justify-end gap-2 pt-4 border-t">
                   <Button variant="outline" onClick={() => setShowTemplatePreview(false)}>
                     Close
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => handleEditTemplate(selectedTemplate)}
+                    className="gap-2"
+                  >
+                    <Eye className="h-3 w-3" />
+                    Edit in Builder
                   </Button>
                   <Button onClick={() => {
                     createWorkflowFromTemplate(selectedTemplate);
