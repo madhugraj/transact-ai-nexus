@@ -28,6 +28,20 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
 
   const currentFilters = step.config.emailConfig?.filters || [];
 
+  // Determine the source type based on the step name
+  const getSourceTypeFromStepName = (stepName: string) => {
+    const lowerName = stepName.toLowerCase();
+    if (lowerName.includes('gmail') || lowerName.includes('email')) {
+      return 'email';
+    } else if (lowerName.includes('drive') || lowerName.includes('google drive')) {
+      return 'drive';
+    }
+    return '';
+  };
+
+  const sourceType = getSourceTypeFromStepName(step.name);
+  const currentSourceValue = step.config.emailConfig ? 'email' : step.config.driveConfig ? 'drive' : sourceType;
+
   const addFilter = () => {
     if (newFilter.trim() && !currentFilters.includes(newFilter.trim())) {
       const updatedFilters = [...currentFilters, newFilter.trim()];
@@ -92,7 +106,7 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Mail className="h-4 w-4" />
+          {sourceType === 'email' ? <Mail className="h-4 w-4" /> : <HardDrive className="h-4 w-4" />}
           Data Source Configuration
         </CardTitle>
       </CardHeader>
@@ -100,7 +114,7 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
         <div>
           <Label htmlFor="sourceType">Source Type</Label>
           <Select
-            value={step.config.emailConfig ? 'email' : step.config.driveConfig ? 'drive' : ''}
+            value={currentSourceValue}
             onValueChange={(value) => {
               if (value === 'email') {
                 onConfigUpdate('emailConfig', { 
@@ -131,14 +145,47 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
               <SelectValue placeholder="Select source type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="email">Email (Gmail)</SelectItem>
-              <SelectItem value="drive">Google Drive</SelectItem>
+              {sourceType === 'email' ? (
+                <>
+                  <SelectItem value="email">Email</SelectItem>
+                </>
+              ) : sourceType === 'drive' ? (
+                <>
+                  <SelectItem value="drive">Drive</SelectItem>
+                </>
+              ) : (
+                <>
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="drive">Drive</SelectItem>
+                </>
+              )}
             </SelectContent>
           </Select>
         </div>
 
-        {step.config.emailConfig && (
+        {/* Email Source Configuration */}
+        {(step.config.emailConfig || sourceType === 'email') && (
           <div className="space-y-4">
+            {/* Email Service Selection */}
+            <div>
+              <Label>Email Service</Label>
+              <Select
+                value={step.config.emailConfig?.source || 'gmail'}
+                onValueChange={(value) => onConfigUpdate('emailConfig', {
+                  ...step.config.emailConfig,
+                  source: value
+                })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gmail">Gmail</SelectItem>
+                  <SelectItem value="outlook">Outlook</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Intelligent Filtering Toggle */}
             <div className="border rounded-lg p-4 bg-gradient-to-r from-purple-50 to-blue-50">
               <div className="flex items-center justify-between mb-2">
@@ -250,11 +297,11 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
               </div>
             </div>
 
-            {/* Summary */}
+            {/* Email Summary */}
             <div className="bg-gray-50 p-3 rounded text-sm">
               <p className="font-medium mb-1">Configuration Summary:</p>
               <ul className="text-xs text-muted-foreground space-y-1">
-                <li>• Source: Gmail</li>
+                <li>• Source: {step.config.emailConfig?.source || 'Gmail'}</li>
                 <li>• Manual filters: {currentFilters.length > 0 ? currentFilters.join(', ') : 'None'}</li>
                 <li>• AI Detection: {useIntelligentFiltering ? 'Enabled' : 'Disabled'}</li>
                 <li>• Attachment types: {step.config.emailConfig?.attachmentTypes?.join(', ') || 'PDF'}</li>
@@ -263,13 +310,34 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
           </div>
         )}
 
-        {step.config.driveConfig && (
+        {/* Drive Source Configuration */}
+        {(step.config.driveConfig || sourceType === 'drive') && (
           <div className="space-y-4">
+            {/* Drive Service Selection */}
+            <div>
+              <Label>Drive Service</Label>
+              <Select
+                value={step.config.driveConfig?.source || 'google-drive'}
+                onValueChange={(value) => onConfigUpdate('driveConfig', {
+                  ...step.config.driveConfig,
+                  source: value
+                })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="google-drive">Google Drive</SelectItem>
+                  <SelectItem value="onedrive">OneDrive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div>
               <Label>Folder Path</Label>
               <Input
                 placeholder="/Documents/Invoices"
-                value={step.config.driveConfig.folderPath || ''}
+                value={step.config.driveConfig?.folderPath || ''}
                 onChange={(e) => onConfigUpdate('driveConfig', {
                   ...step.config.driveConfig,
                   folderPath: e.target.value
@@ -280,7 +348,7 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
             <div className="flex items-center space-x-2">
               <Switch
                 id="processSubfolders"
-                checked={step.config.driveConfig.processSubfolders !== false}
+                checked={step.config.driveConfig?.processSubfolders !== false}
                 onCheckedChange={(checked) => onConfigUpdate('driveConfig', {
                   ...step.config.driveConfig,
                   processSubfolders: checked
@@ -315,11 +383,11 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
               </div>
             </div>
 
-            {/* Summary */}
+            {/* Drive Summary */}
             <div className="bg-gray-50 p-3 rounded text-sm">
               <p className="font-medium mb-1">Configuration Summary:</p>
               <ul className="text-xs text-muted-foreground space-y-1">
-                <li>• Source: Google Drive</li>
+                <li>• Source: {step.config.driveConfig?.source || 'Google Drive'}</li>
                 <li>• Folder: {step.config.driveConfig?.folderPath || 'Root'}</li>
                 <li>• Include subfolders: {step.config.driveConfig?.processSubfolders !== false ? 'Yes' : 'No'}</li>
                 <li>• File types: {step.config.driveConfig?.fileTypes?.join(', ') || 'PDF'}</li>

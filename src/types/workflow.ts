@@ -44,6 +44,13 @@ export interface WorkflowStepConfig {
     source: 'google-drive' | 'onedrive';
     folderPath?: string;
     fileTypes?: string[];
+    processSubfolders?: boolean;
+    nameFilters?: string[];
+    dateRange?: {
+      enabled: boolean;
+      from: string;
+      to: string;
+    };
   };
   
   // Processing configurations
