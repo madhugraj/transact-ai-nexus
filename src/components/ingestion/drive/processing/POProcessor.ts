@@ -60,7 +60,7 @@ export class POProcessor {
           continue;
         }
 
-        // Step 2: Extract PO data
+        // Step 2: Extract PO data using Gemini AI
         console.log(`📊 POProcessor: Starting data extraction for: ${file.name}`);
         const extractionResult = await this.poDataExtractionAgent.process(file);
         console.log(`📊 POProcessor: Extraction result for ${file.name}:`, JSON.stringify(extractionResult, null, 2));
@@ -224,11 +224,11 @@ export class POProcessor {
 
       console.log(`💾 POProcessor: Inserting PO record:`, JSON.stringify(poRecord, null, 2));
 
-      // Test database connection first
+      // Fixed database connection test - use proper syntax
       console.log(`🔍 POProcessor: Testing database connection...`);
       const { data: testData, error: testError } = await supabase
         .from('po_table')
-        .select('count(*)')
+        .select('id')
         .limit(1);
 
       if (testError) {
