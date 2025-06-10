@@ -55,7 +55,7 @@ export class GmailWorkflowService {
   }
 
   private async callGmailAPI(accessToken: string, filters: string[], useIntelligentFiltering: boolean): Promise<any> {
-    // Build search query
+    // Build search query - FIX: Pass the useIntelligentFiltering parameter correctly
     let searchQuery = '';
     
     if (useIntelligentFiltering) {
@@ -69,11 +69,14 @@ export class GmailWorkflowService {
       // Combine user filters with AI-enhanced keywords
       const allKeywords = [...new Set([...filters, ...invoiceKeywords])];
       searchQuery = `(${allKeywords.join(' OR ')}) AND has:attachment`;
+      console.log('🤖 Using AI-enhanced search with attachments filter');
     } else if (filters.length > 0) {
-      searchQuery = filters.join(' OR ');
+      searchQuery = `(${filters.join(' OR ')}) AND has:attachment`;
+      console.log('📧 Using manual filters with attachments filter');
     } else {
       // Default fallback
-      searchQuery = 'invoice OR billing';
+      searchQuery = '(invoice OR billing) AND has:attachment';
+      console.log('🔄 Using default search with attachments filter');
     }
 
     console.log('🔍 Gmail search query:', searchQuery);
@@ -93,6 +96,7 @@ export class GmailWorkflowService {
     }
 
     if (!data.success) {
+      console.error('❌ Gmail API request failed:', data.error);
       throw new Error(data.error || 'Gmail API request failed');
     }
 
