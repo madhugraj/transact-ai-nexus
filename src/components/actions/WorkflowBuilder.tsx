@@ -39,7 +39,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { WorkflowStepNode, SidebarNode } from "./WorkflowNodeTypes";
-import { WorkflowStepPalette } from "@/components/workflow/WorkflowStepPalette";
+import { ComponentPalette } from "@/components/workflow/builder/ComponentPalette";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -103,6 +103,10 @@ const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
                 <option value="general-ocr">General OCR</option>
               </select>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="output-table">Output Table</Label>
+              <Input id="output-table" placeholder="invoice_table or po_table" />
+            </div>
           </div>
         );
       
@@ -133,12 +137,20 @@ const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="source-table">Source Table</Label>
+              <Label htmlFor="source-table">Source Table (Invoices)</Label>
               <Input id="source-table" placeholder="invoice_table" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="target-table">Target Table</Label>
+              <Label htmlFor="target-table">Target Table (POs)</Label>
               <Input id="target-table" placeholder="po_table" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="comparison-output-1">Output Table 1 (Single Comparisons)</Label>
+              <Input id="comparison-output-1" placeholder="compare_po_invoice_table" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="comparison-output-2">Output Table 2 (Multi Comparisons)</Label>
+              <Input id="comparison-output-2" placeholder="compare_po_multi_invoice" />
             </div>
           </div>
         );
@@ -205,6 +217,10 @@ const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
         return (
           <div className="space-y-4 p-2">
             <h4 className="text-sm font-medium">Data Storage Configuration</h4>
+            <div className="space-y-2">
+              <Label htmlFor="storage-table">Target Table</Label>
+              <Input id="storage-table" placeholder="invoice_table, po_table, comparison_results" />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="storage-type">Storage Type</Label>
               <div className="grid grid-cols-2 gap-2">
@@ -331,13 +347,12 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
       event.preventDefault();
 
       const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
-      const type = event.dataTransfer.getData('application/reactflow');
+      const nodeType = event.dataTransfer.getData('application/reactflow');
+      const nodeLabel = event.dataTransfer.getData('application/reactflow-label');
 
-      if (typeof type === 'undefined' || !type || !reactFlowBounds) {
+      if (typeof nodeType === 'undefined' || !nodeType || !reactFlowBounds) {
         return;
       }
-
-      const nodeDetails = JSON.parse(type);
 
       // Get position where node was dropped
       const position = {
@@ -350,9 +365,9 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
         type: 'workflowStep',
         position,
         data: { 
-          label: nodeDetails.name, 
-          type: nodeDetails.type, 
-          description: nodeDetails.description 
+          label: nodeLabel || nodeType, 
+          type: nodeType, 
+          description: `${nodeLabel || nodeType} processing step` 
         },
       };
 
@@ -386,7 +401,33 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
         // Store connected nodes
         connectedTo: edges
           .filter(edge => edge.source === node.id)
-          .map(edge => edge.target)
+          .map(edge => edge.target),
+        // Enhanced config for different step types
+        ...(node.data.type === 'data-comparison' && {
+          comparisonConfig: {
+            type: 'po-invoice-comparison',
+            fields: ['po_number', 'vendor', 'line_items', 'total_amount'],
+            tolerance: 5,
+            matchingCriteria: 'fuzzy',
+            sourceTable: 'invoice_table',
+            targetTable: 'po_table'
+          }
+        }),
+        ...(node.data.type === 'document-processing' && {
+          processingConfig: {
+            type: node.data.label?.toLowerCase().includes('po') ? 'po-extraction' : 'invoice-extraction',
+            aiModel: 'gemini',
+            confidence: 0.8
+          }
+        }),
+        ...(node.data.type === 'data-storage' && {
+          storageConfig: {
+            table: node.data.label?.toLowerCase().includes('comparison') ? 'compare_po_invoice_table' : 
+                   node.data.label?.toLowerCase().includes('po') ? 'po_table' : 'invoice_table',
+            action: 'insert',
+            mapping: {}
+          }
+        })
       }
     }));
   };
@@ -406,7 +447,12 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
       description: data.description,
       isActive: data.active,
       steps: generateWorkflowSteps(),
-      connections: []
+      connections: edges.map((edge, index) => ({
+        id: edge.id || `conn-${index}`,
+        sourceStepId: edge.source,
+        targetStepId: edge.target,
+        condition: edge.label || undefined
+      }))
     };
     
     const createdWorkflow = createWorkflow(newWorkflow);
@@ -415,7 +461,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
     
     toast({
       title: "Workflow Created",
-      description: `The "${newWorkflow.name}" workflow was created successfully.`
+      description: `The "${newWorkflow.name}" workflow was created successfully with proper data flow.`
     });
     
     if (onWorkflowCreated) {
@@ -423,25 +469,11 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
     }
   };
 
-  const handleAddStep = (template: any) => {
-    const position = {
-      x: Math.random() * 400 + 100,
-      y: Math.random() * 300 + 100,
-    };
-
-    const newNode = {
-      id: `node_${Date.now()}`,
-      type: 'workflowStep',
-      position,
-      data: { 
-        label: template.name, 
-        type: template.type, 
-        description: template.description 
-      },
-    };
-
-    setNodes((nds) => nds.concat(newNode));
-  };
+  const onDragStart = useCallback((event: React.DragEvent, nodeType: string, label: string) => {
+    event.dataTransfer.setData('application/reactflow', nodeType);
+    event.dataTransfer.setData('application/reactflow-label', label);
+    event.dataTransfer.effectAllowed = 'move';
+  }, []);
 
   return (
     <Button onClick={() => setShowDialog(true)}>
@@ -459,7 +491,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
           <div className="grid grid-cols-12 gap-4 overflow-hidden h-full">
             {/* Sidebar with workflow palette */}
             <div className="col-span-3 border-r pr-4 overflow-y-auto">
-              <WorkflowStepPalette onAddStep={handleAddStep} />
+              <ComponentPalette onDragStart={onDragStart} />
 
               <Separator className="my-4" />
 
