@@ -97,12 +97,13 @@ export class GmailWorkflowService {
     console.log('🔍 Gmail search query:', searchQuery);
 
     try {
+      // First, get the list of message IDs
       const { data, error } = await supabase.functions.invoke('gmail', {
         body: {
           action: 'listMessages',
           accessToken,
           query: searchQuery,
-          maxResults: 50 // Increase to get more results
+          maxResults: 10 // Reduce for testing
         }
       });
 
@@ -119,29 +120,86 @@ export class GmailWorkflowService {
       console.log('✅ Gmail API raw response:', data);
       
       // Parse the response correctly
-      let emails = [];
+      let messageIds = [];
       if (data.data && data.data.messages) {
-        // Gmail API returns messages in this format
-        emails = data.data.messages.map((msg: any) => ({
-          id: msg.id,
-          subject: msg.snippet || 'No subject', // Use snippet as fallback
-          from: 'Unknown sender',
-          date: new Date().toISOString(),
-          snippet: msg.snippet || '',
-          hasAttachments: true, // We're filtering for attachments
-          labels: msg.labelIds || []
-        }));
-        console.log('📧 Converted Gmail messages to email objects:', emails.length);
-      } else if (data.data && Array.isArray(data.data)) {
-        // If data is already in array format
-        emails = data.data;
-        console.log('📧 Using data array directly:', emails.length);
+        messageIds = data.data.messages.map((msg: any) => msg.id);
+        console.log('📧 Found message IDs:', messageIds.length);
       } else {
         console.log('⚠️ No messages found in Gmail response');
-        emails = [];
+        return {
+          source: 'gmail',
+          emails: [],
+          files: [],
+          count: 0,
+          filters: filters,
+          intelligentFiltering: useIntelligentFiltering,
+          searchQuery
+        };
       }
 
-      console.log('✅ Gmail emails fetched successfully:', emails.length, 'emails');
+      // Now fetch full details for each message to get attachments
+      const emails = [];
+      const processedFiles = [];
+
+      for (const messageId of messageIds.slice(0, 5)) { // Process first 5 emails
+        try {
+          console.log('📧 Fetching full email details for:', messageId);
+          
+          const { data: emailData, error: emailError } = await supabase.functions.invoke('gmail', {
+            body: {
+              action: 'get',
+              accessToken,
+              messageId
+            }
+          });
+
+          if (emailError || !emailData?.success) {
+            console.error('❌ Failed to get email details for:', messageId, emailError || emailData?.error);
+            continue;
+          }
+
+          const fullEmail = emailData.data;
+          console.log('📧 Full email retrieved for:', messageId);
+
+          // Create email object
+          const email = {
+            id: messageId,
+            subject: this.extractSubject(fullEmail.payload?.headers || []),
+            from: this.extractFrom(fullEmail.payload?.headers || []),
+            date: new Date(parseInt(fullEmail.internalDate)).toISOString(),
+            snippet: fullEmail.snippet || '',
+            hasAttachments: true,
+            labels: fullEmail.labelIds || []
+          };
+
+          emails.push(email);
+
+          // Extract attachments from email parts
+          const attachments = this.extractAttachmentsFromParts(fullEmail.payload?.parts || []);
+          console.log('📎 Found attachments in email:', attachments.length);
+
+          for (const attachment of attachments) {
+            if (attachment.mimeType === 'application/pdf' || 
+                attachment.mimeType?.toLowerCase().includes('pdf')) {
+              processedFiles.push({
+                id: attachment.attachmentId,
+                name: attachment.filename,
+                source: 'gmail',
+                emailId: messageId,
+                emailSubject: email.subject,
+                mimeType: attachment.mimeType,
+                size: attachment.size
+              });
+              console.log('📄 Added PDF attachment:', attachment.filename);
+            }
+          }
+        } catch (error) {
+          console.error('❌ Error processing email:', messageId, error);
+        }
+      }
+
+      console.log('✅ Gmail emails processed successfully:', emails.length, 'emails');
+      console.log('📎 Found', processedFiles.length, 'PDF attachments total');
       
       let filteredEmails = emails;
 
@@ -154,6 +212,7 @@ export class GmailWorkflowService {
       return {
         source: 'gmail',
         emails: filteredEmails,
+        files: processedFiles,
         count: filteredEmails.length,
         filters: filters,
         intelligentFiltering: useIntelligentFiltering,
@@ -169,6 +228,16 @@ export class GmailWorkflowService {
       
       throw networkError;
     }
+  }
+
+  private extractSubject(headers: any[]): string {
+    const subjectHeader = headers.find(h => h.name.toLowerCase() === 'subject');
+    return subjectHeader?.value || 'No Subject';
+  }
+
+  private extractFrom(headers: any[]): string {
+    const fromHeader = headers.find(h => h.name.toLowerCase() === 'from');
+    return fromHeader?.value || 'Unknown Sender';
   }
 
   private async applyIntelligentFiltering(emails: any[]): Promise<any[]> {
@@ -313,72 +382,9 @@ export class GmailWorkflowService {
   }
 
   async processEmailAttachments(emails: any[]): Promise<any[]> {
-    // Defensive check to ensure emails is an array
-    if (!Array.isArray(emails)) {
-      console.error('❌ processEmailAttachments received non-array input:', typeof emails, emails);
-      return [];
-    }
-    
-    console.log('📎 Processing email attachments for', emails.length, 'emails');
-    
-    const processedFiles = [];
-    const tokens = localStorage.getItem('gmail_auth_tokens');
-    if (!tokens) {
-      console.error('❌ No Gmail tokens available for attachment processing');
-      return [];
-    }
-
-    const { accessToken } = JSON.parse(tokens);
-    
-    for (const email of emails.slice(0, 5)) { // Limit to first 5 emails
-      console.log('📧 Processing email:', email.id, 'Subject:', email.subject);
-      
-      try {
-        // Get full email details with attachments
-        const { data, error } = await supabase.functions.invoke('gmail', {
-          body: {
-            action: 'get',
-            accessToken,
-            messageId: email.id
-          }
-        });
-
-        if (error || !data?.success) {
-          console.error('❌ Failed to get email details for:', email.id, error || data?.error);
-          continue;
-        }
-
-        const fullEmail = data.data;
-        console.log('📧 Full email retrieved for:', email.id);
-
-        // Extract attachments from email parts
-        const attachments = this.extractAttachmentsFromParts(fullEmail.payload?.parts || []);
-        console.log('📎 Found attachments in email:', attachments.length);
-
-        for (const attachment of attachments) {
-          if (attachment.mimeType === 'application/pdf' || 
-              attachment.mimeType?.toLowerCase().includes('pdf')) {
-            processedFiles.push({
-              id: attachment.attachmentId,
-              name: attachment.filename,
-              source: 'gmail',
-              emailId: email.id,
-              emailSubject: email.subject,
-              mimeType: attachment.mimeType,
-              size: attachment.size,
-              aiConfidence: email.aiConfidence,
-              aiReason: email.aiReason
-            });
-            console.log('📄 Added PDF attachment:', attachment.filename);
-          }
-        }
-      } catch (error) {
-        console.error('❌ Error processing email attachments for:', email.id, error);
-      }
-    }
-    
-    console.log('📎 Found', processedFiles.length, 'PDF attachments total');
-    return processedFiles;
+    // This method is now integrated into callGmailAPI above
+    console.log('📎 Email attachments already processed during email fetch');
+    return [];
   }
 
   private extractAttachmentsFromParts(parts: any[]): any[] {
