@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,17 +25,21 @@ const GoogleDriveConnectorRefactored = () => {
   const [processingResults, setProcessingResults] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasLoadedFiles, setHasLoadedFiles] = useState(false);
   const { toast } = useToast();
 
-  // Check connection status on mount
+  // Check connection status on mount and restore session
   useEffect(() => {
-    checkConnectionStatus();
+    initializeConnection();
   }, []);
 
-  const checkConnectionStatus = async () => {
+  const initializeConnection = async () => {
     try {
+      console.log('🔄 Initializing Google Drive connection...');
+      
       const tokens = localStorage.getItem('drive_auth_tokens');
       if (!tokens) {
+        console.log('❌ No stored tokens found');
         setIsConnected(false);
         setError(null);
         return;
@@ -42,12 +47,15 @@ const GoogleDriveConnectorRefactored = () => {
 
       const parsedTokens = JSON.parse(tokens);
       if (!parsedTokens.accessToken) {
+        console.log('❌ No access token in stored tokens');
         setIsConnected(false);
         setError(null);
         return;
       }
 
-      // Test the connection by making a simple API call
+      console.log('✅ Found stored tokens, validating...');
+      
+      // Validate the stored token
       const { data, error } = await supabase.functions.invoke('google-auth', {
         body: {
           action: 'validate_drive_token',
@@ -56,22 +64,24 @@ const GoogleDriveConnectorRefactored = () => {
       });
 
       if (error || !data?.valid) {
-        console.log('🔄 Token validation failed, clearing stored tokens');
+        console.log('❌ Token validation failed, clearing stored tokens');
         localStorage.removeItem('drive_auth_tokens');
         setIsConnected(false);
-        setError('Connection expired. Please reconnect.');
-      } else {
-        setIsConnected(true);
-        setError(null);
-        // Auto-load files if connected
-        if (files.length === 0) {
-          loadFiles();
-        }
+        setError('Connection expired. Please reconnect to Google Drive.');
+        return;
       }
+
+      console.log('✅ Token validation successful, connection restored');
+      setIsConnected(true);
+      setError(null);
+      
+      // Auto-load files after successful connection
+      await loadFiles(parsedTokens.accessToken);
+      
     } catch (error) {
-      console.error('❌ Connection check failed:', error);
+      console.error('❌ Connection initialization failed:', error);
       setIsConnected(false);
-      setError('Connection check failed. Please try again.');
+      setError('Failed to initialize connection. Please try connecting again.');
     }
   };
 
@@ -147,7 +157,6 @@ const GoogleDriveConnectorRefactored = () => {
     try {
       console.log('🔄 Exchanging authorization code for tokens...');
       
-      // Use the current window location for redirect URI
       const redirectUri = `${window.location.origin}/oauth/callback`;
       
       const { data, error } = await supabase.functions.invoke('google-auth', {
@@ -182,7 +191,8 @@ const GoogleDriveConnectorRefactored = () => {
         description: "Successfully connected to your Google Drive account",
       });
 
-      loadFiles();
+      // Load files immediately after connection
+      await loadFiles(data.accessToken);
 
     } catch (error) {
       console.error('❌ Token exchange failed:', error);
@@ -198,6 +208,7 @@ const GoogleDriveConnectorRefactored = () => {
     setSelectedFiles([]);
     setProcessingResults([]);
     setError(null);
+    setHasLoadedFiles(false);
     
     toast({
       title: "Disconnected",
@@ -205,24 +216,33 @@ const GoogleDriveConnectorRefactored = () => {
     });
   };
 
-  const loadFiles = async () => {
-    if (!isConnected) return;
+  const loadFiles = async (accessToken?: string) => {
+    if (!isConnected && !accessToken) {
+      console.log('❌ Not connected, cannot load files');
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const tokens = localStorage.getItem('drive_auth_tokens');
-      if (!tokens) {
-        throw new Error('No authentication tokens found');
+      let tokenToUse = accessToken;
+      
+      if (!tokenToUse) {
+        const tokens = localStorage.getItem('drive_auth_tokens');
+        if (!tokens) {
+          throw new Error('No authentication tokens found');
+        }
+        const parsedTokens = JSON.parse(tokens);
+        tokenToUse = parsedTokens.accessToken;
       }
-
-      const parsedTokens = JSON.parse(tokens);
+      
+      console.log('📁 Loading files from Google Drive...');
       
       const { data, error } = await supabase.functions.invoke('google-auth', {
         body: {
           action: 'list_drive_files',
-          accessToken: parsedTokens.accessToken,
+          accessToken: tokenToUse,
           query: "mimeType='application/pdf' or mimeType contains 'image/'"
         }
       });
@@ -236,13 +256,16 @@ const GoogleDriveConnectorRefactored = () => {
         throw new Error(`Failed to load files: ${error.message}`);
       }
 
-      console.log(`✅ Loaded ${data.files.length} files from Google Drive`);
-      setFiles(data.files);
+      console.log(`✅ Loaded ${data.files?.length || 0} files from Google Drive`);
+      setFiles(data.files || []);
+      setHasLoadedFiles(true);
 
-      toast({
-        title: "Files Loaded",
-        description: `Found ${data.files.length} files in your Google Drive`,
-      });
+      if (data.files?.length > 0) {
+        toast({
+          title: "Files Loaded",
+          description: `Found ${data.files.length} files in your Google Drive`,
+        });
+      }
 
     } catch (error) {
       console.error('❌ Failed to load Drive files:', error);
@@ -380,6 +403,10 @@ const GoogleDriveConnectorRefactored = () => {
     }
   };
 
+  const handleRefresh = () => {
+    loadFiles();
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -392,7 +419,7 @@ const GoogleDriveConnectorRefactored = () => {
           error={error}
           onConnect={handleConnect}
           onDisconnect={handleDisconnect}
-          onLoadFiles={loadFiles}
+          onLoadFiles={handleRefresh}
         />
 
         {isConnected && (
@@ -403,7 +430,8 @@ const GoogleDriveConnectorRefactored = () => {
               isLoading={isLoading}
               onFileSelection={handleFileSelection}
               onSelectAll={handleSelectAll}
-              onRefresh={loadFiles}
+              onRefresh={handleRefresh}
+              hasLoadedFiles={hasLoadedFiles}
             />
 
             {selectedFiles.length > 0 && (

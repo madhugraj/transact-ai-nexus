@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, X, CheckCircle, AlertCircle } from 'lucide-react';
@@ -20,20 +19,8 @@ const ConnectionStatus = ({
   onDisconnect,
   onLoadFiles 
 }: ConnectionStatusProps) => {
-  // Determine the current state
-  const hasStoredTokens = () => {
-    try {
-      const tokens = localStorage.getItem('drive_auth_tokens');
-      return tokens && JSON.parse(tokens).accessToken;
-    } catch {
-      return false;
-    }
-  };
-
-  const hasTokens = hasStoredTokens();
-  const isExpiredError = error && error.includes('expired');
-
-  if (isConnected) {
+  // Connected state
+  if (isConnected && !error) {
     return (
       <div className="flex items-center justify-between p-3 bg-green-50 rounded border border-green-200">
         <div className="flex items-center gap-2">
@@ -46,9 +33,6 @@ const ConnectionStatus = ({
           </div>
         </div>
         <div className="flex gap-1">
-          <Button variant="ghost" size="sm" onClick={onLoadFiles} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          </Button>
           <Button variant="ghost" size="sm" onClick={onDisconnect}>
             <X className="h-4 w-4" />
           </Button>
@@ -57,8 +41,8 @@ const ConnectionStatus = ({
     );
   }
 
-  // Not connected states
-  if (isExpiredError) {
+  // Connection expired error
+  if (error && error.includes('expired')) {
     return (
       <div className="flex items-center justify-between p-3 bg-yellow-50 rounded border border-yellow-200">
         <div className="flex items-center gap-2">
@@ -77,21 +61,39 @@ const ConnectionStatus = ({
     );
   }
 
-  if (hasTokens && !isConnected) {
+  // Other errors
+  if (error) {
     return (
-      <div className="flex items-center justify-between p-3 bg-blue-50 rounded border border-blue-200">
+      <div className="flex items-center justify-between p-3 bg-red-50 rounded border border-red-200">
         <div className="flex items-center gap-2">
-          <RefreshCw className={`w-4 h-4 text-blue-500 ${isLoading ? 'animate-spin' : ''}`} />
+          <AlertCircle className="w-4 h-4 text-red-500" />
           <div>
-            <span className="text-sm text-blue-700">Reconnecting to Google Drive</span>
-            <div className="text-xs text-blue-600 mt-1">
-              Validating stored credentials...
+            <span className="text-sm text-red-700">Connection Error</span>
+            <div className="text-xs text-red-600 mt-1">
+              {error}
             </div>
           </div>
         </div>
         <Button onClick={onConnect} disabled={isLoading} size="sm" variant="outline">
           {isLoading ? 'Connecting...' : 'Retry'}
         </Button>
+      </div>
+    );
+  }
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-between p-3 bg-blue-50 rounded border border-blue-200">
+        <div className="flex items-center gap-2">
+          <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />
+          <div>
+            <span className="text-sm text-blue-700">Connecting to Google Drive</span>
+            <div className="text-xs text-blue-600 mt-1">
+              Please wait while we establish the connection...
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -109,7 +111,7 @@ const ConnectionStatus = ({
         </div>
       </div>
       <Button onClick={onConnect} disabled={isLoading} size="sm">
-        {isLoading ? 'Connecting...' : 'Connect'}
+        Connect
       </Button>
     </div>
   );

@@ -17,6 +17,7 @@ interface FileExplorerProps {
   files: DriveFile[];
   selectedFiles: string[];
   isLoading: boolean;
+  hasLoadedFiles: boolean;
   onFileSelection: (fileId: string, isSelected: boolean) => void;
   onSelectAll: () => void;
   onRefresh: () => void;
@@ -26,6 +27,7 @@ const FileExplorer = ({
   files, 
   selectedFiles,
   isLoading, 
+  hasLoadedFiles,
   onFileSelection,
   onSelectAll,
   onRefresh 
@@ -51,17 +53,29 @@ const FileExplorer = ({
     return new Date(dateString).toLocaleDateString();
   };
 
-  if (files.length === 0 && !isLoading) {
+  // Show loading state
+  if (isLoading && !hasLoadedFiles) {
+    return (
+      <div className="text-center py-8">
+        <RefreshCw className="h-8 w-8 mx-auto mb-4 text-blue-500 animate-spin" />
+        <p className="text-gray-600">Loading files from Google Drive...</p>
+      </div>
+    );
+  }
+
+  // Show no files found only after we've attempted to load
+  if (files.length === 0 && hasLoadedFiles && !isLoading) {
     return (
       <div className="text-center py-8 text-gray-500">
         <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-        <p>No files found in your Google Drive</p>
+        <p className="mb-2">No PDF or image files found in your Google Drive</p>
+        <p className="text-sm text-gray-400 mb-4">We're looking for .pdf files and image files (jpg, png, etc.)</p>
         <Button 
           variant="outline" 
           onClick={onRefresh} 
-          className="mt-2"
+          disabled={isLoading}
         >
-          <RefreshCw className="h-4 w-4 mr-2" />
+          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
       </div>
