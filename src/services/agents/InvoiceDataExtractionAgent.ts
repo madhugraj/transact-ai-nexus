@@ -34,7 +34,7 @@ REQUIRED FIELDS TO EXTRACT:
 - invoice_date: Date of the invoice (YYYY-MM-DD format)
 - supplier_gst_number: GST/Tax number of the supplier/seller
 - bill_to_gst_number: GST/Tax number of the buyer/bill-to party
-- po_number: Purchase Order number - Look for ANY of these labels: "PO Number", "P.O. Number", "Order No", "Order Number", "Buyer's Order No", "Purchase Order", "PO#", "Order#", "Ref No", "Reference Number"
+- po_number: Purchase Order number - Look for ANY of these patterns and labels
 - shipping_address: Complete shipping/delivery address
 - seal_and_sign_present: Boolean - true if you detect any seal, stamp, or signature on the document
 - line_items: Array of items with the following for each:
@@ -46,11 +46,28 @@ REQUIRED FIELDS TO EXTRACT:
   - serial_number: Serial number if available
 
 CRITICAL INSTRUCTIONS FOR PO NUMBER EXTRACTION:
-1. Look for ANY field that contains order/purchase references
-2. Common field names: "Order No", "Buyer's Order No", "P.O. Number", "PO#", "Order#", "Ref No", "Reference Number", "Purchase Order Number"
-3. Extract the EXACT value found in these fields
-4. If multiple order numbers exist, prioritize the main purchase order reference
-5. Clean up the extracted value (remove prefixes like "PO:", "Order:", etc.)
+1. Look for ANY field that contains purchase order or order references
+2. Common field labels to scan for:
+   - "P.O:" or "P.O." or "P.O" (with or without spaces)
+   - "PO Number" or "PO No" or "PO#"
+   - "Purchase Order" or "Purchase Order No"
+   - "Order No" or "Order Number" or "Order#"
+   - "Buyer's Order No" or "Buyer Order"
+   - "Ref No" or "Reference Number" or "Ref#"
+   - "Work Order" or "WO"
+3. The PO number can appear ANYWHERE on the invoice - header, footer, or within tables
+4. Extract the EXACT alphanumeric value that follows these labels
+5. Common formats: numbers only (like "25260168"), alphanumeric (like "PO-2526-0168"), or with prefixes
+6. Remove any prefixes from the extracted value (like "PO:", "Order:", etc.) - keep only the actual number/code
+7. If multiple order references exist, prioritize the main purchase order number
+8. Look carefully in ALL sections of the document including headers, bill-to sections, and item details
+
+SCANNING STRATEGY FOR PO NUMBER:
+- First scan the top section/header area for "P.O:" type labels
+- Then check bill-to/ship-to sections for order references
+- Look in any reference or description fields
+- Check footer areas for order information
+- Examine any table headers or additional info sections
 
 IMPORTANT INSTRUCTIONS:
 1. Extract data EXACTLY as it appears in the document
@@ -58,7 +75,8 @@ IMPORTANT INSTRUCTIONS:
 3. For amounts, extract only the numeric value (no currency symbols)
 4. If a field is not found, use null
 5. For seal_and_sign_present, carefully look for stamps, seals, signatures, or any authentication marks
-6. PAY SPECIAL ATTENTION to order/PO number fields - they are critical for invoice processing
+6. PAY EXTRA ATTENTION to PO number extraction - it's critical for invoice processing
+7. Be very thorough when scanning for PO numbers - they can be in unexpected locations
 
 Respond with ONLY a JSON object in this exact format:
 {
@@ -119,10 +137,12 @@ Respond with ONLY a JSON object in this exact format:
       const extractedData = this.parseGeminiResponse(response.data);
       
       // Additional logging for PO number extraction
-      console.log(`📊 PO Number extraction result for ${file.name}:`, {
+      console.log(`📊 DETAILED PO Number extraction result for ${file.name}:`, {
         extracted_po_number: extractedData.po_number,
         po_number_type: typeof extractedData.po_number,
-        po_number_length: extractedData.po_number?.length || 0
+        po_number_length: extractedData.po_number?.length || 0,
+        po_number_value: extractedData.po_number,
+        raw_extraction_preview: JSON.stringify(extractedData).substring(0, 300)
       });
       
       console.log(`📊 Successfully parsed extraction data for ${file.name}:`, {
