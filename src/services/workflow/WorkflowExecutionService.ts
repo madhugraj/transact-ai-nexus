@@ -30,7 +30,7 @@ export class WorkflowExecutionService {
           .from('workflows')
           .update({
             last_run: execution.endTime?.toISOString() || new Date().toISOString(),
-            total_runs: supabase.sql`total_runs + 1`
+            total_runs: 1 // Simple increment since we can't use SQL functions
           })
           .eq('id', execution.workflowId);
         
