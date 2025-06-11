@@ -7,9 +7,17 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Folder, RefreshCw, Sparkles, Loader2, AlertTriangle } from 'lucide-react';
-import { GoogleDriveFolderService, DriveFolder } from '@/services/drive/GoogleDriveFolderService';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { supabase } from '@/integrations/supabase/client';
+
+export interface DriveFolder {
+  id: string;
+  name: string;
+  path: string;
+  parentId?: string;
+  isFolder: boolean;
+}
 
 interface DriveAdvancedConfigProps {
   config: any;
@@ -29,63 +37,77 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
     config.driveConfig?.useAIPODetection || false
   );
 
-  const folderService = new GoogleDriveFolderService();
-
   useEffect(() => {
-    checkConnection();
+    checkDriveConnection();
     
     // Set up an interval to check connection status periodically
-    const interval = setInterval(checkConnection, 30000); // Check every 30 seconds
+    const interval = setInterval(checkDriveConnection, 10000); // Check every 10 seconds
     
     return () => clearInterval(interval);
   }, []);
 
-  const checkConnection = async () => {
+  const checkDriveConnection = async () => {
     try {
-      console.log('🔍 Checking Google Drive connection...');
+      console.log('🔍 Checking Google Drive connection status...');
       
-      // Check for stored tokens first
-      const tokens = localStorage.getItem('drive_auth_tokens');
-      if (!tokens) {
-        console.log('❌ No stored Drive tokens found');
+      // Check for stored tokens from Upload page Google Drive connector
+      const storedTokens = localStorage.getItem('drive_auth_tokens');
+      
+      if (!storedTokens) {
+        console.log('❌ No Drive tokens found in localStorage');
         setConnected(false);
         setConnectionError('Google Drive not connected. Please connect in the Upload page first.');
         return;
       }
 
-      const parsedTokens = JSON.parse(tokens);
+      const parsedTokens = JSON.parse(storedTokens);
+      console.log('✅ Found stored Drive tokens:', { 
+        hasAccessToken: !!parsedTokens.accessToken,
+        timestamp: parsedTokens.timestamp 
+      });
+
       if (!parsedTokens.accessToken) {
         console.log('❌ No access token in stored tokens');
         setConnected(false);
-        setConnectionError('Google Drive authentication expired. Please reconnect in the Upload page.');
+        setConnectionError('Google Drive authentication incomplete. Please reconnect in the Upload page.');
         return;
       }
 
-      // Check token age
+      // Check token age (24 hours max)
       if (parsedTokens.timestamp) {
         const tokenAge = Date.now() - parsedTokens.timestamp;
         const maxAge = 24 * 60 * 60 * 1000; // 24 hours
         
         if (tokenAge > maxAge) {
-          console.log('❌ Tokens are too old');
+          console.log('❌ Drive tokens expired');
           setConnected(false);
           setConnectionError('Google Drive session expired. Please reconnect in the Upload page.');
           return;
         }
       }
 
-      // Test the connection by trying to authenticate
-      const isAuthenticated = await folderService.authenticate();
-      setConnected(isAuthenticated);
-      setConnectionError(null);
-      
-      if (isAuthenticated) {
-        console.log('✅ Drive connected, loading folders...');
-        await loadFolders();
-      } else {
-        console.log('❌ Drive authentication failed');
+      // Test the connection by making a simple API call
+      console.log('🔄 Testing Drive connection...');
+      const { data, error } = await supabase.functions.invoke('google-auth', {
+        body: {
+          action: 'validate_drive_token',
+          accessToken: parsedTokens.accessToken
+        }
+      });
+
+      if (error || !data?.valid) {
+        console.log('❌ Drive token validation failed:', error);
+        setConnected(false);
         setConnectionError('Google Drive authentication failed. Please reconnect in the Upload page.');
+        return;
       }
+
+      console.log('✅ Drive connection validated successfully');
+      setConnected(true);
+      setConnectionError(null);
+
+      // Auto-load folders after successful connection validation
+      await loadFolders(parsedTokens.accessToken);
     } catch (error) {
       console.error('❌ Connection check failed:', error);
       setConnected(false);
@@ -93,17 +115,48 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
     }
   };
 
-  const loadFolders = async () => {
+  const loadFolders = async (accessToken?: string) => {
     setLoading(true);
     try {
       console.log('📁 Loading Drive folders...');
-      const drivefolders = await folderService.listFolders();
-      setFolders(drivefolders);
-      console.log('✅ Loaded', drivefolders.length, 'folders from Drive');
+      
+      let tokenToUse = accessToken;
+      if (!tokenToUse) {
+        const storedTokens = localStorage.getItem('drive_auth_tokens');
+        if (!storedTokens) {
+          throw new Error('No Drive authentication tokens found');
+        }
+        const parsedTokens = JSON.parse(storedTokens);
+        tokenToUse = parsedTokens.accessToken;
+      }
+
+      const { data, error } = await supabase.functions.invoke('google-auth', {
+        body: {
+          action: 'list_drive_files',
+          accessToken: tokenToUse,
+          query: "mimeType='application/vnd.google-apps.folder'"
+        }
+      });
+
+      if (error) {
+        console.error('❌ Error loading folders:', error);
+        throw new Error(`Failed to load folders: ${error.message}`);
+      }
+
+      const folderData: DriveFolder[] = (data.files || []).map((folder: any) => ({
+        id: folder.id,
+        name: folder.name,
+        path: `/${folder.name}`,
+        parentId: folder.parents?.[0],
+        isFolder: true
+      }));
+
+      setFolders(folderData);
+      console.log('✅ Loaded', folderData.length, 'folders from Drive');
       
       toast({
         title: "Folders Loaded",
-        description: `Found ${drivefolders.length} folders in your Google Drive`,
+        description: `Found ${folderData.length} folders in your Google Drive`,
       });
     } catch (error) {
       console.error('❌ Failed to load folders:', error);
@@ -134,25 +187,6 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
         description: `Selected: ${selectedFolder.name}`,
       });
     }
-  };
-
-  const enableAIPODetection = () => {
-    setUseAIPODetection(true);
-    onConfigUpdate('driveConfig', {
-      ...config.driveConfig,
-      useAIPODetection: true,
-      aiDetectionRules: {
-        detectPurchaseOrders: true,
-        checkFileContent: true,
-        aiConfidenceThreshold: 0.7,
-        poKeywords: ['purchase order', 'po number', 'vendor', 'procurement', 'order form', 'purchase requisition']
-      }
-    });
-    
-    toast({
-      title: "AI PO Detection Enabled",
-      description: "Gemini AI will analyze files for Purchase Order indicators",
-    });
   };
 
   const connectToDrive = () => {
@@ -193,8 +227,8 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
             <Switch
               checked={useAIPODetection}
               onCheckedChange={(checked) => {
+                setUseAIPODetection(checked);
                 if (checked) {
-                  setUseAIPODetection(true);
                   onConfigUpdate('driveConfig', {
                     ...config.driveConfig,
                     useAIPODetection: true,
@@ -211,7 +245,6 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
                     description: "Gemini AI will analyze files for Purchase Order indicators",
                   });
                 } else {
-                  setUseAIPODetection(false);
                   onConfigUpdate('driveConfig', {
                     ...config.driveConfig,
                     useAIPODetection: false,
@@ -265,7 +298,7 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
                   <Folder className="h-4 w-4" />
                   Go to Upload Page
                 </Button>
-                <Button variant="outline" onClick={checkConnection} className="gap-2">
+                <Button variant="outline" onClick={checkDriveConnection} className="gap-2">
                   <RefreshCw className="h-4 w-4" />
                   Retry Connection
                 </Button>
@@ -286,7 +319,7 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  onClick={loadFolders}
+                  onClick={() => loadFolders()}
                   disabled={loading}
                   className="gap-2"
                 >
@@ -405,6 +438,12 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
             <div className="flex justify-between">
               <span className="text-muted-foreground">Data Source:</span>
               <span className="font-medium">{config.driveConfig?.source || 'Google Drive'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Connection Status:</span>
+              <span className={`font-medium ${connected ? 'text-green-600' : 'text-red-600'}`}>
+                {connected ? '✅ Connected' : '❌ Disconnected'}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Selected Folder:</span>
