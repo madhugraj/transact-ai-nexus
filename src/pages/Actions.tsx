@@ -12,7 +12,7 @@ import { WorkflowBuilderTab } from "./tabs/WorkflowBuilderTab";
 import { SavedWorkflowsTab } from "./tabs/SavedWorkflowsTab";
 import { WorkflowConfigDialog } from "@/components/workflow/WorkflowConfigDialog";
 import { ExecutionTracker } from "@/components/workflow/ExecutionTracker";
-import { RealWorkflowEngine } from "@/services/workflow/RealWorkflowEngine";
+import { EnhancedWorkflowEngine } from "@/services/workflow/EnhancedWorkflowEngine";
 import { workflowTemplates } from "@/data/workflowTemplates";
 import { useWorkflowPersistence } from "@/hooks/useWorkflowPersistence";
 import { useCurrentWorkflow } from "@/hooks/useCurrentWorkflow";
@@ -34,7 +34,7 @@ const Actions = () => {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const { toast } = useToast();
 
-  const workflowEngine = new RealWorkflowEngine();
+  const workflowEngine = new EnhancedWorkflowEngine();
 
   const createWorkflowFromTemplate = (template: WorkflowTemplate, switchToBuilder: boolean = true) => {
     const workflow: WorkflowConfig = {
@@ -136,10 +136,6 @@ const Actions = () => {
   const handleWorkflowSave = (workflow: WorkflowConfig) => {
     addWorkflow(workflow);
     clearCurrentWorkflow(); // Clear from builder after saving
-    toast({
-      title: "Workflow Saved",
-      description: `"${workflow.name}" has been saved successfully.`,
-    });
   };
 
   const handleStepConfigSave = (updatedStep: WorkflowStep) => {

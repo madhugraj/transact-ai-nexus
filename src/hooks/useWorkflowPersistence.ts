@@ -35,7 +35,7 @@ export function useWorkflowPersistence() {
         console.error('❌ Error loading workflows:', error);
         toast({
           title: "Error Loading Workflows",
-          description: "Failed to load workflows from database",
+          description: "Failed to load workflows from database: " + error.message,
           variant: "destructive"
         });
         return;
@@ -46,8 +46,8 @@ export function useWorkflowPersistence() {
         id: dbWorkflow.id,
         name: dbWorkflow.name,
         description: dbWorkflow.description || '',
-        steps: dbWorkflow.config.steps || [],
-        connections: dbWorkflow.config.connections || [],
+        steps: dbWorkflow.config?.steps || [],
+        connections: dbWorkflow.config?.connections || [],
         isActive: dbWorkflow.is_active,
         createdAt: new Date(dbWorkflow.created_at),
         lastRun: dbWorkflow.last_run ? new Date(dbWorkflow.last_run) : undefined,
@@ -61,7 +61,7 @@ export function useWorkflowPersistence() {
       console.error('❌ Failed to load workflows:', error);
       toast({
         title: "Error",
-        description: "Failed to load workflows",
+        description: "Failed to load workflows: " + (error instanceof Error ? error.message : 'Unknown error'),
         variant: "destructive"
       });
     } finally {
@@ -122,7 +122,7 @@ export function useWorkflowPersistence() {
       console.error('❌ Failed to save workflow:', error);
       toast({
         title: "Error",
-        description: "Failed to save workflow",
+        description: "Failed to save workflow: " + (error instanceof Error ? error.message : 'Unknown error'),
         variant: "destructive"
       });
     }
@@ -184,7 +184,7 @@ export function useWorkflowPersistence() {
       console.error('❌ Failed to update workflow:', error);
       toast({
         title: "Error",
-        description: "Failed to update workflow",
+        description: "Failed to update workflow: " + (error instanceof Error ? error.message : 'Unknown error'),
         variant: "destructive"
       });
     }
@@ -225,7 +225,7 @@ export function useWorkflowPersistence() {
       console.error('❌ Failed to delete workflow:', error);
       toast({
         title: "Error",
-        description: "Failed to delete workflow",
+        description: "Failed to delete workflow: " + (error instanceof Error ? error.message : 'Unknown error'),
         variant: "destructive"
       });
     }
@@ -265,7 +265,7 @@ export function useWorkflowPersistence() {
       console.error('❌ Failed to clear workflows:', error);
       toast({
         title: "Error",
-        description: "Failed to clear workflows",
+        description: "Failed to clear workflows: " + (error instanceof Error ? error.message : 'Unknown error'),
         variant: "destructive"
       });
     }
