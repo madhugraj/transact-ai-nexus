@@ -449,5 +449,3 @@ const Actions = () => {
 };
 
 export default Actions;
-
-</edits_to_apply>
