@@ -35,6 +35,7 @@ export const DatabaseConfig: React.FC<DatabaseConfigProps> = ({
   const [availableTables, setAvailableTables] = useState<DatabaseTable[]>([]);
   const [loadingConnections, setLoadingConnections] = useState(false);
   const [loadingTables, setLoadingTables] = useState(false);
+  const [hasTableLoadError, setHasTableLoadError] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -51,7 +52,6 @@ export const DatabaseConfig: React.FC<DatabaseConfigProps> = ({
     setLoadingConnections(true);
     try {
       // In a production app, this would make an API call to fetch actual database connections
-      // For now, we'll include your TransactionAgent and other common connections
       const connections: DatabaseConnection[] = [
         { name: 'TransactionAgent', id: 'transaction_agent' },
         { name: 'Default Supabase', id: 'default_supabase' },
@@ -83,25 +83,43 @@ export const DatabaseConfig: React.FC<DatabaseConfigProps> = ({
 
   const loadAvailableTables = async (connectionId: string) => {
     setLoadingTables(true);
+    setHasTableLoadError(false);
+    
     try {
       let tables: DatabaseTable[] = [];
       
       // For TransactionAgent or Default Supabase, fetch actual tables from Supabase
       if (connectionId === 'transaction_agent' || connectionId === 'default_supabase') {
-        // Fetch tables from Supabase
-        const { data, error } = await supabase
-          .from('pg_tables')
-          .select('tablename, schemaname')
-          .eq('schemaname', 'public')
-          .order('tablename', { ascending: true });
-        
-        if (error) throw error;
-        
-        if (data) {
-          tables = data.map(t => ({
-            name: t.tablename,
-            schema: t.schemaname
-          }));
+        try {
+          console.log('Attempting to fetch tables from Supabase...');
+          
+          // Try to fetch tables from Supabase with better error handling
+          const { data, error } = await supabase
+            .from('pg_tables')
+            .select('tablename, schemaname')
+            .eq('schemaname', 'public')
+            .order('tablename', { ascending: true });
+          
+          if (error) {
+            console.error('Supabase query error:', error);
+            throw error;
+          }
+          
+          if (data && data.length > 0) {
+            console.log(`✅ Successfully fetched ${data.length} tables from Supabase`);
+            tables = data.map(t => ({
+              name: t.tablename,
+              schema: t.schemaname
+            }));
+          } else {
+            console.warn('⚠️ No tables returned from Supabase query');
+          }
+        } catch (supabaseError) {
+          console.error('❌ Supabase table fetch error:', supabaseError);
+          setHasTableLoadError(true);
+          
+          // Fall back to hardcoded tables since we couldn't fetch from Supabase
+          console.log('Falling back to hardcoded tables');
         }
         
         // If Supabase query fails or returns no results, fall back to hardcoded tables
@@ -113,8 +131,12 @@ export const DatabaseConfig: React.FC<DatabaseConfigProps> = ({
             { name: 'compare_po_multi_invoice', schema: 'public' },
             { name: 'extracted_json', schema: 'public' },
             { name: 'compare_source_document', schema: 'public' },
-            { name: 'compare_target_docs', schema: 'public' }
+            { name: 'compare_target_docs', schema: 'public' },
+            { name: 'doc_compare_results', schema: 'public' },
+            { name: 'extracted_tables', schema: 'public' },
+            { name: 'uploaded_files', schema: 'public' }
           ];
+          console.log(`Using ${tables.length} hardcoded tables as fallback`);
         }
       } else {
         // For other connections, use mock data
@@ -142,11 +164,22 @@ export const DatabaseConfig: React.FC<DatabaseConfigProps> = ({
       }
       
       setAvailableTables(tables);
+      console.log(`Total available tables: ${tables.length}`);
+      
     } catch (error) {
       console.error('❌ Error loading tables:', error);
+      setHasTableLoadError(true);
+      
+      // Even if there's an error, populate some fallback tables
+      setAvailableTables([
+        { name: 'invoice_table', schema: 'public' },
+        { name: 'po_table', schema: 'public' },
+        { name: 'compare_po_invoice_table', schema: 'public' }
+      ]);
+      
       toast({
         title: "Error loading database tables",
-        description: "Could not retrieve available tables for this connection",
+        description: "Using default tables as fallback. You can still enter a custom table name.",
         variant: "destructive"
       });
     } finally {
@@ -325,6 +358,12 @@ export const DatabaseConfig: React.FC<DatabaseConfigProps> = ({
             <div className="flex items-center gap-2 mt-2 text-xs text-blue-600">
               <RefreshCw className="h-3 w-3 animate-spin" />
               Loading available tables...
+            </div>
+          }
+          {hasTableLoadError &&
+            <div className="flex items-center gap-2 mt-2 text-xs text-amber-600">
+              <Table className="h-3 w-3" />
+              Using fallback tables due to connection error
             </div>
           }
         </div>
