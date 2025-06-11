@@ -416,7 +416,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onWorkflowCreated }) 
         ...(node.data.type === 'document-processing' && {
           processingConfig: {
             type: (node.data.label as string)?.toLowerCase().includes('po') ? 'po-extraction' : 'invoice-extraction',
-            aiModel: 'gemini',
+            aiModel: 'hybrid',
             confidence: 0.8
           }
         }),

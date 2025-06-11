@@ -34,7 +34,7 @@ export const workflowTemplates: WorkflowTemplate[] = [
         config: {
           processingConfig: {
             type: 'invoice-extraction',
-            aiModel: 'gemini',
+            aiModel: 'hybrid',
             confidence: 0.85
           }
         }
@@ -103,7 +103,7 @@ export const workflowTemplates: WorkflowTemplate[] = [
         config: {
           processingConfig: {
             type: 'invoice-extraction',
-            aiModel: 'gemini'
+            aiModel: 'hybrid'
           }
         }
       },
@@ -115,7 +115,7 @@ export const workflowTemplates: WorkflowTemplate[] = [
         config: {
           processingConfig: {
             type: 'po-extraction',
-            aiModel: 'gemini'
+            aiModel: 'hybrid'
           }
         }
       },
@@ -186,7 +186,7 @@ export const workflowTemplates: WorkflowTemplate[] = [
         config: {
           processingConfig: {
             type: 'invoice-extraction',
-            aiModel: 'gemini',
+            aiModel: 'hybrid',
             confidence: 0.85
           }
         }
@@ -201,7 +201,7 @@ export const workflowTemplates: WorkflowTemplate[] = [
             type: 'po-invoice-comparison',
             sourceTable: 'po_table',
             useIntelligentMatching: true,
-            matchingCriteria: 'threshold',
+            matchingCriteria: 'intelligent',
             tolerance: 0.05
           }
         }

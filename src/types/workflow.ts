@@ -59,7 +59,7 @@ export interface WorkflowStepConfig {
   // Processing configurations
   processingConfig?: {
     type: 'invoice-extraction' | 'po-extraction' | 'receipt-extraction' | 'contract-extraction' | 'general-ocr';
-    aiModel?: 'hybrid' | 'ai-vision' | 'ocr' | 'template-based';
+    aiModel?: 'hybrid' | 'ai-vision' | 'ocr' | 'template-based' | 'gemini';
     confidence?: number;
   };
   
@@ -75,7 +75,7 @@ export interface WorkflowStepConfig {
     type: 'po-invoice-comparison' | 'jd-cv-comparison' | 'invoice-receipt-comparison' | 'contract-invoice-comparison' | 'multi-document-validation' | 'data-normalization' | 'custom-comparison';
     fields?: string[];
     tolerance?: number;
-    matchingCriteria?: 'exact' | 'fuzzy' | 'intelligent';
+    matchingCriteria?: 'exact' | 'fuzzy' | 'intelligent' | 'threshold';
     sourceTable?: string;
     targetTable?: string;
     useIntelligentMatching?: boolean;
