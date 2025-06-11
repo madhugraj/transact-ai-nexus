@@ -320,26 +320,13 @@ export class GmailWorkflowService {
     const snippet = email.snippet?.toLowerCase() || '';
     const fullText = `${subject} ${from} ${snippet}`;
     
-    let confidence = 0.3; // Base confidence
+    let confidence = 0.5; // Base confidence
     
-    // Strong keywords boost confidence significantly
-    const strongKeywords = ['invoice', 'bill', 'payment due', 'purchase order'];
-    strongKeywords.forEach(keyword => {
-      if (fullText.includes(keyword)) confidence += 0.2;
-    });
-    
-    // Attachments are crucial for invoices
-    if (email.hasAttachments) confidence += 0.2;
-    
-    // Business email domains
-    if (from.includes('.com') || from.includes('.org') || from.includes('.net')) {
-      confidence += 0.1;
-    }
-    
-    // Not from personal email services
-    if (!from.includes('gmail.com') && !from.includes('yahoo.com') && !from.includes('hotmail.com')) {
-      confidence += 0.1;
-    }
+    // Strong invoice indicators
+    if (subject.includes('invoice') || subject.includes('bill')) confidence += 0.3;
+    if (subject.includes('payment due') || subject.includes('amount due')) confidence += 0.2;
+    if (from.includes('accounting') || from.includes('billing')) confidence += 0.2;
+    if (snippet.includes('invoice') || snippet.includes('payment')) confidence += 0.1;
     
     return Math.min(confidence, 1.0);
   }
@@ -347,68 +334,60 @@ export class GmailWorkflowService {
   private getInvoiceReasons(email: any): string[] {
     const reasons = [];
     const subject = email.subject?.toLowerCase() || '';
-    const fullText = `${subject} ${email.from?.toLowerCase() || ''} ${email.snippet?.toLowerCase() || ''}`;
+    const from = email.from?.toLowerCase() || '';
     
-    if (fullText.includes('invoice')) reasons.push('Contains "invoice" keyword');
-    if (fullText.includes('bill')) reasons.push('Contains billing keywords');
-    if (fullText.includes('payment')) reasons.push('Contains payment references');
+    if (subject.includes('invoice')) reasons.push('Subject contains "invoice"');
+    if (subject.includes('bill')) reasons.push('Subject contains "bill"');
+    if (from.includes('accounting')) reasons.push('From accounting department');
     if (email.hasAttachments) reasons.push('Has attachments');
-    if (fullText.includes('purchase order') || fullText.includes('po #')) reasons.push('References purchase order');
     
     return reasons;
   }
 
   private async refreshAccessToken(refreshToken: string): Promise<string> {
-    console.log('🔄 Refreshing Gmail access token...');
+    console.log('🔄 Attempting to refresh Gmail access token...');
     
     try {
       const { data, error } = await supabase.functions.invoke('google-auth', {
         body: {
-          action: 'refresh',
-          refreshToken
+          refresh_token: refreshToken,
+          action: 'refresh'
         }
       });
 
-      if (error || !data?.success) {
-        throw new Error('Failed to refresh access token');
+      if (error || !data.success) {
+        throw new Error(data?.error || 'Token refresh failed');
       }
 
       console.log('✅ Access token refreshed successfully');
-      return data.accessToken;
-    } catch (error: any) {
-      console.error('❌ Error refreshing token:', error);
-      throw new Error('Failed to refresh Gmail authentication. Please reconnect your account.');
+      return data.access_token;
+    } catch (error) {
+      console.error('❌ Token refresh failed:', error);
+      throw new Error('Failed to refresh access token');
     }
-  }
-
-  async processEmailAttachments(emails: any[]): Promise<any[]> {
-    // This method is now integrated into callGmailAPI above
-    console.log('📎 Email attachments already processed during email fetch');
-    return [];
   }
 
   private extractAttachmentsFromParts(parts: any[]): any[] {
     const attachments: any[] = [];
     
-    for (const part of parts) {
+    const extractFromPart = (part: any) => {
       // Check if this part has an attachment
       if (part.body?.attachmentId && part.filename) {
         attachments.push({
+          attachmentId: part.body.attachmentId,
           filename: part.filename,
-          mimeType: part.mimeType,
-          size: part.body.size || 0,
-          attachmentId: part.body.attachmentId
+          mimeType: part.mimeType || 'application/octet-stream',
+          size: part.body.size || 0
         });
-        console.log('📎 Found attachment in part:', part.filename, part.mimeType);
       }
       
       // Recursively check nested parts
       if (part.parts && Array.isArray(part.parts)) {
-        const nestedAttachments = this.extractAttachmentsFromParts(part.parts);
-        attachments.push(...nestedAttachments);
+        part.parts.forEach(extractFromPart);
       }
-    }
+    };
     
+    parts.forEach(extractFromPart);
     return attachments;
   }
 }

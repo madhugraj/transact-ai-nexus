@@ -5,8 +5,6 @@ import { RealWorkflowEngine } from './RealWorkflowEngine';
 
 export class EnhancedWorkflowEngine extends RealWorkflowEngine {
   async validateWorkflowRequirements(workflow: WorkflowConfig): Promise<{ valid: boolean; errors: string[] }> {
-    const errors: string[] = [];
-    
     console.log('🔍 Enhanced validation for workflow:', workflow.name);
     
     // First check user authentication
@@ -14,8 +12,10 @@ export class EnhancedWorkflowEngine extends RealWorkflowEngine {
     
     if (authError || !user) {
       console.error('❌ User authentication failed:', authError);
-      errors.push('User must be authenticated to run workflows. Please log in first.');
-      return { valid: false, errors };
+      return { 
+        valid: false, 
+        errors: ['User must be authenticated to run workflows. Please log in first.'] 
+      };
     }
     
     console.log('✅ User authenticated:', user.email);
@@ -23,12 +23,6 @@ export class EnhancedWorkflowEngine extends RealWorkflowEngine {
     // Use parent class validation for external auth requirements
     const parentValidation = await super.validateWorkflowRequirements(workflow);
     
-    // Combine any additional errors
-    errors.push(...parentValidation.errors);
-    
-    return {
-      valid: errors.length === 0,
-      errors
-    };
+    return parentValidation;
   }
 }
