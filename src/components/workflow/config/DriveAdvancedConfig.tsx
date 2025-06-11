@@ -6,9 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Folder, RefreshCw, Sparkles, Loader2 } from 'lucide-react';
+import { Folder, RefreshCw, Sparkles, Loader2, AlertTriangle } from 'lucide-react';
 import { GoogleDriveFolderService, DriveFolder } from '@/services/drive/GoogleDriveFolderService';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface DriveAdvancedConfigProps {
   config: any;
@@ -23,8 +24,9 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
   const [folders, setFolders] = useState<DriveFolder[]>([]);
   const [loading, setLoading] = useState(false);
   const [connected, setConnected] = useState(false);
-  const [useAIDetection, setUseAIDetection] = useState(
-    config.useAIPODetection || false
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [useAIPODetection, setUseAIPODetection] = useState(
+    config.driveConfig?.useAIPODetection || false
   );
 
   const folderService = new GoogleDriveFolderService();
@@ -35,14 +37,22 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
 
   const checkConnection = async () => {
     try {
+      console.log('🔍 Checking Google Drive connection...');
       const isAuthenticated = await folderService.authenticate();
       setConnected(isAuthenticated);
+      setConnectionError(null);
+      
       if (isAuthenticated) {
-        loadFolders();
+        console.log('✅ Drive connected, loading folders...');
+        await loadFolders();
+      } else {
+        console.log('❌ Drive not connected');
+        setConnectionError('Google Drive authentication required. Please connect your account first.');
       }
     } catch (error) {
       console.error('❌ Connection check failed:', error);
       setConnected(false);
+      setConnectionError(error instanceof Error ? error.message : 'Failed to connect to Google Drive');
     }
   };
 
@@ -52,17 +62,19 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
       console.log('📁 Loading Drive folders...');
       const drivefolders = await folderService.listFolders();
       setFolders(drivefolders);
-      console.log('✅ Loaded', drivefolders.length, 'folders');
+      console.log('✅ Loaded', drivefolders.length, 'folders from Drive');
       
       toast({
         title: "Folders Loaded",
-        description: `Found ${drivefolders.length} folders in your Drive`,
+        description: `Found ${drivefolders.length} folders in your Google Drive`,
       });
     } catch (error) {
       console.error('❌ Failed to load folders:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load Drive folders';
+      setConnectionError(errorMessage);
       toast({
         title: "Error Loading Folders",
-        description: error instanceof Error ? error.message : 'Failed to load Drive folders',
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -88,7 +100,7 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
   };
 
   const enableAIPODetection = () => {
-    setUseAIDetection(true);
+    setUseAIPODetection(true);
     onConfigUpdate('driveConfig', {
       ...config.driveConfig,
       useAIPODetection: true,
@@ -96,7 +108,7 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
         detectPurchaseOrders: true,
         checkFileContent: true,
         aiConfidenceThreshold: 0.7,
-        poKeywords: ['purchase order', 'po number', 'vendor', 'procurement']
+        poKeywords: ['purchase order', 'po number', 'vendor', 'procurement', 'order form', 'purchase requisition']
       }
     });
     
@@ -109,10 +121,44 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
   const connectToDrive = () => {
     toast({
       title: "Connect to Google Drive",
-      description: "Please use the Google Drive connector in the Cloud Storage tab to authenticate",
+      description: "Please use the Google Drive connector in the Email Connector page to authenticate first",
       variant: "default"
     });
   };
+
+  if (connectionError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-orange-500" />
+            Google Drive Connection Issue
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert variant="destructive" className="mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{connectionError}</AlertDescription>
+          </Alert>
+          <div className="text-center space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Please connect to Google Drive first to access folders and enable AI-powered PO detection
+            </p>
+            <div className="flex gap-2 justify-center">
+              <Button onClick={connectToDrive} className="gap-2">
+                <Folder className="h-4 w-4" />
+                Connect to Drive
+              </Button>
+              <Button variant="outline" onClick={checkConnection} className="gap-2">
+                <RefreshCw className="h-4 w-4" />
+                Retry Connection
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (!connected) {
     return (
@@ -153,19 +199,19 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
             <div>
               <Label className="font-medium">Enable AI PO Detection</Label>
               <p className="text-xs text-muted-foreground mt-1">
-                {useAIDetection 
+                {useAIPODetection 
                   ? "Gemini AI will analyze file content to identify Purchase Orders"
                   : "Enable to use AI for intelligent Purchase Order detection"
                 }
               </p>
             </div>
             <Switch
-              checked={useAIDetection}
+              checked={useAIPODetection}
               onCheckedChange={(checked) => {
                 if (checked) {
                   enableAIPODetection();
                 } else {
-                  setUseAIDetection(false);
+                  setUseAIPODetection(false);
                   onConfigUpdate('driveConfig', {
                     ...config.driveConfig,
                     useAIPODetection: false,
@@ -176,10 +222,10 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
             />
           </div>
 
-          {useAIDetection && (
+          {useAIPODetection && (
             <div className="bg-purple-50 p-3 rounded-lg">
               <div className="flex flex-wrap gap-1 mb-2">
-                {['purchase order', 'po number', 'vendor', 'procurement'].map((keyword) => (
+                {['purchase order', 'po number', 'vendor', 'procurement', 'order form', 'purchase requisition'].map((keyword) => (
                   <Badge key={keyword} variant="secondary" className="text-xs">
                     {keyword}
                   </Badge>
@@ -314,7 +360,7 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">AI PO Detection:</span>
-              <span>{useAIDetection ? 'Enabled' : 'Disabled'}</span>
+              <span>{useAIPODetection ? 'Enabled' : 'Disabled'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">File Types:</span>
