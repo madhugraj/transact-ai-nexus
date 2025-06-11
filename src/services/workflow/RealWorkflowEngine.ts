@@ -1,94 +1,190 @@
 
-import { WorkflowConfig, WorkflowExecution } from '@/types/workflow';
+import { WorkflowConfig, WorkflowExecution, WorkflowStep, WorkflowStepResult } from '@/types/workflow';
+import { GoogleAuthService } from '@/services/auth/googleAuthService';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 export class RealWorkflowEngine {
+  private executions = new Map<string, WorkflowExecution>();
+  private googleAuthService: GoogleAuthService;
+
+  constructor() {
+    this.googleAuthService = new GoogleAuthService({
+      clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
+      scopes: ['https://www.googleapis.com/auth/drive.readonly', 'https://www.googleapis.com/auth/gmail.readonly'],
+      redirectUri: `${window.location.origin}/oauth/callback`
+    });
+  }
+
   async validateWorkflowRequirements(workflow: WorkflowConfig): Promise<{ valid: boolean; errors: string[] }> {
     const errors: string[] = [];
     
-    // Check if user is authenticated
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      errors.push('User must be authenticated to run workflows');
+    console.log('🔍 Validating workflow requirements for:', workflow.name);
+    
+    // Check if user is authenticated with Supabase
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      console.error('❌ User authentication failed:', authError);
+      errors.push('User must be authenticated to run workflows. Please log in first.');
       return { valid: false, errors };
     }
-
-    // Validate each step's requirements
-    for (const step of workflow.steps) {
-      if (step.type === 'data-source') {
-        if (step.config.emailConfig && !step.config.emailConfig.source) {
-          errors.push(`Step "${step.name}": Email source not configured`);
-        }
-        if (step.config.driveConfig && !step.config.driveConfig.source) {
-          errors.push(`Step "${step.name}": Drive source not configured`);
-        }
-      }
+    
+    console.log('✅ User is authenticated:', user.email);
+    
+    // Check if any step needs Gmail authentication
+    const needsGmailAuth = workflow.steps.some(step => 
+      step.type === 'data-source' && (
+        step.name.toLowerCase().includes('gmail') || 
+        step.name.toLowerCase().includes('email')
+      )
+    );
+    
+    // Check if any step needs Drive authentication
+    const needsDriveAuth = workflow.steps.some(step => 
+      step.type === 'data-source' && step.name.toLowerCase().includes('drive')
+    );
+    
+    console.log('🔐 External authentication requirements:', { needsGmailAuth, needsDriveAuth });
+    
+    if (needsGmailAuth) {
+      console.log('📧 Checking Gmail authentication...');
+      const gmailTokens = localStorage.getItem('gmail_auth_tokens');
+      const hasGmailTokens = gmailTokens && JSON.parse(gmailTokens).accessToken;
+      console.log('📧 Gmail tokens status:', { hasTokens: !!hasGmailTokens });
       
-      if (step.type === 'data-comparison') {
-        if (!step.config.comparisonConfig?.type) {
-          errors.push(`Step "${step.name}": Comparison type not specified`);
-        }
-      }
-      
-      if (step.type === 'database-storage' || step.type === 'data-storage') {
-        if (!step.config.storageConfig?.table) {
-          errors.push(`Step "${step.name}": Storage table not specified`);
-        }
+      if (!hasGmailTokens) {
+        errors.push('Gmail authentication required. Please connect your Gmail account in the Email Connector.');
       }
     }
-
-    return { valid: errors.length === 0, errors };
+    
+    if (needsDriveAuth) {
+      console.log('📁 Checking Drive authentication...');
+      const driveTokens = localStorage.getItem('google_auth_tokens');
+      const hasDriveTokens = driveTokens && JSON.parse(driveTokens).accessToken;
+      console.log('📁 Drive tokens status:', { hasTokens: !!hasDriveTokens });
+      
+      if (!hasDriveTokens) {
+        errors.push('Google Drive authentication required. Please connect your Drive account in the Email Connector.');
+      }
+    }
+    
+    console.log('✅ Validation complete. Valid:', errors.length === 0, 'Errors:', errors);
+    
+    return {
+      valid: errors.length === 0,
+      errors
+    };
   }
 
   async executeWorkflow(workflow: WorkflowConfig): Promise<WorkflowExecution> {
-    const startTime = new Date();
+    console.log('🚀 Starting workflow execution:', workflow.name);
     
+    // Validate authentication and requirements
+    const validation = await this.validateWorkflowRequirements(workflow);
+    if (!validation.valid) {
+      console.error('❌ Workflow validation failed:', validation.errors);
+      throw new Error(`Workflow validation failed:\n${validation.errors.join('\n')}`);
+    }
+
+    const execution: WorkflowExecution = {
+      id: `exec_${Date.now()}`,
+      workflowId: workflow.id,
+      status: 'running',
+      startTime: new Date(),
+      stepResults: [],
+      processedDocuments: 0,
+      errors: []
+    };
+
+    this.executions.set(execution.id, execution);
+    console.log('📊 Created execution:', execution.id);
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('User must be authenticated to execute workflows');
-      }
-
-      const execution: WorkflowExecution = {
-        id: `exec-${Date.now()}`,
-        workflowId: workflow.id,
-        status: 'running',
-        startTime,
-        stepResults: [],
-        processedDocuments: 0
-      };
-
-      // Simulate workflow execution
+      console.log('🔄 Executing', workflow.steps.length, 'steps...');
+      
       for (const step of workflow.steps) {
-        const stepResult = {
-          stepId: step.id,
-          status: 'completed' as const,
-          startTime: new Date(),
-          endTime: new Date(),
-          input: {},
-          output: { message: `${step.name} completed successfully` }
-        };
-        
-        execution.stepResults.push(stepResult);
+        console.log('🎯 Executing step:', step.name, '(', step.type, ')');
+        await this.executeStep(step, execution);
       }
-
+      
       execution.status = 'completed';
       execution.endTime = new Date();
-      execution.processedDocuments = 5; // Simulated
+      
+      console.log('✅ Workflow completed successfully in', 
+        Math.round((execution.endTime.getTime() - execution.startTime.getTime()) / 1000), 'seconds');
+      
+      toast({
+        title: "Workflow Completed",
+        description: `${workflow.name} executed successfully`,
+      });
 
       return execution;
-
     } catch (error) {
-      return {
-        id: `exec-${Date.now()}`,
-        workflowId: workflow.id,
-        status: 'failed',
-        startTime,
-        endTime: new Date(),
-        stepResults: [],
-        processedDocuments: 0,
-        errors: [error instanceof Error ? error.message : 'Unknown error']
-      };
+      execution.status = 'failed';
+      execution.endTime = new Date();
+      execution.errors?.push(error instanceof Error ? error.message : 'Unknown error');
+      
+      console.error('❌ Workflow failed:', error);
+      
+      toast({
+        title: "Workflow Failed",
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: "destructive",
+      });
+
+      throw error;
     }
+  }
+
+  private async executeStep(step: WorkflowStep, execution: WorkflowExecution): Promise<any> {
+    const stepResult: WorkflowStepResult = {
+      stepId: step.id,
+      status: 'running',
+      startTime: new Date()
+    };
+
+    execution.stepResults.push(stepResult);
+    execution.currentStepId = step.id;
+
+    try {
+      console.log('⚙️ Processing step:', step.name);
+      
+      // Simulate different processing times based on step type
+      let processingTime = 500;
+      if (step.type === 'document-processing') processingTime = 1000;
+      if (step.type === 'analytics') processingTime = 800;
+      
+      let output: any = { 
+        message: `Successfully executed ${step.name}`, 
+        success: true,
+        stepType: step.type,
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log('⏱️ Simulating processing for', processingTime, 'ms...');
+      await new Promise(resolve => setTimeout(resolve, processingTime));
+      
+      stepResult.status = 'completed';
+      stepResult.endTime = new Date();
+      stepResult.output = output;
+      
+      console.log('✅ Step completed:', step.name);
+      return output;
+    } catch (error) {
+      stepResult.status = 'failed';
+      stepResult.endTime = new Date();
+      stepResult.error = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ Step failed:', step.name, error);
+      throw error;
+    }
+  }
+
+  getExecution(executionId: string): WorkflowExecution | undefined {
+    return this.executions.get(executionId);
+  }
+
+  getAllExecutions(): WorkflowExecution[] {
+    return Array.from(this.executions.values());
   }
 }

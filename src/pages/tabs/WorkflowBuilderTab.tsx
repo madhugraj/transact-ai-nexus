@@ -3,10 +3,11 @@ import React, { useState } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DragDropWorkflowBuilder } from '@/components/workflow/DragDropWorkflowBuilder';
 import { useWorkflowPersistence } from '@/hooks/useWorkflowPersistence';
+import { useAuth } from '@/components/auth/UserAuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { EnhancedWorkflowEngine } from '@/services/workflow/EnhancedWorkflowEngine';
 import { WorkflowConfig } from '@/types/workflow';
-import { AlertTriangle, FileText } from 'lucide-react';
+import { AlertTriangle, FileText, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface WorkflowBuilderTabProps {
@@ -23,12 +24,22 @@ export const WorkflowBuilderTab: React.FC<WorkflowBuilderTabProps> = ({
   onClearCurrentWorkflow
 }) => {
   const { workflows } = useWorkflowPersistence();
+  const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   const enhancedEngine = new EnhancedWorkflowEngine();
 
   const handleWorkflowSave = (workflow: WorkflowConfig) => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to save workflows.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     console.log('🔄 Saving workflow in WorkflowBuilderTab:', workflow.name);
     onWorkflowSave(workflow);
     toast({
@@ -39,6 +50,16 @@ export const WorkflowBuilderTab: React.FC<WorkflowBuilderTabProps> = ({
 
   const handleWorkflowExecute = async (workflow: WorkflowConfig) => {
     setValidationErrors([]);
+
+    if (!isAuthenticated) {
+      setValidationErrors(['User must be authenticated to run workflows. Please log in first.']);
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to execute workflows.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       // Validate workflow requirements
@@ -77,6 +98,24 @@ export const WorkflowBuilderTab: React.FC<WorkflowBuilderTabProps> = ({
     }
   };
 
+  // Show authentication warning if user is not logged in
+  if (!isAuthenticated) {
+    return (
+      <div className="space-y-4">
+        <Alert variant="destructive">
+          <LogIn className="h-4 w-4" />
+          <AlertDescription>
+            <div className="space-y-2">
+              <p className="font-medium">Authentication Required</p>
+              <p className="text-sm">You must be logged in to create and execute workflows.</p>
+              <p className="text-sm">Please log in to access the Workflow Builder.</p>
+            </div>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* Current Template/Workflow Info */}
@@ -98,6 +137,16 @@ export const WorkflowBuilderTab: React.FC<WorkflowBuilderTabProps> = ({
             >
               Clear & Start Fresh
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* User Info */}
+      {user && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+          <div className="flex items-center gap-2 text-sm text-green-700">
+            <LogIn className="h-4 w-4" />
+            <span>Logged in as: {user.email}</span>
           </div>
         </div>
       )}
