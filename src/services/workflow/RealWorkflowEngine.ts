@@ -430,13 +430,37 @@ export class RealWorkflowEngine {
       const results = [];
       
       for (const doc of inputData.extractedDocuments) {
-        const dataToStore = {
-          file_name: doc.filename,
-          json_extract: doc.extractedData,
-          created_at: new Date().toISOString()
-        };
-        
         console.log('💾 REAL database insert for:', doc.filename);
+        console.log('💾 Document extracted data preview:', JSON.stringify(doc.extractedData).substring(0, 200));
+        
+        let dataToStore;
+        
+        // Handle different table schemas
+        if (tableName === 'invoice_table') {
+          // Use the correct schema for invoice_table
+          dataToStore = {
+            attachment_invoice_name: doc.filename, // Correct column name
+            invoice_number: doc.extractedData.invoice_number ? parseInt(String(doc.extractedData.invoice_number).replace(/\D/g, '')) || 0 : 0,
+            invoice_date: doc.extractedData.invoice_date || null,
+            po_number: doc.extractedData.po_number ? parseInt(String(doc.extractedData.po_number).replace(/\D/g, '')) || null : null,
+            details: doc.extractedData,
+            created_at: new Date().toISOString()
+          };
+        } else {
+          // Default schema for extracted_json table
+          dataToStore = {
+            file_name: doc.filename,
+            json_extract: doc.extractedData,
+            created_at: new Date().toISOString()
+          };
+        }
+        
+        console.log('💾 Data to store:', {
+          table: tableName,
+          filename: doc.filename,
+          hasExtractedData: !!doc.extractedData,
+          dataKeys: Object.keys(dataToStore)
+        });
         
         const { data, error } = await supabase
           .from(tableName)
@@ -449,7 +473,7 @@ export class RealWorkflowEngine {
         }
         
         results.push(data);
-        console.log('✅ REAL database insert successful:', doc.filename);
+        console.log('✅ REAL database insert successful:', doc.filename, 'Data:', data);
       }
       
       console.log('💾 All REAL data stored successfully. Records created:', results.length);
