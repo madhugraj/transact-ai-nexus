@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -7,9 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Mail, HardDrive, Sparkles, X, Plus } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Mail, HardDrive, Sparkles, X, Plus, Settings } from 'lucide-react';
 import { WorkflowStep } from '@/types/workflow';
 import { useToast } from '@/hooks/use-toast';
+import { DriveAdvancedConfig } from './DriveAdvancedConfig';
 
 interface DataSourceConfigProps {
   step: WorkflowStep;
@@ -133,6 +134,7 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
                     folderPath: '',
                     processSubfolders: true,
                     nameFilters: [],
+                    useAIPODetection: false,
                     dateRange: {
                       enabled: false,
                       from: '',
@@ -303,88 +305,93 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
 
         {/* Drive Source Configuration */}
         {(hasDriveConfig || sourceType === 'drive') && (
-          <div className="space-y-4">
-            {/* Drive Service Selection */}
-            <div>
-              <Label>Drive Service</Label>
-              <Select
-                value={step.config.driveConfig?.source || 'google-drive'}
-                onValueChange={(value) => onConfigUpdate('driveConfig', {
-                  ...step.config.driveConfig,
-                  source: value
-                })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="google-drive">Google Drive</SelectItem>
-                  <SelectItem value="onedrive">OneDrive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <Tabs defaultValue="basic" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="basic">Basic Settings</TabsTrigger>
+              <TabsTrigger value="advanced">Advanced Settings</TabsTrigger>
+            </TabsList>
 
-            <div>
-              <Label>Folder Path</Label>
-              <Input
-                placeholder="/Documents/Invoices"
-                value={step.config.driveConfig?.folderPath || ''}
-                onChange={(e) => onConfigUpdate('driveConfig', {
-                  ...step.config.driveConfig,
-                  folderPath: e.target.value
-                })}
-              />
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="processSubfolders"
-                checked={step.config.driveConfig?.processSubfolders !== false}
-                onCheckedChange={(checked) => onConfigUpdate('driveConfig', {
-                  ...step.config.driveConfig,
-                  processSubfolders: checked
-                })}
-              />
-              <Label htmlFor="processSubfolders">Process subfolders</Label>
-            </div>
-
-            <div>
-              <Label>File Types</Label>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {['pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx'].map((type) => (
-                  <Badge 
-                    key={type}
-                    variant={step.config.driveConfig?.fileTypes?.includes(type) ? "default" : "outline"}
-                    className="cursor-pointer"
-                    onClick={() => {
-                      const currentTypes = step.config.driveConfig?.fileTypes || [];
-                      const updatedTypes = currentTypes.includes(type)
-                        ? currentTypes.filter(t => t !== type)
-                        : [...currentTypes, type];
-                      
-                      onConfigUpdate('driveConfig', {
-                        ...step.config.driveConfig,
-                        fileTypes: updatedTypes
-                      });
-                    }}
-                  >
-                    {type.toUpperCase()}
-                  </Badge>
-                ))}
+            <TabsContent value="basic" className="space-y-4">
+              <div>
+                <Label>Drive Service</Label>
+                <Select
+                  value={step.config.driveConfig?.source || 'google-drive'}
+                  onValueChange={(value) => onConfigUpdate('driveConfig', {
+                    ...step.config.driveConfig,
+                    source: value
+                  })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="google-drive">Google Drive</SelectItem>
+                    <SelectItem value="onedrive">OneDrive</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
 
-            {/* Drive Summary */}
-            <div className="bg-gray-50 p-3 rounded text-sm">
-              <p className="font-medium mb-1">Configuration Summary:</p>
-              <ul className="text-xs text-muted-foreground space-y-1">
-                <li>• Source: {step.config.driveConfig?.source || 'Google Drive'}</li>
-                <li>• Folder: {step.config.driveConfig?.folderPath || 'Root'}</li>
-                <li>• Include subfolders: {step.config.driveConfig?.processSubfolders !== false ? 'Yes' : 'No'}</li>
-                <li>• File types: {step.config.driveConfig?.fileTypes?.join(', ') || 'PDF'}</li>
-              </ul>
-            </div>
-          </div>
+              <div>
+                <Label>Folder Path (Basic)</Label>
+                <Input
+                  placeholder="/Documents/Purchase Orders"
+                  value={step.config.driveConfig?.folderPath || ''}
+                  onChange={(e) => onConfigUpdate('driveConfig', {
+                    ...step.config.driveConfig,
+                    folderPath: e.target.value
+                  })}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Use Advanced Settings tab for folder browser
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="processSubfolders"
+                  checked={step.config.driveConfig?.processSubfolders !== false}
+                  onCheckedChange={(checked) => onConfigUpdate('driveConfig', {
+                    ...step.config.driveConfig,
+                    processSubfolders: checked
+                  })}
+                />
+                <Label htmlFor="processSubfolders">Process subfolders</Label>
+              </div>
+
+              <div>
+                <Label>File Types</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {['pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx'].map((type) => (
+                    <Badge 
+                      key={type}
+                      variant={step.config.driveConfig?.fileTypes?.includes(type) ? "default" : "outline"}
+                      className="cursor-pointer"
+                      onClick={() => {
+                        const currentTypes = step.config.driveConfig?.fileTypes || [];
+                        const updatedTypes = currentTypes.includes(type)
+                          ? currentTypes.filter(t => t !== type)
+                          : [...currentTypes, type];
+                        
+                        onConfigUpdate('driveConfig', {
+                          ...step.config.driveConfig,
+                          fileTypes: updatedTypes
+                        });
+                      }}
+                    >
+                      {type.toUpperCase()}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="advanced">
+              <DriveAdvancedConfig 
+                config={step.config}
+                onConfigUpdate={onConfigUpdate}
+              />
+            </TabsContent>
+          </Tabs>
         )}
       </CardContent>
     </Card>
