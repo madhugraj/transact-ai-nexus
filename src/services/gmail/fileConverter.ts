@@ -39,9 +39,21 @@ export class FileConverter {
   ): File {
     console.log('🔄 Creating file from attachment:', { filename, mimeType, dataLength: attachmentData.length });
     
-    const binaryData = this.createFileFromCloudStorage(attachmentData, filename, mimeType);
-    console.log('✅ File created successfully:', filename);
-    return binaryData;
+    const arrayBuffer = this.base64ToArrayBuffer(attachmentData);
+    const blob = new Blob([arrayBuffer], { type: mimeType });
+    const file = new File([blob], filename, { 
+      type: mimeType,
+      lastModified: Date.now()
+    });
+    
+    console.log('✅ File created successfully:', {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModified: file.lastModified
+    });
+    
+    return file;
   }
 
   static createFileFromCloudStorage(

@@ -1,4 +1,3 @@
-
 import { WorkflowConfig, WorkflowExecution, WorkflowStepResult } from '@/types/workflow';
 import { GmailWorkflowService } from './GmailWorkflowService';
 import { InvoiceDetectionAgent } from '@/services/agents/InvoiceDetectionAgent';
@@ -8,6 +7,7 @@ import { PODataExtractionAgent } from '@/services/agents/PODataExtractionAgent';
 import { POProcessor } from '@/components/ingestion/drive/processing/POProcessor';
 import { GoogleDriveFolderService } from '@/services/drive/GoogleDriveFolderService';
 import { supabase } from '@/integrations/supabase/client';
+import { FileConverter } from '@/services/gmail/fileConverter';
 
 export class RealWorkflowEngine {
   private gmailService: GmailWorkflowService;
@@ -257,22 +257,18 @@ export class RealWorkflowEngine {
             continue;
           }
           
-          // Convert base64 to blob and create File object
-          const attachmentContent = attachmentData.data.data; // base64 data
-          console.log('📧 Converting base64 to File object, base64 length:', attachmentContent.length);
-          
+          // Use the FileConverter to properly handle the base64 data
           try {
-            // Decode base64 to binary
-            const binaryString = atob(attachmentContent);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-              bytes[i] = binaryString.charCodeAt(i);
-            }
+            const attachmentContent = attachmentData.data.data; // base64 data
+            console.log('📧 Converting base64 to File object using FileConverter, base64 length:', attachmentContent.length);
             
-            const blob = new Blob([bytes], { type: fileInfo.mimeType });
-            file = new File([blob], fileInfo.name, { type: fileInfo.mimeType });
+            file = FileConverter.createFileFromAttachment(
+              attachmentContent,
+              fileInfo.name,
+              fileInfo.mimeType
+            );
             
-            console.log('✅ Successfully created File object:', {
+            console.log('✅ Successfully created File object using FileConverter:', {
               name: file.name,
               size: file.size,
               type: file.type
@@ -289,7 +285,7 @@ export class RealWorkflowEngine {
             }
             
           } catch (conversionError) {
-            console.error('❌ Error converting base64 to File:', conversionError);
+            console.error('❌ Error converting base64 to File using FileConverter:', conversionError);
             extractedData.failedFiles.push({
               filename: fileInfo.name,
               error: `Base64 conversion failed: ${conversionError instanceof Error ? conversionError.message : 'Unknown error'}`
