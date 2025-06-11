@@ -172,6 +172,7 @@ export const DatabaseConfig: React.FC<DatabaseConfigProps> = ({
             <li>• Table: {step.config.storageConfig?.table || 'Not specified'}</li>
             <li>• Action: {step.config.storageConfig?.action || 'Insert'}</li>
             <li>• Auto-create: {step.config.databaseOptions?.createIfNotExists !== false ? 'Yes' : 'No'}</li>
+            <li>• Validation: {step.config.storageConfig?.validateBeforeInsert !== false ? 'Enabled' : 'Disabled'}</li>
           </ul>
         </div>
       </CardContent>

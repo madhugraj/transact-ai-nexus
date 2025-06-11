@@ -34,7 +34,9 @@ export const ProcessingConfig: React.FC<ProcessingConfigProps> = ({
     'total_amount', 'subtotal', 'tax_amount', 'discount',
     'invoice_date', 'po_date', 'due_date', 'delivery_date',
     'line_items', 'quantities', 'unit_prices', 'descriptions',
-    'currency', 'payment_terms', 'shipping_address', 'billing_address'
+    'currency', 'payment_terms', 'shipping_address', 'billing_address',
+    'contract_number', 'contract_value', 'party_1_name', 'party_2_name',
+    'receipt_number', 'merchant_name', 'transaction_date', 'payment_method'
   ];
 
   useEffect(() => {
@@ -63,6 +65,9 @@ export const ProcessingConfig: React.FC<ProcessingConfigProps> = ({
       setTestingMatching(false);
     }
   };
+
+  // Get current AI-Powered setting (default to true if not set)
+  const isAiPoweredEnabled = step.config.comparisonConfig?.useIntelligentMatching !== false;
 
   return (
     <Card>
@@ -120,7 +125,7 @@ export const ProcessingConfig: React.FC<ProcessingConfigProps> = ({
             ))}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Click fields to select/deselect for comparison
+            Click fields to select/deselect for comparison. All document types supported.
           </p>
         </div>
 
@@ -170,7 +175,7 @@ export const ProcessingConfig: React.FC<ProcessingConfigProps> = ({
               <Label className="font-medium">AI-Powered Intelligent Matching</Label>
             </div>
             <Switch
-              checked={step.config.comparisonConfig?.useIntelligentMatching !== false}
+              checked={isAiPoweredEnabled}
               onCheckedChange={(checked) => onConfigUpdate('comparisonConfig', {
                 ...step.config.comparisonConfig,
                 useIntelligentMatching: checked
@@ -179,10 +184,44 @@ export const ProcessingConfig: React.FC<ProcessingConfigProps> = ({
           </div>
           
           <p className="text-xs text-muted-foreground mb-3">
-            Uses advanced AI algorithms to find semantic matches beyond exact text comparison
+            Uses advanced AI algorithms to find semantic matches beyond exact text comparison.
+            Handles variations in vendor names, amounts with different formatting, and fuzzy date matching.
           </p>
           
-          <div className="flex gap-2">
+          {isAiPoweredEnabled && (
+            <div className="space-y-3">
+              <div>
+                <Label>AI Confidence Threshold: {Math.round((step.config.comparisonConfig?.confidenceThreshold || 0.85) * 100)}%</Label>
+                <Slider
+                  value={[step.config.comparisonConfig?.confidenceThreshold || 0.85]}
+                  onValueChange={([value]) => onConfigUpdate('comparisonConfig', {
+                    ...step.config.comparisonConfig,
+                    confidenceThreshold: value
+                  })}
+                  max={1}
+                  min={0.5}
+                  step={0.05}
+                  className="mt-2"
+                />
+              </div>
+              
+              <div>
+                <Label>Amount Tolerance: {step.config.comparisonConfig?.amountTolerancePercent || 5}%</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="20"
+                  value={step.config.comparisonConfig?.amountTolerancePercent || 5}
+                  onChange={(e) => onConfigUpdate('comparisonConfig', {
+                    ...step.config.comparisonConfig,
+                    amountTolerancePercent: parseFloat(e.target.value)
+                  })}
+                />
+              </div>
+            </div>
+          )}
+          
+          <div className="flex gap-2 mt-3">
             <Button
               variant="outline"
               size="sm"
@@ -201,10 +240,16 @@ export const ProcessingConfig: React.FC<ProcessingConfigProps> = ({
           <p className="font-medium mb-1">Processing Configuration:</p>
           <ul className="text-xs text-muted-foreground space-y-1">
             <li>• Type: {step.config.comparisonConfig?.type || 'PO-Invoice Comparison'}</li>
-            <li>• Fields: {step.config.comparisonConfig?.fields?.join(', ') || 'vendor_name, po_number, total_amount'}</li>
+            <li>• Fields: {(step.config.comparisonConfig?.fields || ['vendor_name', 'po_number', 'total_amount']).join(', ')}</li>
             <li>• Tolerance: {Math.round((step.config.comparisonConfig?.tolerance || 0.8) * 100)}%</li>
             <li>• Matching: {step.config.comparisonConfig?.matchingCriteria || 'AI-Powered'}</li>
-            <li>• AI-Powered: {step.config.comparisonConfig?.useIntelligentMatching !== false ? 'Enabled' : 'Disabled'}</li>
+            <li>• AI-Powered: {isAiPoweredEnabled ? 'Enabled' : 'Disabled'}</li>
+            {isAiPoweredEnabled && (
+              <>
+                <li>• AI Confidence: {Math.round((step.config.comparisonConfig?.confidenceThreshold || 0.85) * 100)}%</li>
+                <li>• Amount Tolerance: {step.config.comparisonConfig?.amountTolerancePercent || 5}%</li>
+              </>
+            )}
           </ul>
         </div>
       </CardContent>

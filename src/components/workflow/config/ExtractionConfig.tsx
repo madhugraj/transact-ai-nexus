@@ -16,13 +16,214 @@ interface ExtractionConfigProps {
   onConfigUpdate: (configKey: string, value: any) => void;
 }
 
+// Pre-written prompts based on document types that we've been using
+const EXTRACTION_PROMPTS = {
+  'invoice-extraction': `You are an expert AI assistant specialized in extracting structured data from invoice documents. Extract the following information and return it in JSON format:
+
+REQUIRED FIELDS:
+- invoice_number: String
+- vendor_name: String  
+- vendor_address: String
+- invoice_date: Date (YYYY-MM-DD format)
+- due_date: Date (YYYY-MM-DD format)
+- subtotal: Number
+- tax_amount: Number
+- total_amount: Number
+- currency: String
+- po_number: String (if available)
+- payment_terms: String
+
+LINE ITEMS (as array):
+- description: String
+- quantity: Number
+- unit_price: Number
+- line_total: Number
+
+Return JSON in this exact format:
+{
+  "invoice_number": "",
+  "vendor_name": "",
+  "vendor_address": "",
+  "invoice_date": "",
+  "due_date": "",
+  "subtotal": 0,
+  "tax_amount": 0,
+  "total_amount": 0,
+  "currency": "",
+  "po_number": "",
+  "payment_terms": "",
+  "line_items": [
+    {
+      "description": "",
+      "quantity": 0,
+      "unit_price": 0,
+      "line_total": 0
+    }
+  ]
+}`,
+
+  'po-extraction': `You are an expert AI assistant specialized in extracting structured data from Purchase Order documents. Extract the following information and return it in JSON format:
+
+REQUIRED FIELDS:
+- po_number: String
+- vendor_name: String
+- vendor_code: String
+- vendor_address: String
+- po_date: Date (YYYY-MM-DD format)
+- delivery_date: Date (YYYY-MM-DD format)
+- ship_to_address: String
+- bill_to_address: String
+- project: String
+- terms_conditions: String
+- subtotal: Number
+- tax_amount: Number
+- total_amount: Number
+- currency: String
+
+LINE ITEMS (as array):
+- item_code: String
+- description: String
+- quantity: Number
+- unit_price: Number
+- line_total: Number
+
+Return JSON in this exact format:
+{
+  "po_number": "",
+  "vendor_name": "",
+  "vendor_code": "",
+  "vendor_address": "",
+  "po_date": "",
+  "delivery_date": "",
+  "ship_to_address": "",
+  "bill_to_address": "",
+  "project": "",
+  "terms_conditions": "",
+  "subtotal": 0,
+  "tax_amount": 0,
+  "total_amount": 0,
+  "currency": "",
+  "line_items": [
+    {
+      "item_code": "",
+      "description": "",
+      "quantity": 0,
+      "unit_price": 0,
+      "line_total": 0
+    }
+  ]
+}`,
+
+  'receipt-extraction': `You are an expert AI assistant specialized in extracting structured data from receipt documents. Extract the following information and return it in JSON format:
+
+REQUIRED FIELDS:
+- receipt_number: String
+- merchant_name: String
+- merchant_address: String
+- transaction_date: Date (YYYY-MM-DD format)
+- subtotal: Number
+- tax_amount: Number
+- total_amount: Number
+- currency: String
+- payment_method: String
+
+LINE ITEMS (as array):
+- description: String
+- quantity: Number
+- unit_price: Number
+- line_total: Number
+
+Return JSON in this exact format:
+{
+  "receipt_number": "",
+  "merchant_name": "",
+  "merchant_address": "",
+  "transaction_date": "",
+  "subtotal": 0,
+  "tax_amount": 0,
+  "total_amount": 0,
+  "currency": "",
+  "payment_method": "",
+  "line_items": [
+    {
+      "description": "",
+      "quantity": 0,
+      "unit_price": 0,
+      "line_total": 0
+    }
+  ]
+}`,
+
+  'contract-extraction': `You are an expert AI assistant specialized in extracting structured data from contract documents. Extract the following information and return it in JSON format:
+
+REQUIRED FIELDS:
+- contract_number: String
+- contract_title: String
+- party_1_name: String
+- party_2_name: String
+- contract_date: Date (YYYY-MM-DD format)
+- start_date: Date (YYYY-MM-DD format)
+- end_date: Date (YYYY-MM-DD format)
+- contract_value: Number
+- currency: String
+- payment_terms: String
+- key_obligations: Array of strings
+
+Return JSON in this exact format:
+{
+  "contract_number": "",
+  "contract_title": "",
+  "party_1_name": "",
+  "party_2_name": "",
+  "contract_date": "",
+  "start_date": "",
+  "end_date": "",
+  "contract_value": 0,
+  "currency": "",
+  "payment_terms": "",
+  "key_obligations": []
+}`,
+
+  'general-ocr': `You are an expert OCR assistant. Read this scanned document image and extract clean, structured text.
+You are also an expert in extracting tables from scanned images.
+
+Instructions:
+- Extract all clear tabular structures from the image
+- Extract all possible tabular structures with data from the image
+- Extract the headings of the table
+- Avoid any logos or text not part of a structured table
+- Output JSON only in the format:
+
+{
+  "tables": [
+    {
+      "title": "extracted heading",
+      "headers": ["Column A", "Column B"],
+      "rows": [
+        ["value1", "value2"]
+      ]
+    }
+  ]
+}`
+};
+
 export const ExtractionConfig: React.FC<ExtractionConfigProps> = ({
   step,
   onConfigUpdate
 }) => {
-  const documentTypes = ['invoice', 'purchase-order', 'receipt', 'contract', 'general-document'];
-  const extractionMethods = ['ocr', 'ai-vision', 'template-based', 'hybrid'];
+  // Get current document type to set appropriate prompt
+  const currentType = step.config.processingConfig?.type || 'general-ocr';
   
+  // Update prompt when document type changes
+  React.useEffect(() => {
+    if (currentType in EXTRACTION_PROMPTS) {
+      onConfigUpdate('ocrSettings', {
+        ...step.config.ocrSettings,
+        customPrompt: EXTRACTION_PROMPTS[currentType as keyof typeof EXTRACTION_PROMPTS]
+      });
+    }
+  }, [currentType, onConfigUpdate]);
+
   return (
     <Card>
       <CardHeader>
@@ -125,8 +326,12 @@ export const ExtractionConfig: React.FC<ExtractionConfigProps> = ({
               customPrompt: e.target.value
             })}
             placeholder="Enter specific instructions for data extraction..."
-            rows={3}
+            rows={8}
+            className="font-mono text-sm"
           />
+          <p className="text-xs text-muted-foreground mt-1">
+            Pre-filled with optimized prompts based on document type. Customize as needed.
+          </p>
         </div>
 
         <div className="flex items-center justify-between">
@@ -147,6 +352,7 @@ export const ExtractionConfig: React.FC<ExtractionConfigProps> = ({
             <li>• Method: {step.config.processingConfig?.aiModel || 'Hybrid'}</li>
             <li>• Confidence: {((step.config.processingConfig?.confidence || 0.8) * 100).toFixed(0)}%</li>
             <li>• Language: {step.config.ocrSettings?.language || 'English'}</li>
+            <li>• Enhanced Resolution: {step.config.ocrSettings?.enhanceResolution ? 'Yes' : 'No'}</li>
           </ul>
         </div>
       </CardContent>

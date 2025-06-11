@@ -3,10 +3,13 @@
 export type WorkflowStepType = 
   | "data-source"           // Email, Drive, Upload, SAP
   | "document-processing"   // Extract Invoice, Extract PO
+  | "Extract Data"          // New step type for extraction
   | "data-validation"       // Validate extracted data
   | "data-comparison"       // Compare PO vs Invoice, JD vs CV
+  | "Process Data"          // New step type for processing
   | "data-storage"         // Store in database
   | "database-storage"     // Legacy alias for data-storage
+  | "Store Data"           // New step type for storage
   | "analytics"            // Generate analytics
   | "notification"         // Send notifications
   | "conditional"          // Conditional logic
@@ -55,27 +58,48 @@ export interface WorkflowStepConfig {
   
   // Processing configurations
   processingConfig?: {
-    type: 'invoice-extraction' | 'po-extraction' | 'general-ocr';
-    aiModel?: 'gemini' | 'openai';
+    type: 'invoice-extraction' | 'po-extraction' | 'receipt-extraction' | 'contract-extraction' | 'general-ocr';
+    aiModel?: 'hybrid' | 'ai-vision' | 'ocr' | 'template-based';
     confidence?: number;
+  };
+  
+  // OCR Settings for extraction
+  ocrSettings?: {
+    language?: string;
+    enhanceResolution?: boolean;
+    customPrompt?: string;
   };
   
   // Comparison configurations
   comparisonConfig?: {
-    type: 'po-invoice-comparison' | 'jd-cv-comparison' | 'custom-comparison';
+    type: 'po-invoice-comparison' | 'jd-cv-comparison' | 'invoice-receipt-comparison' | 'contract-invoice-comparison' | 'multi-document-validation' | 'data-normalization' | 'custom-comparison';
     fields?: string[];
     tolerance?: number;
-    matchingCriteria?: 'exact' | 'fuzzy' | 'threshold';
+    matchingCriteria?: 'exact' | 'fuzzy' | 'intelligent';
     sourceTable?: string;
     targetTable?: string;
     useIntelligentMatching?: boolean;
+    confidenceThreshold?: number;
+    fieldWeights?: Record<string, number>;
+    fuzzyMatchSensitivity?: number;
+    amountTolerancePercent?: number;
+    customBusinessRules?: string[];
   };
   
   // Storage configurations
   storageConfig?: {
     table: string;
-    action: 'insert' | 'upsert';
+    action: 'insert' | 'upsert' | 'update' | 'replace';
     mapping?: Record<string, string>;
+    connection?: string;
+    validateBeforeInsert?: boolean;
+  };
+  
+  // Database options
+  databaseOptions?: {
+    createIfNotExists?: boolean;
+    connection?: string;
+    schema?: Record<string, string>;
   };
   
   // Analytics configurations
