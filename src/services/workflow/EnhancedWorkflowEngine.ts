@@ -2,8 +2,16 @@
 import { WorkflowConfig } from '@/types/workflow';
 import { supabase } from '@/integrations/supabase/client';
 import { RealWorkflowEngine } from './RealWorkflowEngine';
+import { WorkflowExecutionService } from './WorkflowExecutionService';
 
 export class EnhancedWorkflowEngine extends RealWorkflowEngine {
+  private executionService: WorkflowExecutionService;
+
+  constructor() {
+    super();
+    this.executionService = new WorkflowExecutionService();
+  }
+
   async validateWorkflowRequirements(workflow: WorkflowConfig): Promise<{ valid: boolean; errors: string[] }> {
     console.log('🔍 Enhanced validation for REAL workflow:', workflow.name);
     
@@ -24,5 +32,14 @@ export class EnhancedWorkflowEngine extends RealWorkflowEngine {
     const parentValidation = await super.validateWorkflowRequirements(workflow);
     
     return parentValidation;
+  }
+
+  async executeWorkflow(workflow: WorkflowConfig) {
+    const execution = await super.executeWorkflow(workflow);
+    
+    // Save the execution using the service
+    await this.executionService.saveExecution(execution);
+    
+    return execution;
   }
 }
