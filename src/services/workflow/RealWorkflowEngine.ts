@@ -1,13 +1,25 @@
 
 import { WorkflowConfig, WorkflowExecution, WorkflowStepResult } from '@/types/workflow';
 import { GmailWorkflowService } from './GmailWorkflowService';
+import { InvoiceDetectionAgent } from '@/services/agents/InvoiceDetectionAgent';
+import { InvoiceDataExtractionAgent } from '@/services/agents/InvoiceDataExtractionAgent';
+import { PODetectionAgent } from '@/services/agents/PODetectionAgent';
+import { PODataExtractionAgent } from '@/services/agents/PODataExtractionAgent';
 import { supabase } from '@/integrations/supabase/client';
 
 export class RealWorkflowEngine {
   private gmailService: GmailWorkflowService;
+  private invoiceDetectionAgent: InvoiceDetectionAgent;
+  private invoiceExtractionAgent: InvoiceDataExtractionAgent;
+  private poDetectionAgent: PODetectionAgent;
+  private poExtractionAgent: PODataExtractionAgent;
 
   constructor() {
     this.gmailService = new GmailWorkflowService();
+    this.invoiceDetectionAgent = new InvoiceDetectionAgent();
+    this.invoiceExtractionAgent = new InvoiceDataExtractionAgent();
+    this.poDetectionAgent = new PODetectionAgent();
+    this.poExtractionAgent = new PODataExtractionAgent();
   }
 
   async validateWorkflowRequirements(workflow: WorkflowConfig): Promise<{ valid: boolean; errors: string[] }> {
@@ -78,7 +90,7 @@ export class RealWorkflowEngine {
   }
 
   async executeWorkflow(workflow: WorkflowConfig): Promise<WorkflowExecution> {
-    console.log('🚀 Starting workflow execution:', workflow.name);
+    console.log('🚀 Starting REAL workflow execution:', workflow.name);
     
     const executionId = `exec_${Date.now()}`;
     console.log('📊 Created execution:', executionId);
@@ -94,7 +106,7 @@ export class RealWorkflowEngine {
     };
 
     try {
-      console.log('🔄 Executing', workflow.steps.length, 'steps...');
+      console.log('🔄 Executing', workflow.steps.length, 'steps with REAL processing...');
       
       // Execute steps in sequence
       let stepData: any = null; // Data passed between steps
@@ -109,7 +121,7 @@ export class RealWorkflowEngine {
         };
 
         try {
-          console.log('⚙️ Processing step:', step.name);
+          console.log('⚙️ REAL processing step:', step.name);
           
           // Execute the actual step logic
           const result = await this.executeStep(step, stepData);
@@ -119,7 +131,7 @@ export class RealWorkflowEngine {
           stepResult.output = result;
           stepData = result; // Pass data to next step
           
-          console.log('✅ Step completed:', step.name);
+          console.log('✅ Step completed with REAL data:', step.name);
           
         } catch (stepError) {
           console.error('❌ Step failed:', step.name, stepError);
@@ -136,7 +148,7 @@ export class RealWorkflowEngine {
       execution.endTime = new Date();
       
       const duration = (execution.endTime.getTime() - execution.startTime.getTime()) / 1000;
-      console.log('✅ Workflow completed successfully in', duration, 'seconds');
+      console.log('✅ REAL workflow completed successfully in', duration, 'seconds');
       
     } catch (error) {
       console.error('❌ Workflow execution failed:', error);
@@ -170,14 +182,14 @@ export class RealWorkflowEngine {
 
   private async executeDataSourceStep(step: any): Promise<any> {
     if (step.config.emailConfig?.source === 'gmail') {
-      console.log('📧 Fetching emails from Gmail...');
+      console.log('📧 REAL Gmail fetch starting...');
       
       const filters = step.config.emailConfig.filters || [];
       const useIntelligentFiltering = step.config.emailConfig.useIntelligentFiltering || false;
       
       const emailData = await this.gmailService.fetchEmailsWithAttachments(filters, useIntelligentFiltering);
       
-      console.log('📧 Gmail fetch completed:', emailData.count, 'emails found');
+      console.log('📧 REAL Gmail fetch completed:', emailData.count, 'emails found');
       return emailData;
     }
     
@@ -186,42 +198,78 @@ export class RealWorkflowEngine {
   }
 
   private async executeDocumentProcessingStep(step: any, inputData: any): Promise<any> {
-    console.log('🔍 Processing documents with AI extraction...');
+    console.log('🔍 REAL document processing with AI extraction...');
     
     if (!inputData || !inputData.files) {
       throw new Error('No input files to process');
     }
     
     const processingType = step.config.processingConfig?.type || 'general-ocr';
-    const aiModel = step.config.processingConfig?.aiModel || 'hybrid';
+    console.log('🤖 Using REAL processing type:', processingType);
     
-    console.log('🤖 Using processing type:', processingType, 'with AI model:', aiModel);
-    
-    // Here you would call your actual AI extraction service
-    // For now, we'll simulate the processing but with realistic data structure
     const extractedData = {
-      processedCount: inputData.files.length,
-      extractedDocuments: inputData.files.map((file: any) => ({
-        filename: file.name,
-        extractedData: {
-          // This would be real extracted data from your AI service
-          invoice_number: `INV-${Math.floor(Math.random() * 10000)}`,
-          vendor_name: 'Sample Vendor Corp',
-          total_amount: Math.floor(Math.random() * 10000) + 100,
-          invoice_date: new Date().toISOString().split('T')[0],
-          currency: 'USD'
-        },
-        confidence: 0.95,
-        processingTime: Date.now()
-      }))
+      processedCount: 0,
+      extractedDocuments: []
     };
     
-    console.log('🔍 Document processing completed:', extractedData.processedCount, 'documents processed');
+    // Process each file with real AI agents
+    for (const file of inputData.files) {
+      try {
+        console.log('📄 REAL processing file:', file.name);
+        
+        let documentData = null;
+        
+        // Determine document type and use appropriate agent
+        if (processingType === 'invoice-extraction' || step.name.toLowerCase().includes('invoice')) {
+          console.log('📄 Using invoice detection agent for:', file.name);
+          
+          // First detect if it's an invoice
+          const detection = await this.invoiceDetectionAgent.process(file);
+          if (detection.success && detection.data?.is_invoice) {
+            console.log('✅ Invoice detected, extracting data...');
+            const extraction = await this.invoiceExtractionAgent.process(file);
+            if (extraction.success) {
+              documentData = extraction.data;
+            }
+          }
+        } else if (processingType === 'po-extraction' || step.name.toLowerCase().includes('po')) {
+          console.log('📄 Using PO detection agent for:', file.name);
+          
+          // First detect if it's a PO
+          const detection = await this.poDetectionAgent.process(file);
+          if (detection.success && detection.data?.is_po) {
+            console.log('✅ PO detected, extracting data...');
+            const extraction = await this.poExtractionAgent.process(file);
+            if (extraction.success) {
+              documentData = extraction.data;
+            }
+          }
+        }
+        
+        if (documentData) {
+          extractedData.extractedDocuments.push({
+            filename: file.name,
+            extractedData: documentData,
+            confidence: documentData.extraction_confidence || 0.95,
+            processingTime: Date.now()
+          });
+          extractedData.processedCount++;
+          console.log('✅ REAL extraction completed for:', file.name);
+        } else {
+          console.log('⚠️ No data extracted from:', file.name);
+        }
+        
+      } catch (error) {
+        console.error('❌ Error processing file:', file.name, error);
+      }
+    }
+    
+    console.log('🔍 REAL document processing completed:', extractedData.processedCount, 'documents processed');
     return extractedData;
   }
 
   private async executeDataStorageStep(step: any, inputData: any): Promise<any> {
-    console.log('💾 Storing data to database...');
+    console.log('💾 REAL database storage starting...');
     
     if (!inputData || !inputData.extractedDocuments) {
       throw new Error('No extracted data to store');
@@ -230,7 +278,7 @@ export class RealWorkflowEngine {
     const tableName = step.config.storageConfig?.table || 'extracted_json';
     const action = step.config.storageConfig?.action || 'insert';
     
-    console.log('💾 Storing to table:', tableName, 'using action:', action);
+    console.log('💾 REAL storage to table:', tableName, 'using action:', action);
     
     try {
       const results = [];
@@ -242,7 +290,7 @@ export class RealWorkflowEngine {
           created_at: new Date().toISOString()
         };
         
-        console.log('💾 Inserting document data:', doc.filename);
+        console.log('💾 REAL database insert for:', doc.filename);
         
         const { data, error } = await supabase
           .from(tableName)
@@ -250,15 +298,15 @@ export class RealWorkflowEngine {
           .select();
         
         if (error) {
-          console.error('❌ Database insert failed:', error);
+          console.error('❌ REAL database insert failed:', error);
           throw new Error(`Failed to store data for ${doc.filename}: ${error.message}`);
         }
         
         results.push(data);
-        console.log('✅ Successfully stored:', doc.filename);
+        console.log('✅ REAL database insert successful:', doc.filename);
       }
       
-      console.log('💾 All data stored successfully. Records created:', results.length);
+      console.log('💾 All REAL data stored successfully. Records created:', results.length);
       
       return {
         storedCount: results.length,
@@ -267,7 +315,7 @@ export class RealWorkflowEngine {
       };
       
     } catch (error) {
-      console.error('❌ Data storage step failed:', error);
+      console.error('❌ REAL data storage step failed:', error);
       throw error;
     }
   }

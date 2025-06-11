@@ -5,7 +5,7 @@ import { RealWorkflowEngine } from './RealWorkflowEngine';
 
 export class EnhancedWorkflowEngine extends RealWorkflowEngine {
   async validateWorkflowRequirements(workflow: WorkflowConfig): Promise<{ valid: boolean; errors: string[] }> {
-    console.log('🔍 Enhanced validation for workflow:', workflow.name);
+    console.log('🔍 Enhanced validation for REAL workflow:', workflow.name);
     
     // First check user authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -18,7 +18,7 @@ export class EnhancedWorkflowEngine extends RealWorkflowEngine {
       };
     }
     
-    console.log('✅ User authenticated:', user.email);
+    console.log('✅ User authenticated for REAL processing:', user.email);
     
     // Use parent class validation for external auth requirements
     const parentValidation = await super.validateWorkflowRequirements(workflow);
