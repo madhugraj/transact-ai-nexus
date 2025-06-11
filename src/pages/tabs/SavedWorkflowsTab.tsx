@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlayCircle, BarChart3, Trash2, RefreshCw } from 'lucide-react';
+import { PlayCircle, BarChart3, Trash2, RefreshCw, Loader2 } from 'lucide-react';
 import { WorkflowConfig } from '@/types/workflow';
 import WorkflowCard from '@/components/actions/WorkflowCard';
 import { useWorkflowPersistence } from '@/hooks/useWorkflowPersistence';
@@ -20,8 +20,7 @@ export const SavedWorkflowsTab: React.FC<SavedWorkflowsTabProps> = ({
   onEditWorkflow,
   isExecuting
 }) => {
-  // Use the persistence hook directly to get real-time updates
-  const { workflows, deleteWorkflow, clearAllWorkflows, updateWorkflow, debugStorage } = useWorkflowPersistence();
+  const { workflows, loading, deleteWorkflow, clearAllWorkflows, updateWorkflow, refreshWorkflows } = useWorkflowPersistence();
   const { toast } = useToast();
   const workflowEngine = new RealWorkflowEngine();
 
@@ -93,23 +92,7 @@ export const SavedWorkflowsTab: React.FC<SavedWorkflowsTabProps> = ({
       return;
     }
 
-    try {
-      deleteWorkflow(workflowId);
-      
-      toast({
-        title: "Workflow Deleted",
-        description: `"${workflowToDelete.name}" has been removed`,
-      });
-      
-      console.log('✅ Successfully deleted workflow:', workflowToDelete.name);
-    } catch (error) {
-      console.error('❌ Error deleting workflow:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete workflow",
-        variant: "destructive"
-      });
-    }
+    deleteWorkflow(workflowId);
   };
 
   const handleToggleWorkflow = (workflowId: string) => {
@@ -126,19 +109,21 @@ export const SavedWorkflowsTab: React.FC<SavedWorkflowsTabProps> = ({
   const handleClearAll = () => {
     console.log('🗑️ Clearing all workflows');
     clearAllWorkflows();
-    toast({
-      title: "All Workflows Cleared",
-      description: "All workflows have been removed",
-    });
   };
 
-  const handleDebugStorage = () => {
-    debugStorage();
-    toast({
-      title: "Debug Info",
-      description: "Check console for localStorage debug information",
-    });
-  };
+  // Show loading state
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <div className="flex items-center justify-center space-x-2">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span>Loading workflows...</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (workflows.length === 0) {
     return (
@@ -155,9 +140,9 @@ export const SavedWorkflowsTab: React.FC<SavedWorkflowsTabProps> = ({
             <Button onClick={onCreateFirst}>
               Create First Workflow
             </Button>
-            <Button variant="outline" size="sm" onClick={handleDebugStorage}>
+            <Button variant="outline" size="sm" onClick={refreshWorkflows}>
               <RefreshCw className="h-4 w-4 mr-1" />
-              Debug Storage
+              Refresh
             </Button>
           </div>
         </CardContent>
@@ -167,11 +152,11 @@ export const SavedWorkflowsTab: React.FC<SavedWorkflowsTabProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Debug Controls */}
+      {/* Action Controls */}
       <div className="flex gap-2 justify-end">
-        <Button variant="outline" size="sm" onClick={handleDebugStorage}>
+        <Button variant="outline" size="sm" onClick={refreshWorkflows}>
           <RefreshCw className="h-4 w-4 mr-1" />
-          Debug Storage
+          Refresh
         </Button>
         {workflows.length > 0 && (
           <Button variant="destructive" size="sm" onClick={handleClearAll}>
@@ -199,7 +184,7 @@ export const SavedWorkflowsTab: React.FC<SavedWorkflowsTabProps> = ({
       <div className="text-sm text-muted-foreground text-center">
         Showing {workflows.length} workflow{workflows.length !== 1 ? 's' : ''} 
         <span className="ml-2">
-          • Browser-specific storage (Chrome ≠ Safari)
+          • Stored in your account database
         </span>
       </div>
     </div>

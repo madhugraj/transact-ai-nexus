@@ -1,108 +1,289 @@
 
 import { useState, useEffect } from 'react';
 import { WorkflowConfig } from '@/types/workflow';
-
-const WORKFLOWS_STORAGE_KEY = 'saved_workflows';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/components/auth/UserAuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 export function useWorkflowPersistence() {
   const [workflows, setWorkflows] = useState<WorkflowConfig[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { isAuthenticated, user } = useAuth();
+  const { toast } = useToast();
 
-  // Load workflows from localStorage on mount
+  // Load workflows from Supabase when user is authenticated
   useEffect(() => {
-    const savedWorkflows = localStorage.getItem(WORKFLOWS_STORAGE_KEY);
-    console.log('📁 Loading workflows from localStorage:', savedWorkflows);
-    if (savedWorkflows) {
-      try {
-        const parsed = JSON.parse(savedWorkflows);
-        console.log('📄 Parsed workflows count:', parsed.length);
-        // Convert date strings back to Date objects
-        const workflowsWithDates = parsed.map((workflow: any) => ({
-          ...workflow,
-          createdAt: new Date(workflow.createdAt),
-          lastRun: workflow.lastRun ? new Date(workflow.lastRun) : undefined
-        }));
-        setWorkflows(workflowsWithDates);
-        console.log('✅ Successfully loaded workflows:', workflowsWithDates.length);
-      } catch (error) {
-        console.error('❌ Failed to load workflows from localStorage:', error);
-        // Clear corrupted data
-        localStorage.removeItem(WORKFLOWS_STORAGE_KEY);
-        setWorkflows([]);
-      }
+    if (isAuthenticated && user) {
+      loadWorkflowsFromSupabase();
     } else {
-      console.log('📭 No workflows found in localStorage');
+      setWorkflows([]);
+      setLoading(false);
     }
-  }, []);
+  }, [isAuthenticated, user]);
 
-  // Save workflows to localStorage whenever workflows change
-  useEffect(() => {
-    console.log('💾 Saving workflows to localStorage. Count:', workflows.length);
-    console.log('📋 Workflow IDs being saved:', workflows.map(w => w.id));
-    localStorage.setItem(WORKFLOWS_STORAGE_KEY, JSON.stringify(workflows));
-  }, [workflows]);
+  const loadWorkflowsFromSupabase = async () => {
+    try {
+      setLoading(true);
+      console.log('📁 Loading workflows from Supabase for user:', user?.email);
+      
+      const { data, error } = await supabase
+        .from('workflows')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-  const addWorkflow = (workflow: WorkflowConfig) => {
-    console.log('➕ Adding new workflow:', workflow.name, 'ID:', workflow.id);
-    setWorkflows(prev => {
-      const newWorkflows = [...prev, workflow];
-      console.log('📊 New workflows count after add:', newWorkflows.length);
-      return newWorkflows;
-    });
-  };
+      if (error) {
+        console.error('❌ Error loading workflows:', error);
+        toast({
+          title: "Error Loading Workflows",
+          description: "Failed to load workflows from database",
+          variant: "destructive"
+        });
+        return;
+      }
 
-  const updateWorkflow = (id: string, updates: Partial<WorkflowConfig>) => {
-    console.log('📝 Updating workflow with ID:', id, 'Updates:', updates);
-    setWorkflows(prev => {
-      const updated = prev.map(w => w.id === id ? { ...w, ...updates } : w);
-      console.log('📊 Workflows after update:', updated.length);
-      return updated;
-    });
-  };
+      // Convert database format to WorkflowConfig format
+      const workflowConfigs: WorkflowConfig[] = (data || []).map(dbWorkflow => ({
+        id: dbWorkflow.id,
+        name: dbWorkflow.name,
+        description: dbWorkflow.description || '',
+        steps: dbWorkflow.config.steps || [],
+        connections: dbWorkflow.config.connections || [],
+        isActive: dbWorkflow.is_active,
+        createdAt: new Date(dbWorkflow.created_at),
+        lastRun: dbWorkflow.last_run ? new Date(dbWorkflow.last_run) : undefined,
+        totalRuns: dbWorkflow.total_runs || 0,
+        successRate: dbWorkflow.success_rate || 0
+      }));
 
-  const deleteWorkflow = (id: string) => {
-    console.log('🗑️ Attempting to delete workflow with ID:', id);
-    console.log('📋 Current workflow IDs:', workflows.map(w => w.id));
-    
-    setWorkflows(prev => {
-      const filteredWorkflows = prev.filter(w => {
-        const shouldKeep = w.id !== id;
-        console.log(`🔍 Workflow ${w.id} (${w.name}): ${shouldKeep ? 'KEEP' : 'DELETE'}`);
-        return shouldKeep;
+      setWorkflows(workflowConfigs);
+      console.log('✅ Successfully loaded', workflowConfigs.length, 'workflows from Supabase');
+    } catch (error) {
+      console.error('❌ Failed to load workflows:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load workflows",
+        variant: "destructive"
       });
-      
-      console.log('📊 Workflows before deletion:', prev.length, 'After deletion:', filteredWorkflows.length);
-      console.log('📋 Remaining workflow IDs:', filteredWorkflows.map(w => w.id));
-      
-      // Force localStorage update immediately
-      setTimeout(() => {
-        localStorage.setItem(WORKFLOWS_STORAGE_KEY, JSON.stringify(filteredWorkflows));
-        console.log('💾 Force saved to localStorage after deletion');
-      }, 0);
-      
-      return filteredWorkflows;
-    });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const clearAllWorkflows = () => {
-    console.log('🗑️ Clearing all workflows');
-    setWorkflows([]);
-    localStorage.removeItem(WORKFLOWS_STORAGE_KEY);
-    console.log('✅ All workflows cleared');
+  const addWorkflow = async (workflow: WorkflowConfig) => {
+    if (!isAuthenticated || !user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to save workflows",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      console.log('➕ Adding new workflow to Supabase:', workflow.name, 'ID:', workflow.id);
+      
+      const { data, error } = await supabase
+        .from('workflows')
+        .insert({
+          id: workflow.id,
+          user_id: user.id,
+          name: workflow.name,
+          description: workflow.description,
+          config: {
+            steps: workflow.steps,
+            connections: workflow.connections
+          },
+          is_active: workflow.isActive,
+          total_runs: workflow.totalRuns || 0,
+          success_rate: workflow.successRate || 0
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error saving workflow:', error);
+        toast({
+          title: "Error Saving Workflow",
+          description: error.message,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Add to local state
+      setWorkflows(prev => [workflow, ...prev]);
+      console.log('✅ Successfully saved workflow to Supabase');
+      
+      toast({
+        title: "Workflow Saved",
+        description: `"${workflow.name}" has been saved to your account`,
+      });
+    } catch (error) {
+      console.error('❌ Failed to save workflow:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save workflow",
+        variant: "destructive"
+      });
+    }
   };
 
-  // Debug function to check localStorage directly
-  const debugStorage = () => {
-    const stored = localStorage.getItem(WORKFLOWS_STORAGE_KEY);
-    console.log('🔍 Current localStorage data:', stored);
-    console.log('🔍 Current state workflows:', workflows.length);
+  const updateWorkflow = async (id: string, updates: Partial<WorkflowConfig>) => {
+    if (!isAuthenticated || !user) {
+      return;
+    }
+
+    try {
+      console.log('📝 Updating workflow in Supabase:', id, 'Updates:', updates);
+      
+      // Prepare database updates
+      const dbUpdates: any = {
+        updated_at: new Date().toISOString()
+      };
+      
+      if (updates.name !== undefined) dbUpdates.name = updates.name;
+      if (updates.description !== undefined) dbUpdates.description = updates.description;
+      if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive;
+      if (updates.lastRun !== undefined) dbUpdates.last_run = updates.lastRun.toISOString();
+      if (updates.totalRuns !== undefined) dbUpdates.total_runs = updates.totalRuns;
+      if (updates.successRate !== undefined) dbUpdates.success_rate = updates.successRate;
+      
+      // If steps or connections are updated, update the config
+      if (updates.steps !== undefined || updates.connections !== undefined) {
+        const currentWorkflow = workflows.find(w => w.id === id);
+        if (currentWorkflow) {
+          dbUpdates.config = {
+            steps: updates.steps || currentWorkflow.steps,
+            connections: updates.connections || currentWorkflow.connections
+          };
+        }
+      }
+
+      const { error } = await supabase
+        .from('workflows')
+        .update(dbUpdates)
+        .eq('id', id);
+
+      if (error) {
+        console.error('❌ Error updating workflow:', error);
+        toast({
+          title: "Error Updating Workflow",
+          description: error.message,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Update local state
+      setWorkflows(prev => 
+        prev.map(w => w.id === id ? { ...w, ...updates } : w)
+      );
+      
+      console.log('✅ Successfully updated workflow in Supabase');
+    } catch (error) {
+      console.error('❌ Failed to update workflow:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update workflow",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const deleteWorkflow = async (id: string) => {
+    if (!isAuthenticated || !user) {
+      return;
+    }
+
+    try {
+      console.log('🗑️ Deleting workflow from Supabase:', id);
+      
+      const { error } = await supabase
+        .from('workflows')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('❌ Error deleting workflow:', error);
+        toast({
+          title: "Error Deleting Workflow",
+          description: error.message,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Remove from local state
+      setWorkflows(prev => prev.filter(w => w.id !== id));
+      console.log('✅ Successfully deleted workflow from Supabase');
+      
+      toast({
+        title: "Workflow Deleted",
+        description: "Workflow has been removed from your account",
+      });
+    } catch (error) {
+      console.error('❌ Failed to delete workflow:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete workflow",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const clearAllWorkflows = async () => {
+    if (!isAuthenticated || !user) {
+      return;
+    }
+
+    try {
+      console.log('🗑️ Clearing all workflows from Supabase');
+      
+      const { error } = await supabase
+        .from('workflows')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('❌ Error clearing workflows:', error);
+        toast({
+          title: "Error Clearing Workflows",
+          description: error.message,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      setWorkflows([]);
+      console.log('✅ Successfully cleared all workflows from Supabase');
+      
+      toast({
+        title: "All Workflows Cleared",
+        description: "All workflows have been removed from your account",
+      });
+    } catch (error) {
+      console.error('❌ Failed to clear workflows:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear workflows",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const refreshWorkflows = () => {
+    if (isAuthenticated && user) {
+      loadWorkflowsFromSupabase();
+    }
   };
 
   return {
     workflows,
+    loading,
     addWorkflow,
     updateWorkflow,
     deleteWorkflow,
     clearAllWorkflows,
-    debugStorage
+    refreshWorkflows
   };
 }
