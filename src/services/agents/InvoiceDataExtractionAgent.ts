@@ -1,4 +1,3 @@
-
 import { Agent, AgentResult } from './types';
 import { processImageWithGemini } from '@/services/api/geminiService';
 
@@ -35,7 +34,7 @@ REQUIRED FIELDS TO EXTRACT:
 - invoice_date: Date of the invoice (YYYY-MM-DD format)
 - supplier_gst_number: GST/Tax number of the supplier/seller
 - bill_to_gst_number: GST/Tax number of the buyer/bill-to party
-- po_number: Purchase Order number (if mentioned)
+- po_number: Purchase Order number - Look for ANY of these labels: "PO Number", "P.O. Number", "Order No", "Order Number", "Buyer's Order No", "Purchase Order", "PO#", "Order#", "Ref No", "Reference Number"
 - shipping_address: Complete shipping/delivery address
 - seal_and_sign_present: Boolean - true if you detect any seal, stamp, or signature on the document
 - line_items: Array of items with the following for each:
@@ -46,12 +45,20 @@ REQUIRED FIELDS TO EXTRACT:
   - total_amount: Total amount for this line item
   - serial_number: Serial number if available
 
+CRITICAL INSTRUCTIONS FOR PO NUMBER EXTRACTION:
+1. Look for ANY field that contains order/purchase references
+2. Common field names: "Order No", "Buyer's Order No", "P.O. Number", "PO#", "Order#", "Ref No", "Reference Number", "Purchase Order Number"
+3. Extract the EXACT value found in these fields
+4. If multiple order numbers exist, prioritize the main purchase order reference
+5. Clean up the extracted value (remove prefixes like "PO:", "Order:", etc.)
+
 IMPORTANT INSTRUCTIONS:
 1. Extract data EXACTLY as it appears in the document
 2. For dates, convert to YYYY-MM-DD format
 3. For amounts, extract only the numeric value (no currency symbols)
 4. If a field is not found, use null
 5. For seal_and_sign_present, carefully look for stamps, seals, signatures, or any authentication marks
+6. PAY SPECIAL ATTENTION to order/PO number fields - they are critical for invoice processing
 
 Respond with ONLY a JSON object in this exact format:
 {
@@ -111,8 +118,16 @@ Respond with ONLY a JSON object in this exact format:
       
       const extractedData = this.parseGeminiResponse(response.data);
       
+      // Additional logging for PO number extraction
+      console.log(`📊 PO Number extraction result for ${file.name}:`, {
+        extracted_po_number: extractedData.po_number,
+        po_number_type: typeof extractedData.po_number,
+        po_number_length: extractedData.po_number?.length || 0
+      });
+      
       console.log(`📊 Successfully parsed extraction data for ${file.name}:`, {
         hasInvoiceNumber: !!extractedData.invoice_number,
+        hasPONumber: !!extractedData.po_number,
         hasLineItems: extractedData.line_items?.length || 0,
         confidence: extractedData.extraction_confidence
       });
