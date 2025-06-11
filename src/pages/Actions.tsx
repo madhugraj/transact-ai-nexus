@@ -19,6 +19,15 @@ import { useCurrentWorkflow } from "@/hooks/useCurrentWorkflow";
 import { WorkflowConfig, WorkflowTemplate, WorkflowStep } from "@/types/workflow";
 import TemplateWorkflowVisualizer from "@/components/workflow/TemplateWorkflowVisualizer";
 
+// Helper function to generate proper UUIDs
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 const Actions = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("builder");
@@ -38,19 +47,19 @@ const Actions = () => {
 
   const createWorkflowFromTemplate = (template: WorkflowTemplate, switchToBuilder: boolean = true) => {
     const workflow: WorkflowConfig = {
-      id: `workflow-${Date.now()}`,
+      id: generateUUID(), // Use proper UUID instead of timestamp-based string
       name: template.name,
       description: template.description,
       steps: template.steps.map((step, index) => ({
         ...step,
-        id: `step-${index}`,
+        id: `step-${generateUUID()}`, // Use UUID for steps too
         position: step.position || { x: index * 200, y: 100 }
       })),
       connections: template.connections.map((conn, index) => ({
         ...conn,
-        id: `conn-${index}`,
-        sourceStepId: `step-${parseInt(conn.sourceStepId)}`,
-        targetStepId: `step-${parseInt(conn.targetStepId)}`
+        id: `conn-${generateUUID()}`, // Use UUID for connections too
+        sourceStepId: `step-${generateUUID()}`,
+        targetStepId: `step-${generateUUID()}`
       })),
       isActive: true,
       createdAt: new Date(),

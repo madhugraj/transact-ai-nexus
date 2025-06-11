@@ -22,6 +22,15 @@ interface WorkflowBuilderProps {
   onStepDoubleClick?: (step: WorkflowStep) => void;
 }
 
+// Helper function to generate proper UUIDs
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({
   workflow,
   onWorkflowChange,
@@ -31,7 +40,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({
 
   const handleAddStep = (template: StepTemplate) => {
     const newStep: WorkflowStep = {
-      id: `step-${Date.now()}`,
+      id: generateUUID(), // Use proper UUID instead of timestamp
       type: template.type as any,
       name: template.name,
       description: template.description,
