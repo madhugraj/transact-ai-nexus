@@ -437,12 +437,34 @@ export class RealWorkflowEngine {
         
         // Handle different table schemas
         if (tableName === 'invoice_table') {
-          // Use the correct schema for invoice_table
+          // For invoice_table, handle foreign key constraints more gracefully
+          let poNumber = null;
+          
+          // Only set po_number if we have a valid value and it exists in po_table
+          if (doc.extractedData.po_number) {
+            const poNumberValue = parseInt(String(doc.extractedData.po_number).replace(/\D/g, ''));
+            if (poNumberValue && !isNaN(poNumberValue)) {
+              // Check if PO exists in po_table
+              const { data: existingPO } = await supabase
+                .from('po_table')
+                .select('po_number')
+                .eq('po_number', poNumberValue)
+                .maybeSingle();
+              
+              if (existingPO) {
+                poNumber = poNumberValue;
+                console.log('✅ Found existing PO in database:', poNumberValue);
+              } else {
+                console.log('⚠️ PO number not found in po_table, setting to null:', poNumberValue);
+              }
+            }
+          }
+          
           dataToStore = {
-            attachment_invoice_name: doc.filename, // Correct column name
+            attachment_invoice_name: doc.filename,
             invoice_number: doc.extractedData.invoice_number ? parseInt(String(doc.extractedData.invoice_number).replace(/\D/g, '')) || 0 : 0,
             invoice_date: doc.extractedData.invoice_date || null,
-            po_number: doc.extractedData.po_number ? parseInt(String(doc.extractedData.po_number).replace(/\D/g, '')) || null : null,
+            po_number: poNumber, // Only set if PO exists in po_table
             details: doc.extractedData,
             created_at: new Date().toISOString()
           };
@@ -459,7 +481,8 @@ export class RealWorkflowEngine {
           table: tableName,
           filename: doc.filename,
           hasExtractedData: !!doc.extractedData,
-          dataKeys: Object.keys(dataToStore)
+          dataKeys: Object.keys(dataToStore),
+          poNumber: dataToStore.po_number || 'null'
         });
         
         const { data, error } = await supabase
