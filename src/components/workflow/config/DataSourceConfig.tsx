@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -307,7 +308,7 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({
         {(hasDriveConfig || sourceType === 'drive') && (
           <Tabs defaultValue="basic" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="basic">Basic Settings</TabsTrigger>
+              <TabsTrigger value="basic">Basic Configuration</TabsTrigger>
               <TabsTrigger value="advanced">Advanced Settings</TabsTrigger>
             </TabsList>
 

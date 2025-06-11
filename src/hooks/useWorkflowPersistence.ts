@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { WorkflowConfig } from '@/types/workflow';
 import { supabase } from '@/integrations/supabase/client';
@@ -72,7 +73,7 @@ export function useWorkflowPersistence() {
         return;
       }
 
-      // Convert database format to WorkflowConfig format
+      // Convert database format to WorkflowConfig format - ensure they are editable
       const workflowConfigs: WorkflowConfig[] = (data || []).map(dbWorkflow => ({
         id: dbWorkflow.id,
         name: dbWorkflow.name,
@@ -83,11 +84,14 @@ export function useWorkflowPersistence() {
         createdAt: new Date(dbWorkflow.created_at),
         lastRun: dbWorkflow.last_run ? new Date(dbWorkflow.last_run) : undefined,
         totalRuns: dbWorkflow.total_runs || 0,
-        successRate: dbWorkflow.success_rate || 0
+        successRate: dbWorkflow.success_rate || 0,
+        // Ensure workflows are editable by default
+        isEditable: true,
+        canDelete: true
       }));
 
       setWorkflows(workflowConfigs);
-      console.log('✅ Successfully loaded', workflowConfigs.length, 'workflows from Supabase');
+      console.log('✅ Successfully loaded', workflowConfigs.length, 'editable workflows from Supabase');
       
       if (workflowConfigs.length === 0) {
         console.log('📝 No workflows found for user');
@@ -158,9 +162,14 @@ export function useWorkflowPersistence() {
         return;
       }
 
-      // Add to local state
-      setWorkflows(prev => [workflow, ...prev]);
-      console.log('✅ Successfully saved workflow to Supabase');
+      // Add to local state with editable properties
+      const editableWorkflow = {
+        ...workflow,
+        isEditable: true,
+        canDelete: true
+      };
+      setWorkflows(prev => [editableWorkflow, ...prev]);
+      console.log('✅ Successfully saved editable workflow to Supabase');
       
       toast({
         title: "Workflow Saved",

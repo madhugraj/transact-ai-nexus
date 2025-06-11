@@ -33,11 +33,48 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
 
   useEffect(() => {
     checkConnection();
+    
+    // Set up an interval to check connection status periodically
+    const interval = setInterval(checkConnection, 30000); // Check every 30 seconds
+    
+    return () => clearInterval(interval);
   }, []);
 
   const checkConnection = async () => {
     try {
       console.log('🔍 Checking Google Drive connection...');
+      
+      // Check for stored tokens first
+      const tokens = localStorage.getItem('drive_auth_tokens');
+      if (!tokens) {
+        console.log('❌ No stored Drive tokens found');
+        setConnected(false);
+        setConnectionError('Google Drive not connected. Please connect in the Upload page first.');
+        return;
+      }
+
+      const parsedTokens = JSON.parse(tokens);
+      if (!parsedTokens.accessToken) {
+        console.log('❌ No access token in stored tokens');
+        setConnected(false);
+        setConnectionError('Google Drive authentication expired. Please reconnect in the Upload page.');
+        return;
+      }
+
+      // Check token age
+      if (parsedTokens.timestamp) {
+        const tokenAge = Date.now() - parsedTokens.timestamp;
+        const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+        
+        if (tokenAge > maxAge) {
+          console.log('❌ Tokens are too old');
+          setConnected(false);
+          setConnectionError('Google Drive session expired. Please reconnect in the Upload page.');
+          return;
+        }
+      }
+
+      // Test the connection by trying to authenticate
       const isAuthenticated = await folderService.authenticate();
       setConnected(isAuthenticated);
       setConnectionError(null);
@@ -46,13 +83,13 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
         console.log('✅ Drive connected, loading folders...');
         await loadFolders();
       } else {
-        console.log('❌ Drive not connected');
-        setConnectionError('Google Drive authentication required. Please connect your account first.');
+        console.log('❌ Drive authentication failed');
+        setConnectionError('Google Drive authentication failed. Please reconnect in the Upload page.');
       }
     } catch (error) {
       console.error('❌ Connection check failed:', error);
       setConnected(false);
-      setConnectionError(error instanceof Error ? error.message : 'Failed to connect to Google Drive');
+      setConnectionError('Failed to verify Google Drive connection. Please check your connection in the Upload page.');
     }
   };
 
@@ -121,9 +158,12 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
   const connectToDrive = () => {
     toast({
       title: "Connect to Google Drive",
-      description: "Please use the Google Drive connector in the Email Connector page to authenticate first",
+      description: "Please use the Upload page to connect to Google Drive first",
       variant: "default"
     });
+    
+    // Open Upload page in new tab
+    window.open('/upload', '_blank');
   };
 
   return (
@@ -154,7 +194,22 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
               checked={useAIPODetection}
               onCheckedChange={(checked) => {
                 if (checked) {
-                  enableAIPODetection();
+                  setUseAIPODetection(true);
+                  onConfigUpdate('driveConfig', {
+                    ...config.driveConfig,
+                    useAIPODetection: true,
+                    aiDetectionRules: {
+                      detectPurchaseOrders: true,
+                      checkFileContent: true,
+                      aiConfidenceThreshold: 0.7,
+                      poKeywords: ['purchase order', 'po number', 'vendor', 'procurement', 'order form', 'purchase requisition']
+                    }
+                  });
+                  
+                  toast({
+                    title: "AI PO Detection Enabled",
+                    description: "Gemini AI will analyze files for Purchase Order indicators",
+                  });
                 } else {
                   setUseAIPODetection(false);
                   onConfigUpdate('driveConfig', {
@@ -203,12 +258,12 @@ export const DriveAdvancedConfig: React.FC<DriveAdvancedConfigProps> = ({
             </Alert>
             <div className="text-center space-y-4">
               <p className="text-sm text-muted-foreground">
-                Connect to Google Drive to access folders and fully utilize AI features
+                Connect to Google Drive in the Upload page to access folders and fully utilize AI features
               </p>
               <div className="flex gap-2 justify-center">
                 <Button onClick={connectToDrive} className="gap-2">
                   <Folder className="h-4 w-4" />
-                  Connect to Drive
+                  Go to Upload Page
                 </Button>
                 <Button variant="outline" onClick={checkConnection} className="gap-2">
                   <RefreshCw className="h-4 w-4" />
