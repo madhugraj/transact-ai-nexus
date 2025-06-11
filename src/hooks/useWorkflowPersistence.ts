@@ -1,9 +1,14 @@
-
 import { useState, useEffect } from 'react';
 import { WorkflowConfig } from '@/types/workflow';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/UserAuthContext';
 import { useToast } from '@/hooks/use-toast';
+
+// Helper function to validate UUID format
+const isValidUUID = (id: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
+};
 
 export function useWorkflowPersistence() {
   const [workflows, setWorkflows] = useState<WorkflowConfig[]>([]);
@@ -190,6 +195,23 @@ export function useWorkflowPersistence() {
       return;
     }
 
+    // Check if the ID is a valid UUID - if not, skip the database update
+    if (!isValidUUID(id)) {
+      console.warn('⚠️ Skipping database update for invalid UUID:', id);
+      
+      // Only update local state for invalid UUIDs
+      setWorkflows(prev => 
+        prev.map(w => w.id === id ? { ...w, ...updates } : w)
+      );
+      
+      toast({
+        title: "Local Update Only",
+        description: "Workflow updated locally. Please save it again to persist to database.",
+        variant: "default"
+      });
+      return;
+    }
+
     try {
       console.log('📝 Updating workflow in Supabase:', id, 'Updates:', updates);
       
@@ -249,6 +271,17 @@ export function useWorkflowPersistence() {
 
   const deleteWorkflow = async (id: string) => {
     if (!isAuthenticated || !user) {
+      return;
+    }
+
+    // If it's not a valid UUID, just remove from local state
+    if (!isValidUUID(id)) {
+      console.warn('⚠️ Removing invalid UUID workflow from local state only:', id);
+      setWorkflows(prev => prev.filter(w => w.id !== id));
+      toast({
+        title: "Workflow Removed",
+        description: "Workflow removed from local view",
+      });
       return;
     }
 
