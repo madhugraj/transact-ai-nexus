@@ -220,6 +220,11 @@ export class RealWorkflowEngine {
           const { accessToken } = JSON.parse(tokens);
           
           console.log('📧 Making API call to download attachment...');
+          console.log('📧 Attachment details:', {
+            messageId: fileInfo.emailId,
+            attachmentId: fileInfo.id,
+            filename: fileInfo.name
+          });
           
           // Download the attachment using the Gmail API
           const { data: attachmentData, error } = await supabase.functions.invoke('gmail', {
@@ -240,19 +245,58 @@ export class RealWorkflowEngine {
             continue;
           }
           
-          console.log('📧 Attachment downloaded successfully, converting to File object...');
+          console.log('📧 Attachment downloaded successfully, data length:', attachmentData.data?.data?.length);
+          console.log('📧 Attachment data type:', typeof attachmentData.data?.data);
+          
+          if (!attachmentData.data?.data) {
+            console.error('❌ No attachment data received');
+            extractedData.failedFiles.push({
+              filename: fileInfo.name,
+              error: 'No attachment data received from Gmail API'
+            });
+            continue;
+          }
           
           // Convert base64 to blob and create File object
           const attachmentContent = attachmentData.data.data; // base64 data
-          const binaryString = atob(attachmentContent);
-          const bytes = new Uint8Array(binaryString.length);
-          for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-          }
-          const blob = new Blob([bytes], { type: fileInfo.mimeType });
-          file = new File([blob], fileInfo.name, { type: fileInfo.mimeType });
+          console.log('📧 Converting base64 to File object, base64 length:', attachmentContent.length);
           
-          console.log('✅ Successfully created File object:', fileInfo.name, 'Size:', file.size);
+          try {
+            // Decode base64 to binary
+            const binaryString = atob(attachmentContent);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+            
+            const blob = new Blob([bytes], { type: fileInfo.mimeType });
+            file = new File([blob], fileInfo.name, { type: fileInfo.mimeType });
+            
+            console.log('✅ Successfully created File object:', {
+              name: file.name,
+              size: file.size,
+              type: file.type
+            });
+            
+            // Verify the file has content
+            if (file.size === 0) {
+              console.error('❌ Created file is empty');
+              extractedData.failedFiles.push({
+                filename: fileInfo.name,
+                error: 'File created but has no content'
+              });
+              continue;
+            }
+            
+          } catch (conversionError) {
+            console.error('❌ Error converting base64 to File:', conversionError);
+            extractedData.failedFiles.push({
+              filename: fileInfo.name,
+              error: `Base64 conversion failed: ${conversionError instanceof Error ? conversionError.message : 'Unknown error'}`
+            });
+            continue;
+          }
+          
         } else {
           // For non-Gmail files, create a mock file for testing
           console.log('🔄 Creating mock file for processing:', fileInfo.name);
@@ -264,6 +308,7 @@ export class RealWorkflowEngine {
         let extractionResult = null;
         
         console.log(`🤖 Starting AI extraction for ${fileInfo.name} with processing type: ${processingType}`);
+        console.log(`🤖 File ready for extraction - size: ${file.size}, type: ${file.type}`);
         
         // For PO processing
         if (processingType === 'po-extraction' || step.name.toLowerCase().includes('po')) {
