@@ -1,3 +1,4 @@
+
 import { WorkflowConfig, WorkflowExecution, WorkflowStepResult } from '@/types/workflow';
 import { GmailWorkflowService } from './GmailWorkflowService';
 import { InvoiceDetectionAgent } from '@/services/agents/InvoiceDetectionAgent';
@@ -430,7 +431,7 @@ export class RealWorkflowEngine {
       const results = [];
       
       for (const doc of inputData.extractedDocuments) {
-        console.log('💾 REAL database insert for:', doc.filename);
+        console.log('💾 REAL database insert for: – "' + doc.filename + '"');
         console.log('💾 Document extracted data preview:', JSON.stringify(doc.extractedData).substring(0, 200));
         
         let dataToStore;
@@ -445,13 +446,15 @@ export class RealWorkflowEngine {
             const poNumberValue = parseInt(String(doc.extractedData.po_number).replace(/\D/g, ''));
             if (poNumberValue && !isNaN(poNumberValue)) {
               // Check if PO exists in po_table
-              const { data: existingPO } = await supabase
+              const { data: existingPO, error: poCheckError } = await supabase
                 .from('po_table')
                 .select('po_number')
                 .eq('po_number', poNumberValue)
                 .maybeSingle();
               
-              if (existingPO) {
+              if (poCheckError) {
+                console.error('❌ Error checking PO existence:', poCheckError);
+              } else if (existingPO) {
                 poNumber = poNumberValue;
                 console.log('✅ Found existing PO in database:', poNumberValue);
               } else {
@@ -460,9 +463,24 @@ export class RealWorkflowEngine {
             }
           }
           
+          // Generate a unique invoice number if none exists or if it's 0
+          let invoiceNumber = null;
+          if (doc.extractedData.invoice_number) {
+            const extractedInvoiceNum = parseInt(String(doc.extractedData.invoice_number).replace(/\D/g, ''));
+            if (extractedInvoiceNum && !isNaN(extractedInvoiceNum) && extractedInvoiceNum > 0) {
+              invoiceNumber = extractedInvoiceNum;
+            }
+          }
+          
+          // If no valid invoice number, generate one based on timestamp
+          if (!invoiceNumber) {
+            invoiceNumber = Date.now(); // Use timestamp as unique invoice number
+            console.log('🔢 Generated invoice number:', invoiceNumber, 'for file:', doc.filename);
+          }
+          
           dataToStore = {
             attachment_invoice_name: doc.filename,
-            invoice_number: doc.extractedData.invoice_number ? parseInt(String(doc.extractedData.invoice_number).replace(/\D/g, '')) || 0 : 0,
+            invoice_number: invoiceNumber,
             invoice_date: doc.extractedData.invoice_date || null,
             po_number: poNumber, // Only set if PO exists in po_table
             details: doc.extractedData,
@@ -477,13 +495,16 @@ export class RealWorkflowEngine {
           };
         }
         
-        console.log('💾 Data to store:', {
+        console.log('💾 Final data to store:', {
           table: tableName,
           filename: doc.filename,
           hasExtractedData: !!doc.extractedData,
           dataKeys: Object.keys(dataToStore),
+          invoiceNumber: dataToStore.invoice_number || 'null',
           poNumber: dataToStore.po_number || 'null'
         });
+        
+        console.log('💾 Full data object:', JSON.stringify(dataToStore, null, 2));
         
         const { data, error } = await supabase
           .from(tableName)
@@ -491,12 +512,21 @@ export class RealWorkflowEngine {
           .select();
         
         if (error) {
-          console.error('❌ REAL database insert failed:', error);
-          throw new Error(`Failed to store data for ${doc.filename}: ${error.message}`);
+          console.error('❌ REAL database insert failed for:', doc.filename);
+          console.error('❌ Database error details:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          });
+          console.error('❌ Data that failed to insert:', JSON.stringify(dataToStore, null, 2));
+          throw new Error(`Failed to store data for ${doc.filename}: ${error.message} (Code: ${error.code})`);
         }
         
         results.push(data);
-        console.log('✅ REAL database insert successful:', doc.filename, 'Data:', data);
+        console.log('✅ REAL database insert successful for:', doc.filename);
+        console.log('✅ Inserted data ID:', data?.[0]?.id || 'No ID returned');
+        console.log('✅ Database response:', JSON.stringify(data, null, 2));
       }
       
       console.log('💾 All REAL data stored successfully. Records created:', results.length);
@@ -509,6 +539,7 @@ export class RealWorkflowEngine {
       
     } catch (error) {
       console.error('❌ REAL data storage step failed:', error);
+      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       throw error;
     }
   }
