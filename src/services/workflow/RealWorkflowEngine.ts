@@ -190,7 +190,8 @@ export class RealWorkflowEngine {
     
     const extractedData = {
       processedCount: 0,
-      extractedDocuments: []
+      extractedDocuments: [],
+      failedFiles: []
     };
 
     // Process each file with real AI agents
@@ -218,6 +219,8 @@ export class RealWorkflowEngine {
           
           const { accessToken } = JSON.parse(tokens);
           
+          console.log('📧 Making API call to download attachment...');
+          
           // Download the attachment using the Gmail API
           const { data: attachmentData, error } = await supabase.functions.invoke('gmail', {
             body: {
@@ -230,8 +233,14 @@ export class RealWorkflowEngine {
           
           if (error || !attachmentData?.success) {
             console.error('❌ Failed to download attachment:', error || attachmentData?.error);
-            throw new Error(`Failed to download attachment: ${fileInfo.name}`);
+            extractedData.failedFiles.push({
+              filename: fileInfo.name,
+              error: `Failed to download attachment: ${error?.message || attachmentData?.error}`
+            });
+            continue;
           }
+          
+          console.log('📧 Attachment downloaded successfully, converting to File object...');
           
           // Convert base64 to blob and create File object
           const attachmentContent = attachmentData.data.data; // base64 data
@@ -243,7 +252,7 @@ export class RealWorkflowEngine {
           const blob = new Blob([bytes], { type: fileInfo.mimeType });
           file = new File([blob], fileInfo.name, { type: fileInfo.mimeType });
           
-          console.log('✅ Successfully downloaded Gmail attachment:', fileInfo.name, 'Size:', file.size);
+          console.log('✅ Successfully created File object:', fileInfo.name, 'Size:', file.size);
         } else {
           // For non-Gmail files, create a mock file for testing
           console.log('🔄 Creating mock file for processing:', fileInfo.name);
@@ -254,41 +263,59 @@ export class RealWorkflowEngine {
         
         let extractionResult = null;
         
+        console.log(`🤖 Starting AI extraction for ${fileInfo.name} with processing type: ${processingType}`);
+        
         // For PO processing
         if (processingType === 'po-extraction' || step.name.toLowerCase().includes('po')) {
           console.log('📄 Using REAL PO extraction agent...');
           extractionResult = await this.poExtractionAgent.process(file);
-          console.log('📄 PO extraction result:', extractionResult);
+          console.log('📄 PO extraction result:', {
+            success: extractionResult?.success,
+            hasData: !!extractionResult?.data,
+            error: extractionResult?.error
+          });
         }
         // For invoice processing  
         else if (processingType === 'invoice-extraction' || step.name.toLowerCase().includes('invoice')) {
           console.log('📄 Using REAL invoice detection and extraction...');
           const detection = await this.invoiceDetectionAgent.process(file);
-          console.log('📄 Invoice detection result:', detection);
+          console.log('📄 Invoice detection result:', {
+            success: detection?.success,
+            isInvoice: detection?.data?.is_invoice,
+            confidence: detection?.data?.confidence
+          });
           
           if (detection.success && detection.data?.is_invoice) {
             console.log('✅ Invoice detected, extracting data...');
             extractionResult = await this.invoiceExtractionAgent.process(file);
-            console.log('📄 Invoice extraction result:', extractionResult);
           } else {
             console.log('❌ Not detected as invoice, trying data extraction anyway...');
             extractionResult = await this.invoiceExtractionAgent.process(file);
-            console.log('📄 Forced extraction result:', extractionResult);
           }
+          
+          console.log('📄 Invoice extraction result:', {
+            success: extractionResult?.success,
+            hasData: !!extractionResult?.data,
+            error: extractionResult?.error
+          });
         }
         // General OCR processing
         else {
-          console.log('📄 Using general OCR processing...');
-          // Use invoice extraction as fallback for general processing
+          console.log('📄 Using general OCR processing with invoice extraction agent...');
           extractionResult = await this.invoiceExtractionAgent.process(file);
-          console.log('📄 General OCR extraction result:', extractionResult);
+          console.log('📄 General OCR extraction result:', {
+            success: extractionResult?.success,
+            hasData: !!extractionResult?.data,
+            error: extractionResult?.error
+          });
         }
         
-        console.log('🔍 Full extraction result for', fileInfo.name, ':', {
+        console.log('🔍 Detailed extraction result for', fileInfo.name, ':', {
           success: extractionResult?.success,
           hasData: !!extractionResult?.data,
           error: extractionResult?.error,
-          dataKeys: extractionResult?.data ? Object.keys(extractionResult.data) : []
+          dataKeys: extractionResult?.data ? Object.keys(extractionResult.data) : [],
+          dataPreview: extractionResult?.data ? JSON.stringify(extractionResult.data).substring(0, 200) : null
         });
         
         if (extractionResult && extractionResult.success && extractionResult.data) {
@@ -302,12 +329,19 @@ export class RealWorkflowEngine {
           });
           extractedData.processedCount++;
           console.log('✅ Successfully extracted data from:', fileInfo.name);
+          console.log('✅ Extracted data preview:', JSON.stringify(extractionResult.data).substring(0, 300));
         } else {
           console.log('❌ No data extracted from:', fileInfo.name);
           console.log('❌ Extraction failure details:', {
             success: extractionResult?.success,
             error: extractionResult?.error,
             hasData: !!extractionResult?.data
+          });
+          
+          extractedData.failedFiles.push({
+            filename: fileInfo.name,
+            error: extractionResult?.error || 'No data extracted',
+            extractionResult: extractionResult
           });
         }
         
@@ -317,10 +351,20 @@ export class RealWorkflowEngine {
           message: error instanceof Error ? error.message : 'Unknown error',
           stack: error instanceof Error ? error.stack : undefined
         });
+        
+        extractedData.failedFiles.push({
+          filename: fileInfo.name,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
       }
     }
     
-    console.log('🔍 REAL document processing completed:', extractedData.processedCount, 'documents processed');
+    console.log('🔍 REAL document processing completed:', {
+      processedCount: extractedData.processedCount,
+      successfulFiles: extractedData.extractedDocuments.map(d => d.filename),
+      failedFiles: extractedData.failedFiles.map(f => f.filename)
+    });
+    
     return extractedData;
   }
 

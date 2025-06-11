@@ -17,6 +17,13 @@ export class InvoiceDataExtractionAgent implements Agent {
     console.log(`📊 File details: size=${file.size}, type=${file.type}`);
     
     try {
+      // Check if file is valid
+      if (!file || file.size === 0) {
+        console.error(`📊 Invalid file: ${file.name}, size: ${file.size}`);
+        throw new Error(`Invalid file: ${file.name}`);
+      }
+
+      console.log(`📊 Converting file to base64: ${file.name}`);
       const base64Image = await this.fileToBase64(file);
       console.log(`📊 Successfully converted to base64, length: ${base64Image.length}`);
       
@@ -70,25 +77,46 @@ Respond with ONLY a JSON object in this exact format:
 `;
 
       console.log(`📊 Calling Gemini API with prompt length: ${prompt.length}`);
+      console.log(`📊 File type being sent to Gemini: ${file.type}`);
+      
       const response = await processImageWithGemini(prompt, base64Image, file.type);
       
-      console.log(`📊 Gemini API response:`, {
+      console.log(`📊 Gemini API response received:`, {
         success: response.success,
         hasData: !!response.data,
         error: response.error,
-        dataLength: response.data?.length
+        dataLength: response.data?.length,
+        responsePreview: response.data?.substring(0, 200)
       });
       
       if (!response.success) {
-        console.error(`📊 Gemini API failed:`, response.error);
-        throw new Error(response.error || 'Failed to extract invoice data');
+        console.error(`📊 Gemini API failed for ${file.name}:`, response.error);
+        return {
+          success: false,
+          error: response.error || 'Failed to extract invoice data',
+          agent: this.id
+        };
       }
 
-      console.log(`📊 Raw Gemini response data:`, response.data?.substring(0, 500) + '...');
+      if (!response.data) {
+        console.error(`📊 Gemini API returned no data for ${file.name}`);
+        return {
+          success: false,
+          error: 'No data returned from Gemini API',
+          agent: this.id
+        };
+      }
+
+      console.log(`📊 Raw Gemini response data for ${file.name}:`, response.data.substring(0, 500) + '...');
       
-      const extractedData = this.parseGeminiResponse(response.data || '');
+      const extractedData = this.parseGeminiResponse(response.data);
       
-      console.log(`📊 Parsed extraction data:`, extractedData);
+      console.log(`📊 Successfully parsed extraction data for ${file.name}:`, {
+        hasInvoiceNumber: !!extractedData.invoice_number,
+        hasLineItems: extractedData.line_items?.length || 0,
+        confidence: extractedData.extraction_confidence
+      });
+      
       console.log(`✅ ${this.name}: Data extraction complete for ${file.name}`);
       
       return {
@@ -107,8 +135,10 @@ Respond with ONLY a JSON object in this exact format:
       console.error(`❌ ${this.name}: Error processing ${file.name}:`, error);
       console.error(`❌ Full error details:`, {
         message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
+        errorType: typeof error
       });
+      
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -118,17 +148,19 @@ Respond with ONLY a JSON object in this exact format:
   }
 
   private async fileToBase64(file: File): Promise<string> {
+    console.log(`📊 Converting ${file.name} to base64...`);
+    
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => {
         const base64 = reader.result as string;
         const base64Data = base64.split(',')[1];
-        console.log(`📊 File to base64 conversion successful, length: ${base64Data.length}`);
+        console.log(`📊 File to base64 conversion successful for ${file.name}, length: ${base64Data.length}`);
         resolve(base64Data);
       };
       reader.onerror = error => {
-        console.error('📊 File to base64 conversion failed:', error);
+        console.error(`📊 File to base64 conversion failed for ${file.name}:`, error);
         reject(error);
       };
     });
@@ -136,44 +168,48 @@ Respond with ONLY a JSON object in this exact format:
 
   private parseGeminiResponse(responseText: string): any {
     console.log(`📊 Parsing Gemini response, length: ${responseText.length}`);
-    console.log(`📊 Raw response text:`, responseText.substring(0, 1000));
+    console.log(`📊 Raw response preview:`, responseText.substring(0, 500));
     
     try {
-      const parsed = JSON.parse(responseText.trim());
-      console.log(`📊 Direct JSON parsing successful:`, parsed);
+      // First try direct JSON parsing
+      const trimmed = responseText.trim();
+      const parsed = JSON.parse(trimmed);
+      console.log(`📊 Direct JSON parsing successful`);
       return parsed;
     } catch (error) {
       console.log(`📊 Direct JSON parsing failed, trying code block extraction...`);
+      console.log(`📊 Parse error:`, error instanceof Error ? error.message : error);
     }
     
+    // Try to extract JSON from code blocks
     const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/i;
     const codeBlockMatch = responseText.match(codeBlockRegex);
     
     if (codeBlockMatch) {
       try {
         const extractedJson = JSON.parse(codeBlockMatch[1].trim());
-        console.log(`📊 Successfully extracted JSON from code block:`, extractedJson);
+        console.log(`📊 Successfully extracted JSON from code block`);
         return extractedJson;
       } catch (error) {
         console.error('📊 Failed to parse JSON from code block:', error);
       }
     }
     
-    // Try to find any JSON-like structure
+    // Try to find any JSON-like structure using a more flexible regex
     const jsonRegex = /\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}/;
     const jsonMatch = responseText.match(jsonRegex);
     
     if (jsonMatch) {
       try {
         const extractedJson = JSON.parse(jsonMatch[0]);
-        console.log(`📊 Successfully extracted JSON using regex:`, extractedJson);
+        console.log(`📊 Successfully extracted JSON using regex`);
         return extractedJson;
       } catch (error) {
         console.error('📊 Failed to parse extracted JSON:', error);
       }
     }
     
-    console.error('📊 All parsing methods failed for response:', responseText);
+    console.error('📊 All parsing methods failed for response:', responseText.substring(0, 1000));
     throw new Error('Unable to extract valid JSON from Gemini response');
   }
 }
