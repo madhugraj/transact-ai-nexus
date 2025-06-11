@@ -14,9 +14,11 @@ export class InvoiceDataExtractionAgent implements Agent {
 
   async process(file: File): Promise<AgentResult> {
     console.log(`📊 ${this.name}: Starting data extraction for ${file.name}`);
+    console.log(`📊 File details: size=${file.size}, type=${file.type}`);
     
     try {
       const base64Image = await this.fileToBase64(file);
+      console.log(`📊 Successfully converted to base64, length: ${base64Image.length}`);
       
       const prompt = `
 You are an expert invoice data extraction system. Extract ALL the following information from this invoice document.
@@ -67,15 +69,27 @@ Respond with ONLY a JSON object in this exact format:
 }
 `;
 
+      console.log(`📊 Calling Gemini API with prompt length: ${prompt.length}`);
       const response = await processImageWithGemini(prompt, base64Image, file.type);
       
+      console.log(`📊 Gemini API response:`, {
+        success: response.success,
+        hasData: !!response.data,
+        error: response.error,
+        dataLength: response.data?.length
+      });
+      
       if (!response.success) {
+        console.error(`📊 Gemini API failed:`, response.error);
         throw new Error(response.error || 'Failed to extract invoice data');
       }
 
+      console.log(`📊 Raw Gemini response data:`, response.data?.substring(0, 500) + '...');
+      
       const extractedData = this.parseGeminiResponse(response.data || '');
       
-      console.log(`✅ ${this.name}: Data extraction complete`);
+      console.log(`📊 Parsed extraction data:`, extractedData);
+      console.log(`✅ ${this.name}: Data extraction complete for ${file.name}`);
       
       return {
         success: true,
@@ -90,7 +104,11 @@ Respond with ONLY a JSON object in this exact format:
       };
       
     } catch (error) {
-      console.error(`❌ ${this.name}: Error:`, error);
+      console.error(`❌ ${this.name}: Error processing ${file.name}:`, error);
+      console.error(`❌ Full error details:`, {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -106,29 +124,56 @@ Respond with ONLY a JSON object in this exact format:
       reader.onload = () => {
         const base64 = reader.result as string;
         const base64Data = base64.split(',')[1];
+        console.log(`📊 File to base64 conversion successful, length: ${base64Data.length}`);
         resolve(base64Data);
       };
-      reader.onerror = error => reject(error);
+      reader.onerror = error => {
+        console.error('📊 File to base64 conversion failed:', error);
+        reject(error);
+      };
     });
   }
 
   private parseGeminiResponse(responseText: string): any {
+    console.log(`📊 Parsing Gemini response, length: ${responseText.length}`);
+    console.log(`📊 Raw response text:`, responseText.substring(0, 1000));
+    
     try {
       const parsed = JSON.parse(responseText.trim());
+      console.log(`📊 Direct JSON parsing successful:`, parsed);
       return parsed;
     } catch (error) {
-      const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/i;
-      const codeBlockMatch = responseText.match(codeBlockRegex);
-      
-      if (codeBlockMatch) {
-        try {
-          return JSON.parse(codeBlockMatch[1].trim());
-        } catch (error) {
-          console.error('Failed to parse JSON from code block:', error);
-        }
-      }
-      
-      throw new Error('Unable to extract valid JSON from response');
+      console.log(`📊 Direct JSON parsing failed, trying code block extraction...`);
     }
+    
+    const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/i;
+    const codeBlockMatch = responseText.match(codeBlockRegex);
+    
+    if (codeBlockMatch) {
+      try {
+        const extractedJson = JSON.parse(codeBlockMatch[1].trim());
+        console.log(`📊 Successfully extracted JSON from code block:`, extractedJson);
+        return extractedJson;
+      } catch (error) {
+        console.error('📊 Failed to parse JSON from code block:', error);
+      }
+    }
+    
+    // Try to find any JSON-like structure
+    const jsonRegex = /\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}/;
+    const jsonMatch = responseText.match(jsonRegex);
+    
+    if (jsonMatch) {
+      try {
+        const extractedJson = JSON.parse(jsonMatch[0]);
+        console.log(`📊 Successfully extracted JSON using regex:`, extractedJson);
+        return extractedJson;
+      } catch (error) {
+        console.error('📊 Failed to parse extracted JSON:', error);
+      }
+    }
+    
+    console.error('📊 All parsing methods failed for response:', responseText);
+    throw new Error('Unable to extract valid JSON from Gemini response');
   }
 }

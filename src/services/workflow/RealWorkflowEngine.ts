@@ -1,3 +1,4 @@
+
 import { WorkflowConfig, WorkflowExecution, WorkflowStepResult } from '@/types/workflow';
 import { GmailWorkflowService } from './GmailWorkflowService';
 import { InvoiceDetectionAgent } from '@/services/agents/InvoiceDetectionAgent';
@@ -196,11 +197,60 @@ export class RealWorkflowEngine {
     for (const fileInfo of inputData.files) {
       try {
         console.log('📄 REAL processing file:', fileInfo.name);
+        console.log('📄 File details:', {
+          name: fileInfo.name,
+          source: fileInfo.source,
+          mimeType: fileInfo.mimeType,
+          size: fileInfo.size
+        });
         
-        // Create File object from file info
-        const mockFileContent = `Mock PDF content for ${fileInfo.name}`;
-        const blob = new Blob([mockFileContent], { type: fileInfo.mimeType });
-        const file = new File([blob], fileInfo.name, { type: fileInfo.mimeType });
+        // We need to actually download the Gmail attachment first
+        let file: File;
+        
+        if (fileInfo.source === 'gmail') {
+          console.log('📧 Downloading Gmail attachment:', fileInfo.name);
+          
+          // Get Gmail tokens
+          const tokens = localStorage.getItem('gmail_auth_tokens');
+          if (!tokens) {
+            throw new Error('Gmail authentication required');
+          }
+          
+          const { accessToken } = JSON.parse(tokens);
+          
+          // Download the attachment using the Gmail API
+          const { data: attachmentData, error } = await supabase.functions.invoke('gmail', {
+            body: {
+              action: 'getAttachment',
+              accessToken,
+              messageId: fileInfo.emailId,
+              attachmentId: fileInfo.id
+            }
+          });
+          
+          if (error || !attachmentData?.success) {
+            console.error('❌ Failed to download attachment:', error || attachmentData?.error);
+            throw new Error(`Failed to download attachment: ${fileInfo.name}`);
+          }
+          
+          // Convert base64 to blob and create File object
+          const attachmentContent = attachmentData.data.data; // base64 data
+          const binaryString = atob(attachmentContent);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          const blob = new Blob([bytes], { type: fileInfo.mimeType });
+          file = new File([blob], fileInfo.name, { type: fileInfo.mimeType });
+          
+          console.log('✅ Successfully downloaded Gmail attachment:', fileInfo.name, 'Size:', file.size);
+        } else {
+          // For non-Gmail files, create a mock file for testing
+          console.log('🔄 Creating mock file for processing:', fileInfo.name);
+          const mockFileContent = `Mock PDF content for ${fileInfo.name}`;
+          const blob = new Blob([mockFileContent], { type: fileInfo.mimeType });
+          file = new File([blob], fileInfo.name, { type: fileInfo.mimeType });
+        }
         
         let extractionResult = null;
         
@@ -208,14 +258,22 @@ export class RealWorkflowEngine {
         if (processingType === 'po-extraction' || step.name.toLowerCase().includes('po')) {
           console.log('📄 Using REAL PO extraction agent...');
           extractionResult = await this.poExtractionAgent.process(file);
+          console.log('📄 PO extraction result:', extractionResult);
         }
         // For invoice processing  
         else if (processingType === 'invoice-extraction' || step.name.toLowerCase().includes('invoice')) {
           console.log('📄 Using REAL invoice detection and extraction...');
           const detection = await this.invoiceDetectionAgent.process(file);
+          console.log('📄 Invoice detection result:', detection);
+          
           if (detection.success && detection.data?.is_invoice) {
             console.log('✅ Invoice detected, extracting data...');
             extractionResult = await this.invoiceExtractionAgent.process(file);
+            console.log('📄 Invoice extraction result:', extractionResult);
+          } else {
+            console.log('❌ Not detected as invoice, trying data extraction anyway...');
+            extractionResult = await this.invoiceExtractionAgent.process(file);
+            console.log('📄 Forced extraction result:', extractionResult);
           }
         }
         // General OCR processing
@@ -223,7 +281,15 @@ export class RealWorkflowEngine {
           console.log('📄 Using general OCR processing...');
           // Use invoice extraction as fallback for general processing
           extractionResult = await this.invoiceExtractionAgent.process(file);
+          console.log('📄 General OCR extraction result:', extractionResult);
         }
+        
+        console.log('🔍 Full extraction result for', fileInfo.name, ':', {
+          success: extractionResult?.success,
+          hasData: !!extractionResult?.data,
+          error: extractionResult?.error,
+          dataKeys: extractionResult?.data ? Object.keys(extractionResult.data) : []
+        });
         
         if (extractionResult && extractionResult.success && extractionResult.data) {
           extractedData.extractedDocuments.push({
@@ -237,11 +303,20 @@ export class RealWorkflowEngine {
           extractedData.processedCount++;
           console.log('✅ Successfully extracted data from:', fileInfo.name);
         } else {
-          console.log('⚠️ No data extracted from:', fileInfo.name);
+          console.log('❌ No data extracted from:', fileInfo.name);
+          console.log('❌ Extraction failure details:', {
+            success: extractionResult?.success,
+            error: extractionResult?.error,
+            hasData: !!extractionResult?.data
+          });
         }
         
       } catch (error) {
         console.error('❌ Error processing file:', fileInfo.name, error);
+        console.error('❌ Full error details:', {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined
+        });
       }
     }
     
