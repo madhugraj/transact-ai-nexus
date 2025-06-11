@@ -46,31 +46,45 @@ const Actions = () => {
   const workflowEngine = new EnhancedWorkflowEngine();
 
   const createWorkflowFromTemplate = (template: WorkflowTemplate, switchToBuilder: boolean = true) => {
-    // Create a mapping from old step IDs to new step IDs
+    console.log('🔄 Creating workflow from template:', template.name);
+    
+    // Generate new UUIDs for all steps and create ID mapping
     const stepIdMapping: Record<string, string> = {};
     
-    // First, create steps with new UUIDs and build the mapping
-    const steps = template.steps.map((step, index) => {
+    // Create steps with new IDs
+    const steps = template.steps.map((templateStep, index) => {
       const newStepId = generateUUID();
-      stepIdMapping[step.id] = newStepId;
+      const originalId = `template-step-${index}`; // Create a consistent original ID
+      stepIdMapping[originalId] = newStepId;
+      
+      const step: WorkflowStep = {
+        id: newStepId,
+        type: templateStep.type,
+        name: templateStep.name,
+        description: templateStep.description,
+        position: templateStep.position || { x: index * 200, y: 100 },
+        config: templateStep.config || {}
+      };
+      
+      return step;
+    });
+
+    // Create connections with proper step ID mapping
+    const connections = template.connections.map((conn, index) => {
+      // Map template connection IDs to actual step IDs
+      const sourceStepId = stepIdMapping[`template-step-${template.steps.findIndex(s => s.type === conn.sourceStepId || s.name === conn.sourceStepId)}`] || steps[0]?.id;
+      const targetStepId = stepIdMapping[`template-step-${template.steps.findIndex(s => s.type === conn.targetStepId || s.name === conn.targetStepId)}`] || steps[steps.length - 1]?.id;
       
       return {
-        ...step,
-        id: newStepId,
-        position: step.position || { x: index * 200, y: 100 }
+        id: generateUUID(),
+        sourceStepId,
+        targetStepId,
+        condition: conn.condition
       };
     });
 
-    // Then, create connections using the mapped step IDs
-    const connections = template.connections.map((conn) => ({
-      ...conn,
-      id: generateUUID(),
-      sourceStepId: stepIdMapping[conn.sourceStepId] || conn.sourceStepId,
-      targetStepId: stepIdMapping[conn.targetStepId] || conn.targetStepId
-    }));
-
     const workflow: WorkflowConfig = {
-      id: generateUUID(), // Use proper UUID instead of timestamp-based string
+      id: generateUUID(),
       name: template.name,
       description: template.description,
       steps,
@@ -80,6 +94,9 @@ const Actions = () => {
       totalRuns: 0,
       successRate: 0
     };
+
+    console.log('✅ Created workflow with UUID:', workflow.id);
+    console.log('📊 Steps:', steps.length, 'Connections:', connections.length);
 
     // Load into builder instead of saving immediately
     loadWorkflowInBuilder(workflow);
@@ -432,3 +449,5 @@ const Actions = () => {
 };
 
 export default Actions;
+
+</edits_to_apply>
