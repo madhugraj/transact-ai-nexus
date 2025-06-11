@@ -10,6 +10,8 @@ import { WorkflowStep } from '@/types/workflow';
 import { DataSourceConfig } from './config/DataSourceConfig';
 import { ComparisonConfig } from './config/ComparisonConfig';
 import { DatabaseConfig } from './config/DatabaseConfig';
+import { ExtractionConfig } from './config/ExtractionConfig';
+import { ProcessingConfig } from './config/ProcessingConfig';
 
 interface WorkflowConfigDialogProps {
   step: WorkflowStep | null;
@@ -58,14 +60,25 @@ export const WorkflowConfigDialog: React.FC<WorkflowConfigDialogProps> = ({
             onConfigUpdate={handleConfigUpdate}
           />
         );
-      case 'data-comparison':
+      case 'document-processing':
+      case 'Extract Data':
         return (
-          <ComparisonConfig 
+          <ExtractionConfig 
+            step={editedStep} 
+            onConfigUpdate={handleConfigUpdate}
+          />
+        );
+      case 'data-comparison':
+      case 'Process Data':
+        return (
+          <ProcessingConfig 
             step={editedStep} 
             onConfigUpdate={handleConfigUpdate}
           />
         );
       case 'database-storage':
+      case 'data-storage':
+      case 'Store Data':
         return (
           <DatabaseConfig 
             step={editedStep} 
@@ -75,7 +88,7 @@ export const WorkflowConfigDialog: React.FC<WorkflowConfigDialogProps> = ({
       default:
         return (
           <div className="p-4 text-center text-muted-foreground">
-            Configuration not available for this step type
+            Configuration not available for step type: {editedStep.type}
           </div>
         );
     }
