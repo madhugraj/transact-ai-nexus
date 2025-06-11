@@ -46,21 +46,35 @@ const Actions = () => {
   const workflowEngine = new EnhancedWorkflowEngine();
 
   const createWorkflowFromTemplate = (template: WorkflowTemplate, switchToBuilder: boolean = true) => {
+    // Create a mapping from old step IDs to new step IDs
+    const stepIdMapping: Record<string, string> = {};
+    
+    // First, create steps with new UUIDs and build the mapping
+    const steps = template.steps.map((step, index) => {
+      const newStepId = generateUUID();
+      stepIdMapping[step.id] = newStepId;
+      
+      return {
+        ...step,
+        id: newStepId,
+        position: step.position || { x: index * 200, y: 100 }
+      };
+    });
+
+    // Then, create connections using the mapped step IDs
+    const connections = template.connections.map((conn) => ({
+      ...conn,
+      id: generateUUID(),
+      sourceStepId: stepIdMapping[conn.sourceStepId] || conn.sourceStepId,
+      targetStepId: stepIdMapping[conn.targetStepId] || conn.targetStepId
+    }));
+
     const workflow: WorkflowConfig = {
       id: generateUUID(), // Use proper UUID instead of timestamp-based string
       name: template.name,
       description: template.description,
-      steps: template.steps.map((step, index) => ({
-        ...step,
-        id: `step-${generateUUID()}`, // Use UUID for steps too
-        position: step.position || { x: index * 200, y: 100 }
-      })),
-      connections: template.connections.map((conn, index) => ({
-        ...conn,
-        id: `conn-${generateUUID()}`, // Use UUID for connections too
-        sourceStepId: `step-${generateUUID()}`,
-        targetStepId: `step-${generateUUID()}`
-      })),
+      steps,
+      connections,
       isActive: true,
       createdAt: new Date(),
       totalRuns: 0,
