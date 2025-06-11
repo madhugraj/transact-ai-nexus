@@ -406,6 +406,48 @@ export type Database = {
         }
         Relationships: []
       }
+      workflows: {
+        Row: {
+          config: Json
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          last_run: string | null
+          name: string
+          success_rate: number
+          total_runs: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          last_run?: string | null
+          name: string
+          success_rate?: number
+          total_runs?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          last_run?: string | null
+          name?: string
+          success_rate?: number
+          total_runs?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

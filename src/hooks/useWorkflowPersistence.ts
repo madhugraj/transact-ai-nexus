@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { WorkflowConfig } from '@/types/workflow';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,6 +25,22 @@ export function useWorkflowPersistence() {
       setLoading(true);
       console.log('📁 Loading workflows from Supabase for user:', user?.email);
       
+      // First check if user is properly authenticated
+      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !currentUser) {
+        console.error('❌ Authentication error:', authError);
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to view your workflows",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+
+      console.log('✅ User authenticated, loading workflows for:', currentUser.email);
+
       const { data, error } = await supabase
         .from('workflows')
         .select('*')
@@ -33,11 +48,27 @@ export function useWorkflowPersistence() {
 
       if (error) {
         console.error('❌ Error loading workflows:', error);
-        toast({
-          title: "Error Loading Workflows",
-          description: "Failed to load workflows from database: " + error.message,
-          variant: "destructive"
-        });
+        
+        if (error.code === 'PGRST116') {
+          toast({
+            title: "Table Not Found",
+            description: "Workflows table doesn't exist. Please contact support.",
+            variant: "destructive"
+          });
+        } else if (error.code === '42501') {
+          toast({
+            title: "Permission Denied", 
+            description: "You don't have permission to access workflows. Please check your authentication.",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Error Loading Workflows",
+            description: `Database error: ${error.message}`,
+            variant: "destructive"
+          });
+        }
+        setLoading(false);
         return;
       }
 
@@ -57,6 +88,10 @@ export function useWorkflowPersistence() {
 
       setWorkflows(workflowConfigs);
       console.log('✅ Successfully loaded', workflowConfigs.length, 'workflows from Supabase');
+      
+      if (workflowConfigs.length === 0) {
+        console.log('📝 No workflows found for user');
+      }
     } catch (error) {
       console.error('❌ Failed to load workflows:', error);
       toast({
@@ -82,11 +117,24 @@ export function useWorkflowPersistence() {
     try {
       console.log('➕ Adding new workflow to Supabase:', workflow.name, 'ID:', workflow.id);
       
+      // Verify current user authentication
+      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !currentUser) {
+        console.error('❌ User not authenticated for workflow creation');
+        toast({
+          title: "Authentication Error",
+          description: "Please log in again to save workflows",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       const { data, error } = await supabase
         .from('workflows')
         .insert({
           id: workflow.id,
-          user_id: user.id,
+          user_id: currentUser.id,
           name: workflow.name,
           description: workflow.description,
           config: {
