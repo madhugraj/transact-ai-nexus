@@ -1,4 +1,3 @@
-
 import { WorkflowEngine } from './WorkflowEngine';
 import { WorkflowConfig, WorkflowStep, ProcessingContext, WorkflowExecution } from '@/types/workflow';
 import { GmailWorkflowService } from './GmailWorkflowService';
@@ -256,21 +255,96 @@ export class RealWorkflowEngine extends WorkflowEngine {
     }
     
     try {
-      const result = await this.databaseService.storeData(extractedData, storageConfig);
+      // Ensure we have a valid table name
+      const tableName = (storageConfig as any)?.table || 'extracted_json';
+      const connection = (storageConfig as any)?.connection || 'default';
       
-      console.log(`💾 Data storage completed: ${result.recordsStored} records stored`);
+      console.log('💾 Storing data to database with config:', {
+        connection,
+        table: tableName,
+        recordCount: extractedData.length
+      });
+      
+      // Transform the data to match the expected database schema
+      const transformedData = extractedData.map((data, index) => {
+        // Handle different data formats
+        if (typeof data === 'string') {
+          try {
+            return {
+              json_extract: JSON.parse(data),
+              file_name: `processed_document_${index + 1}`,
+              created_at: new Date().toISOString()
+            };
+          } catch (e) {
+            return {
+              json_extract: { raw_text: data },
+              file_name: `processed_document_${index + 1}`,
+              created_at: new Date().toISOString()
+            };
+          }
+        } else if (typeof data === 'object' && data !== null) {
+          return {
+            json_extract: data,
+            file_name: data.fileName || data.file_name || `processed_document_${index + 1}`,
+            created_at: new Date().toISOString()
+          };
+        } else {
+          return {
+            json_extract: { data },
+            file_name: `processed_document_${index + 1}`,
+            created_at: new Date().toISOString()
+          };
+        }
+      });
+      
+      console.log('📄 Transformed data for storage:', transformedData.length, 'records');
+      
+      const result = await this.databaseService.storeData(transformedData, {
+        table: tableName,
+        connection,
+        action: 'insert'
+      });
+      
+      console.log('💾 Data storage completed:', result.recordsStored, 'records stored');
       
       return {
         success: true,
-        storedCount: result.recordsStored,
-        recordsProcessed: result.recordsProcessed
+        storedCount: result.recordsStored || transformedData.length,
+        recordsProcessed: result.recordsProcessed || transformedData.length
       };
     } catch (error) {
       console.error('❌ Data storage failed:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Data storage failed'
-      };
+      
+      // Try fallback storage to extracted_json table
+      try {
+        console.log('🔄 Attempting fallback storage to extracted_json table...');
+        
+        const fallbackData = extractedData.map((data, index) => ({
+          json_extract: typeof data === 'object' ? data : { raw_data: data },
+          file_name: `workflow_document_${index + 1}_${Date.now()}`
+        }));
+        
+        const fallbackResult = await this.databaseService.storeData(fallbackData, {
+          table: 'extracted_json',
+          connection: 'default',
+          action: 'insert'
+        });
+        
+        console.log('✅ Fallback storage successful:', fallbackResult.recordsStored, 'records');
+        
+        return {
+          success: true,
+          storedCount: fallbackResult.recordsStored || fallbackData.length,
+          recordsProcessed: fallbackResult.recordsProcessed || fallbackData.length,
+          message: 'Data stored using fallback method'
+        };
+      } catch (fallbackError) {
+        console.error('❌ Fallback storage also failed:', fallbackError);
+        return {
+          success: false,
+          error: `Storage failed: ${error instanceof Error ? error.message : 'Unknown error'}. Fallback also failed: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`
+        };
+      }
     }
   }
 

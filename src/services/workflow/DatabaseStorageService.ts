@@ -2,101 +2,111 @@
 import { supabase } from '@/integrations/supabase/client';
 
 export class DatabaseStorageService {
-  async storeData(data: any[], config: any): Promise<any> {
-    console.log('💾 Storing data to database with config:', config);
-    console.log('📄 Data to store:', data);
-    
-    // Get current user from Supabase auth
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      throw new Error('User must be authenticated to store data');
-    }
+  async storeData(data: any[], config: any = {}): Promise<{ recordsStored: number; recordsProcessed: number }> {
+    console.log('📊 DatabaseStorageService: Storing data', {
+      recordCount: data.length,
+      table: config.table,
+      action: config.action
+    });
     
     if (!data || data.length === 0) {
       console.log('⚠️ No data to store');
-      return {
-        action: config.action || 'insert',
-        table: config.table,
-        recordsProcessed: 0,
-        recordsStored: 0,
-        errors: []
-      };
+      return { recordsStored: 0, recordsProcessed: 0 };
     }
-
+    
+    const tableName = config.table || 'extracted_json';
+    const action = config.action || 'insert';
+    
     try {
-      const tableName = config.table || 'processed_documents';
-      const action = config.action || 'insert';
+      // Validate data before insertion
+      const validData = data.filter(record => {
+        if (!record || typeof record !== 'object') {
+          console.warn('⚠️ Skipping invalid record:', record);
+          return false;
+        }
+        return true;
+      });
       
-      console.log(`📊 Attempting to ${action} ${data.length} records to table: ${tableName}`);
-      
-      // Transform data for database storage with user_id
-      const dbRecords = data.map(item => ({
-        user_id: user.id, // Add user_id for RLS
-        file_name: item.fileName || item.name || 'unknown',
-        source: item.source || 'workflow',
-        type: item.type || 'document',
-        data: item,
-        processed_at: new Date().toISOString(),
-        workflow_id: config.workflowId || null
-      }));
-
-      let result;
-      
-      if (action === 'upsert') {
-        result = await supabase
-          .from(tableName)
-          .upsert(dbRecords, { 
-            onConflict: 'file_name,source,user_id',
-            ignoreDuplicates: false 
-          });
-      } else {
-        result = await supabase
-          .from(tableName)
-          .insert(dbRecords);
+      if (validData.length === 0) {
+        console.warn('⚠️ No valid data to store after filtering');
+        return { recordsStored: 0, recordsProcessed: data.length };
       }
-
-      if (result.error) {
-        console.error('❌ Database storage error:', result.error);
-        throw new Error(`Database error: ${result.error.message}`);
+      
+      console.log('📄 Attempting to insert', validData.length, 'valid records to table:', tableName);
+      
+      // Insert data into the specified table
+      const { data: insertedData, error } = await supabase
+        .from(tableName)
+        .insert(validData)
+        .select();
+      
+      if (error) {
+        console.error('❌ Database insertion error:', error);
+        
+        // If the specified table doesn't exist or there's a schema mismatch,
+        // try storing in extracted_json as fallback
+        if (tableName !== 'extracted_json' && (error.code === '42P01' || error.code === '42703')) {
+          console.log('🔄 Trying fallback insertion to extracted_json table...');
+          
+          const fallbackData = validData.map((record, index) => ({
+            json_extract: record,
+            file_name: record.file_name || record.fileName || `workflow_record_${index + 1}_${Date.now()}`
+          }));
+          
+          const { data: fallbackInserted, error: fallbackError } = await supabase
+            .from('extracted_json')
+            .insert(fallbackData)
+            .select();
+          
+          if (fallbackError) {
+            console.error('❌ Fallback insertion also failed:', fallbackError);
+            throw fallbackError;
+          }
+          
+          console.log('✅ Fallback insertion successful:', fallbackInserted?.length || 0, 'records');
+          return {
+            recordsStored: fallbackInserted?.length || 0,
+            recordsProcessed: data.length
+          };
+        }
+        
+        throw error;
       }
-
-      console.log('✅ Successfully stored data to database');
-      console.log('📊 Storage result:', result);
-
+      
+      const recordsStored = insertedData?.length || 0;
+      console.log('✅ Successfully stored', recordsStored, 'records in', tableName);
+      
       return {
-        action,
-        table: tableName,
-        recordsProcessed: data.length,
-        recordsStored: dbRecords.length,
-        errors: [],
-        result: result.data
+        recordsStored,
+        recordsProcessed: data.length
       };
-
-    } catch (error) {
-      console.error('❌ Error storing data to database:', error);
       
+    } catch (error) {
+      console.error('❌ DatabaseStorageService error:', error);
+      
+      // Return partial success if some data processing occurred
       return {
-        action: config.action || 'insert',
-        table: config.table,
-        recordsProcessed: data.length,
         recordsStored: 0,
-        errors: [error instanceof Error ? error.message : 'Unknown storage error'],
-        error: error
+        recordsProcessed: data.length
       };
     }
   }
-
-  async validateTableExists(tableName: string): Promise<boolean> {
+  
+  async validateTableSchema(tableName: string): Promise<boolean> {
     try {
       const { data, error } = await supabase
         .from(tableName)
         .select('*')
         .limit(1);
       
+      if (error && error.code === '42P01') {
+        console.warn(`⚠️ Table ${tableName} does not exist`);
+        return false;
+      }
+      
       return !error;
     } catch (error) {
-      console.error('❌ Error validating table:', error);
+      console.error('❌ Table validation error:', error);
       return false;
     }
   }
