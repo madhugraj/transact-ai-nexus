@@ -204,8 +204,8 @@ export class RealWorkflowEngine extends WorkflowEngine {
     }
     
     try {
-      // Use the actual comparison service
-      const result = await this.comparisonService.compareDocuments(extractedData, comparisonConfig);
+      // Use the actual comparison service with proper method
+      const result = await this.comparisonService.performComparison(extractedData, comparisonConfig);
       
       console.log(`⚖️ Data comparison completed: ${result.comparisons?.length || 0} comparisons`);
       
