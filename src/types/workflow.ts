@@ -24,6 +24,23 @@ export type WorkflowStepType =
   | "report_generation"
   | "approval_notification";
 
+// Processing context interface for agent communication
+export interface ProcessingContext {
+  options?: Record<string, any>;
+  results?: Map<string, any>;
+  metadata?: Record<string, any>;
+  customPrompt?: string;
+  processingType?: string;
+  confidence?: number;
+  language?: string;
+  emails?: any[];
+  documents?: any[];
+  extractedData?: any[];
+  processedCount?: number;
+  storedCount?: number;
+  comparisons?: any[];
+}
+
 // Enhanced step configuration
 export interface WorkflowStepConfig {
   // Position for react-flow compatibility
@@ -32,6 +49,20 @@ export interface WorkflowStepConfig {
   connectedTo?: string[];
   
   // Data source configurations
+  sourceConfig?: {
+    source?: 'gmail' | 'outlook';
+    filters?: string[];
+    attachmentTypes?: string[];
+    useIntelligentFiltering?: boolean;
+    intelligentRules?: {
+      detectInvoices: boolean;
+      checkAttachments: boolean;
+      aiConfidenceThreshold: number;
+    };
+    limit?: number;
+    includeAttachments?: boolean;
+  };
+  
   emailConfig?: {
     source: 'gmail' | 'outlook';
     filters?: string[];

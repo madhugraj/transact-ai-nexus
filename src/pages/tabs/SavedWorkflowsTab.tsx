@@ -45,7 +45,7 @@ export const SavedWorkflowsTab: React.FC<SavedWorkflowsTabProps> = ({
         description: `Executing ${workflow.name}...`
       });
 
-      // Execute the workflow
+      // Execute the workflow with correct signature (only workflow parameter)
       const execution = await workflowEngine.executeWorkflow(workflow);
       
       // Update workflow stats

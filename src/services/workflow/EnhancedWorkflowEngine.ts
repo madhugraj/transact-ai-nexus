@@ -1,5 +1,5 @@
 
-import { WorkflowConfig } from '@/types/workflow';
+import { WorkflowConfig, WorkflowExecution } from '@/types/workflow';
 import { supabase } from '@/integrations/supabase/client';
 import { RealWorkflowEngine } from './RealWorkflowEngine';
 import { WorkflowExecutionService } from './WorkflowExecutionService';
@@ -34,7 +34,7 @@ export class EnhancedWorkflowEngine extends RealWorkflowEngine {
     return parentValidation;
   }
 
-  async executeWorkflow(workflow: WorkflowConfig) {
+  async executeWorkflow(workflow: WorkflowConfig): Promise<WorkflowExecution> {
     const execution = await super.executeWorkflow(workflow);
     
     // Save the execution using the service
