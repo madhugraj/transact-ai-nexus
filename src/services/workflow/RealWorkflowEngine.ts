@@ -150,8 +150,8 @@ export class RealWorkflowEngine extends WorkflowEngine {
     const ocrSettings = step.config?.ocrSettings || {};
     const customPrompt = ocrSettings.customPrompt;
     
-    // Get processing type with proper fallback
-    const processingType = processingConfig.type || 'invoice-extraction';
+    // Get processing type with proper fallback and type safety
+    const processingType = (processingConfig as any)?.type || 'invoice-extraction';
     
     console.log('🔧 Processing config:', {
       type: processingType,
@@ -163,7 +163,7 @@ export class RealWorkflowEngine extends WorkflowEngine {
       ...context,
       customPrompt,
       processingType,
-      confidence: processingConfig.confidence || 0.8,
+      confidence: (processingConfig as any)?.confidence || 0.8,
       language: ocrSettings.language || 'eng'
     };
     
@@ -208,8 +208,8 @@ export class RealWorkflowEngine extends WorkflowEngine {
     try {
       // Check if the service has the expected method, fallback to a basic implementation
       let result;
-      if (typeof this.comparisonService.performComparison === 'function') {
-        result = await this.comparisonService.performComparison(extractedData, comparisonConfig);
+      if (typeof (this.comparisonService as any).performComparison === 'function') {
+        result = await (this.comparisonService as any).performComparison(extractedData, comparisonConfig);
       } else {
         // Fallback implementation
         console.log('⚠️ Using fallback comparison logic');
