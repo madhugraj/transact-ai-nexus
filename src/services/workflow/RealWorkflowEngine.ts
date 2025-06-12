@@ -159,7 +159,11 @@ export class RealWorkflowEngine extends WorkflowEngine {
       language: ocrSettings.language || 'eng'
     };
     
-    const result = await this.documentService.processDocuments(enhancedContext);
+    // Create mock files array for the service call
+    const mockFiles = context.documents || [];
+    const processingType = (processingConfig as any)?.type || 'invoice-extraction';
+    
+    const result = await this.documentService.processDocuments(mockFiles, processingType);
     console.log(`🔍 Document processing completed: ${result.processedCount} documents`);
     return result;
   }
@@ -184,7 +188,11 @@ export class RealWorkflowEngine extends WorkflowEngine {
     console.log('💾 Executing data storage step...');
     
     const storageConfig = step.config?.storageConfig || {};
-    const result = await this.databaseService.storeData(context);
+    
+    // Create mock extracted data for the service call
+    const mockExtractedData = context.extractedData || [];
+    
+    const result = await this.databaseService.storeData(context, mockExtractedData);
     
     console.log(`💾 Data storage completed: ${result.storedCount} records`);
     return result;
