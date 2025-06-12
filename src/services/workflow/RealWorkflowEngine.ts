@@ -192,7 +192,7 @@ export class RealWorkflowEngine extends WorkflowEngine {
     // Create mock extracted data for the service call
     const mockExtractedData = context.extractedData || [];
     
-    const result = await this.databaseService.storeData(context, mockExtractedData);
+    const result = await this.databaseService.storeData(mockExtractedData, storageConfig);
     
     console.log(`💾 Data storage completed: ${result.storedCount} records`);
     return result;
