@@ -50,7 +50,7 @@ export class RealWorkflowEngine extends WorkflowEngine {
           break;
         }
         
-        const result = await this.executeStep(step, context);
+        const result = await this.executeWorkflowStep(step, context);
         if (!result?.success) {
           console.error(`❌ RealWorkflowEngine: Step ${step.id} failed:`, result?.error);
           execution.status = 'failed';
@@ -78,7 +78,7 @@ export class RealWorkflowEngine extends WorkflowEngine {
     }
   }
 
-  private async executeStep(step: WorkflowStep, context: ProcessingContext): Promise<any> {
+  private async executeWorkflowStep(step: WorkflowStep, context: ProcessingContext): Promise<any> {
     console.log(`🔄 RealWorkflowEngine: Executing step ${step.id} (${step.type})`);
     
     try {
@@ -116,11 +116,11 @@ export class RealWorkflowEngine extends WorkflowEngine {
   private async executeDocumentSource(step: WorkflowStep, context: ProcessingContext): Promise<any> {
     console.log('📧 Executing document source step...');
     
-    // Extract source configuration with proper fallbacks
-    const sourceConfig = step.config.sourceConfig || step.config.emailConfig || {};
+    // Extract source configuration with proper fallbacks and type checking
+    const sourceConfig = step.config?.sourceConfig || step.config?.emailConfig || {};
     const gmailFilters = {
       ...sourceConfig,
-      limit: sourceConfig.limit || 50,
+      limit: (sourceConfig as any)?.limit || 50,
       includeAttachments: true
     };
     
@@ -139,13 +139,13 @@ export class RealWorkflowEngine extends WorkflowEngine {
   private async executeDocumentProcessing(step: WorkflowStep, context: ProcessingContext): Promise<any> {
     console.log('🔍 Executing document processing step...');
     
-    // Extract processing configuration and custom prompt
-    const processingConfig = step.config.processingConfig || {};
-    const ocrSettings = step.config.ocrSettings || {};
+    // Extract processing configuration and custom prompt with proper type checking
+    const processingConfig = step.config?.processingConfig || {};
+    const ocrSettings = step.config?.ocrSettings || {};
     const customPrompt = ocrSettings.customPrompt;
     
     console.log('🔧 Processing config:', {
-      type: processingConfig.type || 'invoice-extraction',
+      type: (processingConfig as any)?.type || 'invoice-extraction',
       hasCustomPrompt: !!customPrompt,
       promptLength: customPrompt?.length || 0
     });
@@ -154,8 +154,8 @@ export class RealWorkflowEngine extends WorkflowEngine {
     const enhancedContext = {
       ...context,
       customPrompt,
-      processingType: processingConfig.type || 'invoice-extraction',
-      confidence: processingConfig.confidence || 0.8,
+      processingType: (processingConfig as any)?.type || 'invoice-extraction',
+      confidence: (processingConfig as any)?.confidence || 0.8,
       language: ocrSettings.language || 'eng'
     };
     
@@ -167,7 +167,7 @@ export class RealWorkflowEngine extends WorkflowEngine {
   private async executeDataComparison(step: WorkflowStep, context: ProcessingContext): Promise<any> {
     console.log('⚖️ Executing data comparison step...');
     
-    const comparisonConfig = step.config.comparisonConfig || {};
+    const comparisonConfig = step.config?.comparisonConfig || {};
     
     // Mock result for now - replace with actual comparison service call
     const result = {
@@ -183,7 +183,7 @@ export class RealWorkflowEngine extends WorkflowEngine {
   private async executeDataStorage(step: WorkflowStep, context: ProcessingContext): Promise<any> {
     console.log('💾 Executing data storage step...');
     
-    const storageConfig = step.config.storageConfig || {};
+    const storageConfig = step.config?.storageConfig || {};
     const result = await this.databaseService.storeData(context);
     
     console.log(`💾 Data storage completed: ${result.storedCount} records`);
