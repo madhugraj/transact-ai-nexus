@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,11 +48,13 @@ const Actions = () => {
     // Generate new UUIDs for all steps and create ID mapping
     const stepIdMapping: Record<string, string> = {};
     
-    // Create steps with new IDs
+    // Create steps with new UUIDs
     const steps = template.steps.map((templateStep, index) => {
       const newStepId = generateUUID();
       const originalId = `template-step-${index}`; // Create a consistent original ID
       stepIdMapping[originalId] = newStepId;
+      
+      console.log(`🔧 Creating step with UUID: ${newStepId} for template step ${index}`);
       
       const step: WorkflowStep = {
         id: newStepId,
@@ -79,8 +82,12 @@ const Actions = () => {
       };
     });
 
+    // Generate proper UUID for workflow
+    const workflowId = generateUUID();
+    console.log(`✅ Generated workflow UUID: ${workflowId}`);
+
     const workflow: WorkflowConfig = {
-      id: generateUUID(),
+      id: workflowId,
       name: template.name,
       description: template.description,
       steps,
@@ -91,7 +98,7 @@ const Actions = () => {
       successRate: 0
     };
 
-    console.log('✅ Created workflow with UUID:', workflow.id);
+    console.log('✅ Created workflow with proper UUID:', workflow.id);
     console.log('📊 Steps:', steps.length, 'Connections:', connections.length);
 
     // Load into builder instead of saving immediately
@@ -105,7 +112,8 @@ const Actions = () => {
     
     toast({
       title: "Template Loaded",
-      description: `${template.name} template has been loaded in the builder. Customize and save when ready.`
+      description: `${template.name} template has been loaded in the builder. Customize and save when ready.`,
+      duration: 3000
     });
   };
 

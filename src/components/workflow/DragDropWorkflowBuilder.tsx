@@ -40,6 +40,11 @@ const nodeTypes = {
 
 const AUTOSAVE_KEY = 'workflow_draft';
 
+// Helper function to generate proper UUIDs
+const generateUUID = () => {
+  return crypto.randomUUID();
+};
+
 export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = ({
   onWorkflowSave,
   onWorkflowExecute,
@@ -166,7 +171,8 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
         y: event.clientY - reactFlowBounds.top,
       };
 
-      const stepId = `node_${Date.now()}`;
+      // Generate proper UUID for step ID
+      const stepId = generateUUID();
       
       const workflowStep: WorkflowStep = {
         id: stepId,
@@ -290,13 +296,17 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
       return;
     }
 
+    // Generate proper UUID for workflow ID
+    const workflowId = generateUUID();
+    console.log('💾 Generated proper UUID for workflow:', workflowId);
+
     const workflow: WorkflowConfig = {
-      id: `workflow_${Date.now()}`,
+      id: workflowId,
       name: workflowName,
       description: workflowDescription,
       steps: generateWorkflowSteps(),
       connections: edges.map((edge, index) => ({
-        id: edge.id || `conn-${index}`,
+        id: edge.id || generateUUID(),
         sourceStepId: edge.source,
         targetStepId: edge.target,
       })),
@@ -304,7 +314,7 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
       createdAt: new Date(),
     };
 
-    console.log('💾 Saving workflow from DragDropWorkflowBuilder:', workflow);
+    console.log('💾 Saving workflow with proper UUID:', workflow.id);
     
     // Add to persistent storage
     addWorkflow(workflow);
@@ -317,18 +327,21 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
     
     toast({
       title: "Workflow Saved",
-      description: `"${workflow.name}" has been saved successfully and will persist across sessions.`,
+      description: `"${workflow.name}" has been saved successfully with ID: ${workflow.id}`,
     });
   };
 
   const handleExecuteWorkflow = () => {
+    // Generate proper UUID for execution
+    const executionId = generateUUID();
+    
     const workflow: WorkflowConfig = {
-      id: `workflow_${Date.now()}`,
+      id: executionId,
       name: workflowName || 'Untitled Workflow',
       description: workflowDescription,
       steps: generateWorkflowSteps(),
       connections: edges.map((edge, index) => ({
-        id: edge.id || `conn-${index}`,
+        id: edge.id || generateUUID(),
         sourceStepId: edge.source,
         targetStepId: edge.target,
       })),
@@ -336,6 +349,7 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
       createdAt: new Date(),
     };
 
+    console.log('🚀 Executing workflow with proper UUID:', workflow.id);
     onWorkflowExecute(workflow);
   };
 

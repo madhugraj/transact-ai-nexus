@@ -1,3 +1,4 @@
+
 import { Agent, AgentResult } from './types';
 import { processImageWithGemini } from '@/services/api/geminiService';
 
@@ -34,7 +35,7 @@ REQUIRED FIELDS TO EXTRACT:
 - invoice_date: Date of the invoice (YYYY-MM-DD format)
 - supplier_gst_number: GST/Tax number of the supplier/seller
 - bill_to_gst_number: GST/Tax number of the buyer/bill-to party
-- po_number: Purchase Order number - Look for ANY of these patterns and labels
+- po_number: Purchase Order number - This is CRITICAL to find
 - shipping_address: Complete shipping/delivery address
 - seal_and_sign_present: Boolean - true if you detect any seal, stamp, or signature on the document
 - line_items: Array of items with the following for each:
@@ -45,29 +46,32 @@ REQUIRED FIELDS TO EXTRACT:
   - total_amount: Total amount for this line item
   - serial_number: Serial number if available
 
-CRITICAL INSTRUCTIONS FOR PO NUMBER EXTRACTION:
-1. Look for ANY field that contains purchase order or order references
-2. Common field labels to scan for:
-   - "P.O:" or "P.O." or "P.O" (with or without spaces)
-   - "PO Number" or "PO No" or "PO#"
-   - "Purchase Order" or "Purchase Order No"
-   - "Order No" or "Order Number" or "Order#"
-   - "Buyer's Order No" or "Buyer Order"
-   - "Ref No" or "Reference Number" or "Ref#"
-   - "Work Order" or "WO"
-3. The PO number can appear ANYWHERE on the invoice - header, footer, or within tables
-4. Extract the EXACT alphanumeric value that follows these labels
-5. Common formats: numbers only (like "25260168"), alphanumeric (like "PO-2526-0168"), or with prefixes
-6. Remove any prefixes from the extracted value (like "PO:", "Order:", etc.) - keep only the actual number/code
-7. If multiple order references exist, prioritize the main purchase order number
-8. Look carefully in ALL sections of the document including headers, bill-to sections, and item details
+CRITICAL - PO NUMBER EXTRACTION IS ESSENTIAL:
+The Purchase Order (PO) number is ABSOLUTELY CRITICAL to find. It can appear as:
+- "P.O:" followed by a number (like "P.O: 25260168")
+- "P.O." followed by a number
+- "P.O" followed by a number
+- "PO Number:" followed by a number
+- "Purchase Order No:" followed by a number
+- "Order No:" followed by a number
+- "Buyer's Order No:" followed by a number
+- Any variation of the above
 
-SCANNING STRATEGY FOR PO NUMBER:
-- First scan the top section/header area for "P.O:" type labels
-- Then check bill-to/ship-to sections for order references
-- Look in any reference or description fields
-- Check footer areas for order information
-- Examine any table headers or additional info sections
+SCAN EVERY PART OF THE DOCUMENT FOR PO NUMBER:
+1. Header section (top of document)
+2. Bill-to/Ship-to address blocks
+3. Order details section
+4. Footer section
+5. Any reference fields
+6. Table headers or cells
+
+SPECIFIC EXTRACTION RULES FOR PO NUMBER:
+- Look for text patterns like "P.O: 25260168" and extract "25260168"
+- Look for "Purchase Order: ABC123" and extract "ABC123" 
+- Look for "Order No: 12345" and extract "12345"
+- Remove prefixes like "P.O:", "Order:", "PO:" etc. - keep only the actual number
+- The PO number can be purely numeric (like 25260168) or alphanumeric (like PO-2526-0168)
+- If you find multiple potential PO numbers, choose the most prominent one
 
 IMPORTANT INSTRUCTIONS:
 1. Extract data EXACTLY as it appears in the document
@@ -75,10 +79,10 @@ IMPORTANT INSTRUCTIONS:
 3. For amounts, extract only the numeric value (no currency symbols)
 4. If a field is not found, use null
 5. For seal_and_sign_present, carefully look for stamps, seals, signatures, or any authentication marks
-6. PAY EXTRA ATTENTION to PO number extraction - it's critical for invoice processing
-7. Be very thorough when scanning for PO numbers - they can be in unexpected locations
+6. PO NUMBER IS CRITICAL - Take extra time to scan the entire document thoroughly
+7. Be very systematic in your search for the PO number
 
-Respond with ONLY a JSON object in this exact format:
+RESPONSE FORMAT - Respond with ONLY a JSON object:
 {
   "invoice_number": "string or null",
   "invoice_date": "YYYY-MM-DD or null",
@@ -99,9 +103,11 @@ Respond with ONLY a JSON object in this exact format:
   ],
   "extraction_confidence": 0.0-1.0
 }
+
+Remember: The PO number extraction is CRITICAL. Scan every part of the document systematically.
 `;
 
-      console.log(`📊 Calling Gemini API with prompt length: ${prompt.length}`);
+      console.log(`📊 Calling Gemini API with enhanced PO extraction prompt`);
       console.log(`📊 File type being sent to Gemini: ${file.type}`);
       
       const response = await processImageWithGemini(prompt, base64Image, file.type);
@@ -132,24 +138,51 @@ Respond with ONLY a JSON object in this exact format:
         };
       }
 
-      console.log(`📊 Raw Gemini response data for ${file.name}:`, response.data.substring(0, 500) + '...');
+      console.log(`📊 Raw Gemini response data for ${file.name}:`, response.data.substring(0, 1000));
       
       const extractedData = this.parseGeminiResponse(response.data);
       
-      // Additional logging for PO number extraction
-      console.log(`📊 DETAILED PO Number extraction result for ${file.name}:`, {
+      // Enhanced logging for PO number extraction
+      console.log(`📊 ENHANCED PO Number extraction analysis for ${file.name}:`, {
         extracted_po_number: extractedData.po_number,
         po_number_type: typeof extractedData.po_number,
         po_number_length: extractedData.po_number?.length || 0,
         po_number_value: extractedData.po_number,
-        raw_extraction_preview: JSON.stringify(extractedData).substring(0, 300)
+        is_po_number_null: extractedData.po_number === null,
+        is_po_number_empty: extractedData.po_number === '',
+        raw_gemini_response: response.data,
+        full_extracted_data: JSON.stringify(extractedData, null, 2)
       });
+      
+      // Special check for PO number patterns in raw response
+      const poPatterns = [
+        /P\.O[:\.\s]*(\d+)/i,
+        /Purchase\s*Order[:\s]*(\w+)/i,
+        /Order\s*No[:\s]*(\w+)/i,
+        /PO[:\s]*(\w+)/i
+      ];
+      
+      let foundPOInRaw = null;
+      for (const pattern of poPatterns) {
+        const match = response.data.match(pattern);
+        if (match) {
+          foundPOInRaw = match[1];
+          console.log(`📊 Found PO pattern in raw response: ${pattern} -> ${foundPOInRaw}`);
+          break;
+        }
+      }
+      
+      if (foundPOInRaw && !extractedData.po_number) {
+        console.log(`📊 PO found in raw but not in extracted data - using raw match: ${foundPOInRaw}`);
+        extractedData.po_number = foundPOInRaw;
+      }
       
       console.log(`📊 Successfully parsed extraction data for ${file.name}:`, {
         hasInvoiceNumber: !!extractedData.invoice_number,
         hasPONumber: !!extractedData.po_number,
         hasLineItems: extractedData.line_items?.length || 0,
-        confidence: extractedData.extraction_confidence
+        confidence: extractedData.extraction_confidence,
+        finalPONumber: extractedData.po_number
       });
       
       console.log(`✅ ${this.name}: Data extraction complete for ${file.name}`);
@@ -162,7 +195,8 @@ Respond with ONLY a JSON object in this exact format:
           fileType: file.type,
           fileSize: file.size,
           fileName: file.name,
-          extractedFields: Object.keys(extractedData).length
+          extractedFields: Object.keys(extractedData).length,
+          poNumberFound: !!extractedData.po_number
         }
       };
       
