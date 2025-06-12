@@ -1,5 +1,5 @@
 
-import { Agent, AgentResult } from './types';
+import { Agent, AgentResult, ProcessingContext } from './types';
 import { processImageWithGemini } from '@/services/api/geminiService';
 
 export class InvoiceDataExtractionAgent implements Agent {
@@ -12,7 +12,19 @@ export class InvoiceDataExtractionAgent implements Agent {
     return data instanceof File || (typeof data === 'string' && data.startsWith('data:image'));
   }
 
-  async process(file: File, customPrompt?: string): Promise<AgentResult> {
+  async process(data: any, context?: ProcessingContext): Promise<AgentResult> {
+    // Extract file and custom prompt from the parameters
+    const file = data instanceof File ? data : null;
+    const customPrompt = context?.options?.customPrompt;
+
+    if (!file) {
+      return {
+        success: false,
+        error: 'Invalid input: expected a File object',
+        agent: this.id
+      };
+    }
+
     console.log(`📊 ${this.name}: Starting data extraction for ${file.name}`);
     console.log(`📊 File details: size=${file.size}, type=${file.type}`);
     
