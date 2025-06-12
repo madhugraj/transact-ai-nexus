@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -173,6 +172,7 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
 
       // Generate proper UUID for step ID
       const stepId = generateUUID();
+      console.log('🆔 Generated new step UUID:', stepId);
       
       const workflowStep: WorkflowStep = {
         id: stepId,
@@ -248,6 +248,8 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
   }, [setNodes, setEdges]);
 
   const handleConfigSave = (updatedStep: WorkflowStep) => {
+    console.log('💾 Saving step configuration:', updatedStep.name, 'ID:', updatedStep.id);
+    
     setNodes((nds) => 
       nds.map((node) => 
         node.id === updatedStep.id 
@@ -296,9 +298,10 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
       return;
     }
 
-    // Generate proper UUID for workflow ID
+    // Generate proper UUID for workflow ID - ensure uniqueness
     const workflowId = generateUUID();
-    console.log('💾 Generated proper UUID for workflow:', workflowId);
+    const timestamp = Date.now();
+    console.log('💾 Generated unique workflow UUID:', workflowId, 'at timestamp:', timestamp);
 
     const workflow: WorkflowConfig = {
       id: workflowId,
@@ -314,7 +317,8 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
       createdAt: new Date(),
     };
 
-    console.log('💾 Saving workflow with proper UUID:', workflow.id);
+    console.log('💾 Saving workflow with UUID:', workflow.id);
+    console.log('💾 Workflow steps:', workflow.steps.length, 'connections:', workflow.connections.length);
     
     // Add to persistent storage
     addWorkflow(workflow);
@@ -327,13 +331,14 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
     
     toast({
       title: "Workflow Saved",
-      description: `"${workflow.name}" has been saved successfully with ID: ${workflow.id}`,
+      description: `"${workflow.name}" has been saved successfully`,
     });
   };
 
   const handleExecuteWorkflow = () => {
     // Generate proper UUID for execution
     const executionId = generateUUID();
+    console.log('🚀 Generated execution UUID:', executionId);
     
     const workflow: WorkflowConfig = {
       id: executionId,
@@ -349,7 +354,7 @@ export const DragDropWorkflowBuilder: React.FC<DragDropWorkflowBuilderProps> = (
       createdAt: new Date(),
     };
 
-    console.log('🚀 Executing workflow with proper UUID:', workflow.id);
+    console.log('🚀 Executing workflow with UUID:', workflow.id);
     onWorkflowExecute(workflow);
   };
 

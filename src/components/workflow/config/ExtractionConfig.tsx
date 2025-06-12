@@ -16,7 +16,7 @@ interface ExtractionConfigProps {
   onConfigUpdate: (configKey: string, value: any) => void;
 }
 
-// Pre-written prompts based on document types that we've been using
+// Pre-written prompts based on document types
 const EXTRACTION_PROMPTS = {
   'invoice-extraction': `You are an expert AI assistant specialized in extracting structured data from invoice documents. Extract the following information and return it in JSON format:
 
@@ -30,8 +30,17 @@ REQUIRED FIELDS:
 - tax_amount: Number
 - total_amount: Number
 - currency: String
-- po_number: String (if available)
+- po_number: String (CRITICAL - Look for "P.O:", "PO Number:", "Order No:", etc.)
 - payment_terms: String
+
+CRITICAL PO NUMBER EXTRACTION:
+The Purchase Order (PO) number is ABSOLUTELY CRITICAL. Look for:
+- "P.O:" followed by a number (like "P.O: 25260168")
+- "P.O." or "PO Number:" or "Order No:" followed by a number
+- ANY field that contains purchase order references
+- Check EVERY section: header, bill-to area, footer, tables
+- Extract the EXACT number after these labels
+- Remove prefixes like "P.O:", keep only the actual number
 
 LINE ITEMS (as array):
 - description: String
@@ -114,76 +123,6 @@ Return JSON in this exact format:
   ]
 }`,
 
-  'receipt-extraction': `You are an expert AI assistant specialized in extracting structured data from receipt documents. Extract the following information and return it in JSON format:
-
-REQUIRED FIELDS:
-- receipt_number: String
-- merchant_name: String
-- merchant_address: String
-- transaction_date: Date (YYYY-MM-DD format)
-- subtotal: Number
-- tax_amount: Number
-- total_amount: Number
-- currency: String
-- payment_method: String
-
-LINE ITEMS (as array):
-- description: String
-- quantity: Number
-- unit_price: Number
-- line_total: Number
-
-Return JSON in this exact format:
-{
-  "receipt_number": "",
-  "merchant_name": "",
-  "merchant_address": "",
-  "transaction_date": "",
-  "subtotal": 0,
-  "tax_amount": 0,
-  "total_amount": 0,
-  "currency": "",
-  "payment_method": "",
-  "line_items": [
-    {
-      "description": "",
-      "quantity": 0,
-      "unit_price": 0,
-      "line_total": 0
-    }
-  ]
-}`,
-
-  'contract-extraction': `You are an expert AI assistant specialized in extracting structured data from contract documents. Extract the following information and return it in JSON format:
-
-REQUIRED FIELDS:
-- contract_number: String
-- contract_title: String
-- party_1_name: String
-- party_2_name: String
-- contract_date: Date (YYYY-MM-DD format)
-- start_date: Date (YYYY-MM-DD format)
-- end_date: Date (YYYY-MM-DD format)
-- contract_value: Number
-- currency: String
-- payment_terms: String
-- key_obligations: Array of strings
-
-Return JSON in this exact format:
-{
-  "contract_number": "",
-  "contract_title": "",
-  "party_1_name": "",
-  "party_2_name": "",
-  "contract_date": "",
-  "start_date": "",
-  "end_date": "",
-  "contract_value": 0,
-  "currency": "",
-  "payment_terms": "",
-  "key_obligations": []
-}`,
-
   'general-ocr': `You are an expert OCR assistant. Read this scanned document image and extract clean, structured text.
 You are also an expert in extracting tables from scanned images.
 
@@ -211,18 +150,40 @@ export const ExtractionConfig: React.FC<ExtractionConfigProps> = ({
   step,
   onConfigUpdate
 }) => {
-  // Get current document type to set appropriate prompt
   const currentType = step.config.processingConfig?.type || 'general-ocr';
-  
-  // Update prompt when document type changes
+  const currentPrompt = step.config.ocrSettings?.customPrompt || '';
+
+  // Initialize with default prompt if empty
   React.useEffect(() => {
-    if (currentType in EXTRACTION_PROMPTS) {
+    if (!currentPrompt && currentType in EXTRACTION_PROMPTS) {
+      console.log('🔧 Initializing extraction prompt for type:', currentType);
       onConfigUpdate('ocrSettings', {
         ...step.config.ocrSettings,
         customPrompt: EXTRACTION_PROMPTS[currentType as keyof typeof EXTRACTION_PROMPTS]
       });
     }
-  }, [currentType, onConfigUpdate]);
+  }, [currentType, currentPrompt, onConfigUpdate]);
+
+  const handlePromptChange = (newPrompt: string) => {
+    console.log('📝 Updating custom extraction prompt, length:', newPrompt.length);
+    onConfigUpdate('ocrSettings', {
+      ...step.config.ocrSettings,
+      customPrompt: newPrompt
+    });
+  };
+
+  const handleTypeChange = (newType: string) => {
+    console.log('🔄 Changing extraction type to:', newType);
+    onConfigUpdate('processingConfig', {
+      ...step.config.processingConfig,
+      type: newType
+    });
+    
+    // Update prompt when type changes
+    if (newType in EXTRACTION_PROMPTS) {
+      handlePromptChange(EXTRACTION_PROMPTS[newType as keyof typeof EXTRACTION_PROMPTS]);
+    }
+  };
 
   return (
     <Card>
@@ -236,11 +197,8 @@ export const ExtractionConfig: React.FC<ExtractionConfigProps> = ({
         <div>
           <Label>Document Source Type</Label>
           <Select
-            value={step.config.processingConfig?.type || 'general-ocr'}
-            onValueChange={(value) => onConfigUpdate('processingConfig', {
-              ...step.config.processingConfig,
-              type: value
-            })}
+            value={currentType}
+            onValueChange={handleTypeChange}
           >
             <SelectTrigger>
               <SelectValue />
@@ -272,6 +230,7 @@ export const ExtractionConfig: React.FC<ExtractionConfigProps> = ({
               <SelectItem value="ai-vision">AI Vision Processing</SelectItem>
               <SelectItem value="template-based">Template Matching</SelectItem>
               <SelectItem value="hybrid">Hybrid (AI + OCR)</SelectItem>
+              <SelectItem value="gemini">Gemini Vision AI</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -318,20 +277,36 @@ export const ExtractionConfig: React.FC<ExtractionConfigProps> = ({
         </div>
 
         <div>
-          <Label>Custom Extraction Prompt</Label>
+          <Label className="flex items-center justify-between">
+            Custom Extraction Prompt
+            <Badge variant="outline" className="text-xs">
+              {currentPrompt.length} chars
+            </Badge>
+          </Label>
           <Textarea
-            value={step.config.ocrSettings?.customPrompt || ''}
-            onChange={(e) => onConfigUpdate('ocrSettings', {
-              ...step.config.ocrSettings,
-              customPrompt: e.target.value
-            })}
+            value={currentPrompt}
+            onChange={(e) => handlePromptChange(e.target.value)}
             placeholder="Enter specific instructions for data extraction..."
-            rows={8}
+            rows={12}
             className="font-mono text-sm"
           />
-          <p className="text-xs text-muted-foreground mt-1">
-            Pre-filled with optimized prompts based on document type. Customize as needed.
-          </p>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-xs text-muted-foreground">
+              Customize the AI prompt for better extraction accuracy
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (currentType in EXTRACTION_PROMPTS) {
+                  handlePromptChange(EXTRACTION_PROMPTS[currentType as keyof typeof EXTRACTION_PROMPTS]);
+                }
+              }}
+              className="text-xs"
+            >
+              Reset to Default
+            </Button>
+          </div>
         </div>
 
         <div className="flex items-center justify-between">
@@ -346,13 +321,14 @@ export const ExtractionConfig: React.FC<ExtractionConfigProps> = ({
         </div>
 
         <div className="bg-gray-50 p-3 rounded text-sm">
-          <p className="font-medium mb-1">Extraction Configuration:</p>
+          <p className="font-medium mb-1">Current Configuration:</p>
           <ul className="text-xs text-muted-foreground space-y-1">
-            <li>• Type: {step.config.processingConfig?.type || 'General OCR'}</li>
+            <li>• Type: {currentType.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</li>
             <li>• Method: {step.config.processingConfig?.aiModel || 'Hybrid'}</li>
             <li>• Confidence: {((step.config.processingConfig?.confidence || 0.8) * 100).toFixed(0)}%</li>
             <li>• Language: {step.config.ocrSettings?.language || 'English'}</li>
             <li>• Enhanced Resolution: {step.config.ocrSettings?.enhanceResolution ? 'Yes' : 'No'}</li>
+            <li>• Custom Prompt: {currentPrompt ? 'Configured' : 'Default'}</li>
           </ul>
         </div>
       </CardContent>

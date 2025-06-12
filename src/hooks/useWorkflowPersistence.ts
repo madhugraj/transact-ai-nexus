@@ -138,6 +138,14 @@ export function useWorkflowPersistence() {
         });
         return;
       }
+
+      // Ensure we have a valid UUID
+      if (!isValidUUID(workflow.id)) {
+        console.error('❌ Invalid UUID for workflow:', workflow.id);
+        // Generate a new UUID
+        workflow.id = crypto.randomUUID();
+        console.log('🆔 Generated new UUID for workflow:', workflow.id);
+      }
       
       const { data, error } = await supabase
         .from('workflows')
@@ -158,6 +166,14 @@ export function useWorkflowPersistence() {
         .single();
 
       if (error) {
+        if (error.code === '23505') {
+          console.error('❌ Duplicate key error, generating new UUID');
+          // Generate new UUID and retry
+          workflow.id = crypto.randomUUID();
+          console.log('🆔 Retrying with new UUID:', workflow.id);
+          return addWorkflow(workflow);
+        }
+        
         console.error('❌ Error saving workflow:', error);
         toast({
           title: "Error Saving Workflow",
