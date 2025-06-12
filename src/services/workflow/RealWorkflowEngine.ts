@@ -186,8 +186,10 @@ export class RealWorkflowEngine {
       };
     }
     
-    const processingType = step.config.processingConfig?.type || 'general-ocr';
+    const processingType = step.config.processingConfig?.type || 'invoice-extraction';
+    const customPrompt = step.config.ocrSettings?.customPrompt;
     console.log('🤖 Using REAL processing type:', processingType);
+    console.log('📝 Custom prompt configured:', !!customPrompt, 'length:', customPrompt?.length || 0);
     
     const extractedData = {
       processedCount: 0,
@@ -306,11 +308,19 @@ export class RealWorkflowEngine {
         
         console.log(`🤖 Starting AI extraction for ${fileInfo.name} with processing type: ${processingType}`);
         console.log(`🤖 File ready for extraction - size: ${file.size}, type: ${file.type}`);
+        console.log(`📝 Using custom prompt: ${!!customPrompt}, length: ${customPrompt?.length || 0}`);
+        
+        // Create processing context with custom prompt
+        const processingContext = {
+          options: {
+            customPrompt: customPrompt
+          }
+        };
         
         // For PO processing
         if (processingType === 'po-extraction' || step.name.toLowerCase().includes('po')) {
           console.log('📄 Using REAL PO extraction agent...');
-          extractionResult = await this.poExtractionAgent.process(file);
+          extractionResult = await this.poExtractionAgent.process(file, processingContext);
           console.log('📄 PO extraction result:', {
             success: extractionResult?.success,
             hasData: !!extractionResult?.data,
@@ -328,11 +338,11 @@ export class RealWorkflowEngine {
           });
           
           if (detection.success && detection.data?.is_invoice) {
-            console.log('✅ Invoice detected, extracting data...');
-            extractionResult = await this.invoiceExtractionAgent.process(file);
+            console.log('✅ Invoice detected, extracting data with custom prompt...');
+            extractionResult = await this.invoiceExtractionAgent.process(file, processingContext);
           } else {
-            console.log('❌ Not detected as invoice, trying data extraction anyway...');
-            extractionResult = await this.invoiceExtractionAgent.process(file);
+            console.log('❌ Not detected as invoice, trying data extraction anyway with custom prompt...');
+            extractionResult = await this.invoiceExtractionAgent.process(file, processingContext);
           }
           
           console.log('📄 Invoice extraction result:', {
@@ -344,7 +354,7 @@ export class RealWorkflowEngine {
         // General OCR processing
         else {
           console.log('📄 Using general OCR processing with invoice extraction agent...');
-          extractionResult = await this.invoiceExtractionAgent.process(file);
+          extractionResult = await this.invoiceExtractionAgent.process(file, processingContext);
           console.log('📄 General OCR extraction result:', {
             success: extractionResult?.success,
             hasData: !!extractionResult?.data,
@@ -417,12 +427,12 @@ export class RealWorkflowEngine {
       console.log('⚠️ No extracted data to store');
       return {
         storedCount: 0,
-        tableName: step.config.storageConfig?.table || 'extracted_json',
+        tableName: step.config.storageConfig?.table || 'invoices',
         records: []
       };
     }
     
-    const tableName = step.config.storageConfig?.table || 'extracted_json';
+    const tableName = step.config.storageConfig?.table || 'invoices';
     const action = step.config.storageConfig?.action || 'insert';
     
     console.log('💾 REAL storage to table:', tableName, 'using action:', action);
@@ -431,102 +441,100 @@ export class RealWorkflowEngine {
       const results = [];
       
       for (const doc of inputData.extractedDocuments) {
-        console.log('💾 REAL database insert for: – "' + doc.filename + '"');
+        console.log('💾 REAL database insert for:', doc.filename);
         console.log('💾 Document extracted data preview:', JSON.stringify(doc.extractedData).substring(0, 200));
         
-        let dataToStore;
-        
-        // Handle different table schemas
-        if (tableName === 'invoice_table') {
-          // For invoice_table, handle foreign key constraints more gracefully
-          let poNumber = null;
+        if (tableName === 'invoices') {
+          // Store in the new optimized invoices schema
+          console.log('💾 Using new optimized invoices schema');
           
-          // Only set po_number if we have a valid value and it exists in po_table
-          if (doc.extractedData.po_number) {
-            const poNumberValue = parseInt(String(doc.extractedData.po_number).replace(/\D/g, ''));
-            if (poNumberValue && !isNaN(poNumberValue)) {
-              // Check if PO exists in po_table
-              const { data: existingPO, error: poCheckError } = await supabase
-                .from('po_table')
-                .select('po_number')
-                .eq('po_number', poNumberValue)
-                .maybeSingle();
-              
-              if (poCheckError) {
-                console.error('❌ Error checking PO existence:', poCheckError);
-              } else if (existingPO) {
-                poNumber = poNumberValue;
-                console.log('✅ Found existing PO in database:', poNumberValue);
-              } else {
-                console.log('⚠️ PO number not found in po_table, setting to null:', poNumberValue);
-              }
-            }
-          }
-          
-          // Generate a unique invoice number if none exists or if it's 0
-          let invoiceNumber = null;
-          if (doc.extractedData.invoice_number) {
-            const extractedInvoiceNum = parseInt(String(doc.extractedData.invoice_number).replace(/\D/g, ''));
-            if (extractedInvoiceNum && !isNaN(extractedInvoiceNum) && extractedInvoiceNum > 0) {
-              invoiceNumber = extractedInvoiceNum;
-            }
-          }
-          
-          // If no valid invoice number, generate one based on timestamp
-          if (!invoiceNumber) {
-            invoiceNumber = Date.now(); // Use timestamp as unique invoice number
-            console.log('🔢 Generated invoice number:', invoiceNumber, 'for file:', doc.filename);
-          }
-          
-          dataToStore = {
-            attachment_invoice_name: doc.filename,
-            invoice_number: invoiceNumber,
-            invoice_date: doc.extractedData.invoice_date || null,
-            po_number: poNumber, // Only set if PO exists in po_table
-            details: doc.extractedData,
-            created_at: new Date().toISOString()
+          const invoiceData = {
+            invoice_number: doc.extractedData.invoice_number || `INV-${Date.now()}`,
+            invoice_date: doc.extractedData.invoice_date || new Date().toISOString().split('T')[0],
+            supplier_gst_number: doc.extractedData.supplier_gst_number || null,
+            bill_to_gst_number: doc.extractedData.bill_to_gst_number || null,
+            po_number: doc.extractedData.po_number || null,
+            shipping_address: doc.extractedData.shipping_address || null,
+            seal_and_sign_present: doc.extractedData.seal_and_sign_present || false,
+            seal_sign_image: doc.extractedData.seal_sign_image ? Buffer.from(doc.extractedData.seal_sign_image, 'base64') : null,
+            document_quality_notes: doc.extractedData.document_quality_notes || null,
+            raw_json: doc.extractedData,
+            confidence_score: Math.round((doc.confidence || 0.85) * 100)
           };
+          
+          console.log('💾 Inserting invoice record:', {
+            invoice_number: invoiceData.invoice_number,
+            po_number: invoiceData.po_number,
+            confidence_score: invoiceData.confidence_score
+          });
+          
+          // Insert the main invoice record
+          const { data: invoiceRecord, error: invoiceError } = await supabase
+            .from('invoices')
+            .insert(invoiceData)
+            .select()
+            .single();
+          
+          if (invoiceError) {
+            console.error('❌ Failed to insert invoice:', invoiceError);
+            throw invoiceError;
+          }
+          
+          console.log('✅ Invoice inserted successfully:', invoiceRecord.id);
+          
+          // Insert line items if they exist
+          if (doc.extractedData.line_items && doc.extractedData.line_items.length > 0) {
+            console.log('💾 Inserting', doc.extractedData.line_items.length, 'line items');
+            
+            const lineItemsData = doc.extractedData.line_items.map((item: any, index: number) => ({
+              invoice_id: invoiceRecord.id,
+              item_index: index + 1,
+              description: item.description || null,
+              hsn_sac: item.hsn_sac || null,
+              quantity: parseFloat(item.quantity) || 0,
+              unit_price: parseFloat(item.unit_price) || 0,
+              total_amount: parseFloat(item.total_amount) || 0,
+              serial_number: item.serial_number || null,
+              item_confidence: Math.round((item.confidence || 0.85) * 100)
+            }));
+            
+            const { data: lineItemsRecords, error: lineItemsError } = await supabase
+              .from('invoice_line_items')
+              .insert(lineItemsData)
+              .select();
+            
+            if (lineItemsError) {
+              console.error('❌ Failed to insert line items:', lineItemsError);
+              // Don't throw here, we still have the main invoice record
+            } else {
+              console.log('✅ Line items inserted successfully:', lineItemsRecords.length);
+            }
+          }
+          
+          results.push(invoiceRecord);
+          
         } else {
-          // Default schema for extracted_json table
-          dataToStore = {
+          // Default schema for other tables
+          const dataToStore = {
             file_name: doc.filename,
             json_extract: doc.extractedData,
             created_at: new Date().toISOString()
           };
+          
+          console.log('💾 Inserting into table:', tableName);
+          
+          const { data, error } = await supabase
+            .from(tableName)
+            .insert(dataToStore)
+            .select();
+          
+          if (error) {
+            console.error('❌ Database insert failed:', error);
+            throw error;
+          }
+          
+          results.push(data);
         }
-        
-        console.log('💾 Final data to store:', {
-          table: tableName,
-          filename: doc.filename,
-          hasExtractedData: !!doc.extractedData,
-          dataKeys: Object.keys(dataToStore),
-          invoiceNumber: dataToStore.invoice_number || 'null',
-          poNumber: dataToStore.po_number || 'null'
-        });
-        
-        console.log('💾 Full data object:', JSON.stringify(dataToStore, null, 2));
-        
-        const { data, error } = await supabase
-          .from(tableName)
-          .insert(dataToStore)
-          .select();
-        
-        if (error) {
-          console.error('❌ REAL database insert failed for:', doc.filename);
-          console.error('❌ Database error details:', {
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-            code: error.code
-          });
-          console.error('❌ Data that failed to insert:', JSON.stringify(dataToStore, null, 2));
-          throw new Error(`Failed to store data for ${doc.filename}: ${error.message} (Code: ${error.code})`);
-        }
-        
-        results.push(data);
-        console.log('✅ REAL database insert successful for:', doc.filename);
-        console.log('✅ Inserted data ID:', data?.[0]?.id || 'No ID returned');
-        console.log('✅ Database response:', JSON.stringify(data, null, 2));
       }
       
       console.log('💾 All REAL data stored successfully. Records created:', results.length);
@@ -539,7 +547,6 @@ export class RealWorkflowEngine {
       
     } catch (error) {
       console.error('❌ REAL data storage step failed:', error);
-      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       throw error;
     }
   }

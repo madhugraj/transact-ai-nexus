@@ -24,216 +24,75 @@ export class DatabaseStorage {
         throw new Error('No extracted data provided');
       }
 
-      // Extract invoice number - handle string to number conversion
-      let invoiceNumber = 0;
-      if (extractedData.invoice_number) {
-        if (typeof extractedData.invoice_number === 'string') {
-          const numberMatch = extractedData.invoice_number.match(/\d+/);
-          invoiceNumber = numberMatch ? parseInt(numberMatch[0]) : 0;
+      console.log(`📋 Using new optimized invoices schema for ${filename}`);
+
+      // Prepare invoice data for the new schema
+      const invoiceData = {
+        invoice_number: extractedData.invoice_number || `INV-${Date.now()}`,
+        invoice_date: extractedData.invoice_date || new Date().toISOString().split('T')[0],
+        supplier_gst_number: extractedData.supplier_gst_number || null,
+        bill_to_gst_number: extractedData.bill_to_gst_number || null,
+        po_number: extractedData.po_number || null,
+        shipping_address: extractedData.shipping_address || null,
+        seal_and_sign_present: extractedData.seal_and_sign_present || false,
+        seal_sign_image: extractedData.seal_sign_image ? Buffer.from(extractedData.seal_sign_image, 'base64') : null,
+        document_quality_notes: extractedData.document_quality_notes || `Extracted from email: ${email.subject}`,
+        raw_json: extractedData,
+        confidence_score: Math.round((extractedData.extraction_confidence || 0.85) * 100)
+      };
+
+      console.log(`💾 Inserting invoice record:`, {
+        invoice_number: invoiceData.invoice_number,
+        po_number: invoiceData.po_number,
+        confidence_score: invoiceData.confidence_score,
+        has_seal_image: !!invoiceData.seal_sign_image
+      });
+
+      // Insert the main invoice record
+      const { data: invoiceRecord, error: invoiceError } = await supabase
+        .from('invoices')
+        .insert(invoiceData)
+        .select()
+        .single();
+
+      if (invoiceError) {
+        console.error('❌ Failed to insert invoice:', invoiceError);
+        throw new Error(`Failed to store invoice data: ${invoiceError.message}`);
+      }
+
+      console.log('✅ Invoice inserted successfully:', invoiceRecord.id);
+
+      // Insert line items if they exist
+      if (extractedData.line_items && extractedData.line_items.length > 0) {
+        console.log('💾 Inserting', extractedData.line_items.length, 'line items');
+        
+        const lineItemsData = extractedData.line_items.map((item: any, index: number) => ({
+          invoice_id: invoiceRecord.id,
+          item_index: index + 1,
+          description: item.description || null,
+          hsn_sac: item.hsn_sac || null,
+          quantity: parseFloat(item.quantity) || 0,
+          unit_price: parseFloat(item.unit_price) || 0,
+          total_amount: parseFloat(item.total_amount) || 0,
+          serial_number: item.serial_number || null,
+          item_confidence: Math.round((item.confidence || 0.85) * 100)
+        }));
+
+        const { data: lineItemsRecords, error: lineItemsError } = await supabase
+          .from('invoice_line_items')
+          .insert(lineItemsData)
+          .select();
+
+        if (lineItemsError) {
+          console.error('❌ Failed to insert line items:', lineItemsError);
+          console.error('❌ Line items data:', lineItemsData);
+          // Don't throw here, we still have the main invoice record
         } else {
-          invoiceNumber = parseInt(extractedData.invoice_number) || 0;
+          console.log('✅ Line items inserted successfully:', lineItemsRecords.length);
         }
       }
 
-      console.log(`📋 Invoice number extracted: ${invoiceNumber}`);
-
-      // Check if PO number exists in po_table if provided
-      let poNumber = null;
-      if (extractedData.po_number) {
-        console.log(`🔍 Checking if PO number ${extractedData.po_number} exists in po_table...`);
-        
-        let poNumberValue;
-        if (typeof extractedData.po_number === 'string') {
-          const numberMatch = extractedData.po_number.match(/\d+/);
-          poNumberValue = numberMatch ? parseInt(numberMatch[0]) : null;
-        } else {
-          poNumberValue = parseInt(extractedData.po_number) || null;
-        }
-
-        if (poNumberValue) {
-          const { data: poData, error: poError } = await supabase
-            .from('po_table')
-            .select('po_number')
-            .eq('po_number', poNumberValue)
-            .eq('user_id', user.id) // Only check user's own POs
-            .single();
-
-          if (poError && poError.code !== 'PGRST116') {
-            console.error('Error checking PO existence:', poError);
-          } else if (poData) {
-            poNumber = poNumberValue;
-            console.log(`✅ PO number ${poNumberValue} exists in po_table`);
-          } else {
-            console.log(`⚠️ PO number ${poNumberValue} not found in user's po_table - will proceed with null PO reference`);
-          }
-        }
-      } else {
-        console.log(`ℹ️ No PO number found in extracted data - will proceed with null PO reference`);
-      }
-
-      // Process line items
-      const lineItems = extractedData.line_items || [];
-      console.log(`📊 Line items found: ${lineItems.length}`);
-
-      if (lineItems.length > 0) {
-        console.log(`💾 Storing ${lineItems.length} line item(s) for invoice: ${invoiceNumber}`);
-        
-        for (let i = 0; i < lineItems.length; i++) {
-          const lineItem = lineItems[i];
-          console.log(`💾 Inserting line item ${i + 1}/${lineItems.length} for invoice: ${invoiceNumber}`);
-          
-          // Check if this exact record already exists to prevent duplicates
-          const { data: existingRecord } = await supabase
-            .from('invoice_table')
-            .select('*')
-            .eq('invoice_number', invoiceNumber)
-            .eq('attachment_invoice_name', filename)
-            .eq('email_header', email.subject || '')
-            .eq('user_id', user.id); // Only check user's own invoices
-
-          if (existingRecord && existingRecord.length > 0) {
-            console.log(`⚠️ Record already exists for invoice ${invoiceNumber} with filename ${filename}, skipping insertion`);
-            continue;
-          }
-          
-          // Map to the actual invoice_table schema with user_id
-          const invoiceRecord = {
-            user_id: user.id, // Add user_id for RLS
-            po_number: poNumber,
-            invoice_date: extractedData.invoice_date || null,
-            invoice_number: invoiceNumber,
-            email_date: email.date ? new Date(email.date).toISOString().split('T')[0] : null,
-            details: {
-              vendor_name: extractedData.vendor_name || '',
-              item_description: lineItem.description || lineItem.item_description || '',
-              quantity: lineItem.quantity || 0,
-              unit_price: lineItem.unit_price || lineItem.price || 0,
-              line_total: lineItem.total || lineItem.line_total || (lineItem.quantity * lineItem.unit_price) || 0,
-              gst_rate: lineItem.gst_rate || extractedData.gst_rate || 0,
-              gst_amount: lineItem.gst_amount || extractedData.gst_amount || 0,
-              total_amount: lineItem.total_amount || extractedData.total_amount || 0,
-              line_item_index: i + 1,
-              total_line_items: lineItems.length,
-              extraction_confidence: extractedData.extraction_confidence || 0
-            },
-            attachment_invoice_name: filename,
-            email_header: email.subject || ''
-          };
-
-          console.log(`💾 Attempting to insert invoice record:`, {
-            invoice_number: invoiceRecord.invoice_number,
-            po_number: invoiceRecord.po_number,
-            attachment_invoice_name: invoiceRecord.attachment_invoice_name,
-            email_header: invoiceRecord.email_header,
-            user_id: invoiceRecord.user_id
-          });
-
-          try {
-            const { data, error: insertError } = await supabase
-              .from('invoice_table')
-              .insert([invoiceRecord])
-              .select();
-
-            if (insertError) {
-              console.error(`❌ Database insert error for line item ${i + 1}:`, insertError);
-              
-              if (insertError.code === '23505') {
-                console.log(`⚠️ Duplicate key detected for line item ${i + 1}, skipping but continuing with next items`);
-                continue;
-              }
-              
-              throw insertError;
-            } else {
-              console.log(`✅ Successfully inserted line item ${i + 1}/${lineItems.length} into invoice_table`, data);
-            }
-          } catch (itemError: any) {
-            console.error(`❌ Error inserting line item ${i + 1}:`, itemError);
-            
-            if (itemError.code === '23505') {
-              console.log(`⚠️ Duplicate key detected for line item ${i + 1}, continuing with next items`);
-              continue;
-            }
-            
-            throw itemError;
-          }
-        }
-      } else {
-        // Handle case with no line items - create single record
-        console.log(`💾 No line items found, creating single invoice record`);
-        
-        // Check if this exact record already exists to prevent duplicates
-        const { data: existingRecord } = await supabase
-          .from('invoice_table')
-          .select('*')
-          .eq('invoice_number', invoiceNumber)
-          .eq('attachment_invoice_name', filename)
-          .eq('email_header', email.subject || '')
-          .eq('user_id', user.id); // Only check user's own invoices
-
-        if (existingRecord && existingRecord.length > 0) {
-          console.log(`⚠️ Record already exists for invoice ${invoiceNumber} with filename ${filename}, skipping insertion`);
-          return;
-        }
-        
-        const invoiceRecord = {
-          user_id: user.id, // Add user_id for RLS
-          po_number: poNumber,
-          invoice_date: extractedData.invoice_date || null,
-          invoice_number: invoiceNumber,
-          email_date: email.date ? new Date(email.date).toISOString().split('T')[0] : null,
-          details: {
-            vendor_name: extractedData.vendor_name || '',
-            item_description: extractedData.description || 'No description available',
-            quantity: 1,
-            unit_price: extractedData.total_amount || 0,
-            line_total: extractedData.total_amount || 0,
-            gst_rate: extractedData.gst_rate || 0,
-            gst_amount: extractedData.gst_amount || 0,
-            total_amount: extractedData.total_amount || 0,
-            extraction_confidence: extractedData.extraction_confidence || 0
-          },
-          attachment_invoice_name: filename,
-          email_header: email.subject || ''
-        };
-
-        console.log(`💾 Attempting to insert single invoice record:`, {
-          invoice_number: invoiceRecord.invoice_number,
-          po_number: invoiceRecord.po_number,
-          attachment_invoice_name: invoiceRecord.attachment_invoice_name,
-          user_id: invoiceRecord.user_id
-        });
-
-        try {
-          const { data, error: insertError } = await supabase
-            .from('invoice_table')
-            .insert([invoiceRecord])
-            .select();
-
-          if (insertError) {
-            console.error(`❌ Database insert error:`, insertError);
-            
-            if (insertError.code === '23505') {
-              console.log(`⚠️ Duplicate key detected for invoice record, but processing completed`);
-              return;
-            }
-            
-            throw insertError;
-          } else {
-            console.log(`✅ Successfully inserted invoice record into invoice_table`, data);
-          }
-        } catch (insertError: any) {
-          console.error(`❌ Failed to insert invoice record:`, insertError);
-          
-          if (insertError.code === '23505') {
-            console.log(`⚠️ Duplicate key detected for invoice record, but processing completed`);
-            return;
-          }
-          
-          throw insertError;
-        }
-      }
-
-      console.log(`✅ Successfully processed invoice data for ${filename} - check invoice_table in Supabase`);
+      console.log(`✅ Successfully processed invoice data for ${filename} - check invoices table in Supabase`);
 
     } catch (error) {
       console.error(`❌ Error storing invoice in database for ${filename}:`, error);

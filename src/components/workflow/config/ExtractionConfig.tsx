@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -19,58 +18,56 @@ interface ExtractionConfigProps {
 
 // Pre-written prompts based on document types
 const EXTRACTION_PROMPTS = {
-  'invoice-extraction': `You are an expert AI assistant specialized in extracting structured data from invoice documents. Extract the following information and return it in JSON format:
+  'invoice-extraction': `Extract the following invoice details from the provided document with high accuracy. Return ONLY a valid JSON response with the exact structure specified below. Handle variations in field names/labels as described. For any field not found, use null.
 
-REQUIRED FIELDS:
-- invoice_number: String
-- vendor_name: String  
-- vendor_address: String
-- invoice_date: Date (YYYY-MM-DD format)
-- due_date: Date (YYYY-MM-DD format)
-- subtotal: Number
-- tax_amount: Number
-- total_amount: Number
-- currency: String
-- po_number: String (CRITICAL - Look for "P.O:", "PO Number:", "Order No:", etc.)
-- payment_terms: String
+Required fields:
+1. invoice_number: Look for 'Invoice No.', 'Bill Number', 'Invoice ID' or similar
+2. invoice_date: Find date in DD-MM-YYYY or similar formats
+3. supplier_gst_number: Search for 'Supplier GSTIN', 'GST No.' or similar
+4. bill_to_gst_number: Look for 'Bill To GSTIN', 'Recipient GST' or similar
+5. po_number: Find 'PO Number', 'Purchase Order' reference
+6. shipping_address: Extract complete shipping address block
+7. seal_and_sign_present: Boolean (true/false) - Detect if any seal/signature is visible AND if true, extract the image of the seal/signature as base64 encoded string in 'seal_sign_image' field
+8. description: Item/service description (array for multiple line items)
+9. hsn_sac: HSN/SAC codes for each item (array)
+10. quantity: Quantities for each item (array)
+11. unit_price: Unit prices for each item (array)
+12. total_amount: Total amounts for each line item (array)
+13. serial_number: Serial numbers if present (array)
 
-CRITICAL PO NUMBER EXTRACTION:
-The Purchase Order (PO) number is ABSOLUTELY CRITICAL. Look for:
-- "P.O:" followed by a number (like "P.O: 25260168")
-- "P.O." or "PO Number:" or "Order No:" followed by a number
-- ANY field that contains purchase order references
-- Check EVERY section: header, bill-to area, footer, tables
-- Extract the EXACT number after these labels
-- Remove prefixes like "P.O:", keep only the actual number
-
-LINE ITEMS (as array):
-- description: String
-- quantity: Number
-- unit_price: Number
-- line_total: Number
-
-Return JSON in this exact format:
+Required JSON structure:
 {
-  "invoice_number": "",
-  "vendor_name": "",
-  "vendor_address": "",
-  "invoice_date": "",
-  "due_date": "",
-  "subtotal": 0,
-  "tax_amount": 0,
-  "total_amount": 0,
-  "currency": "",
-  "po_number": "",
-  "payment_terms": "",
+  "invoice_number": "value",
+  "invoice_date": "DD-MM-YYYY",
+  "supplier_gst_number": "value",
+  "bill_to_gst_number": "value",
+  "po_number": "value",
+  "shipping_address": "multiline text",
+  "seal_and_sign_present": boolean,
+  "seal_sign_image": "base64string" (if seal_and_sign_present=true),
   "line_items": [
     {
-      "description": "",
-      "quantity": 0,
-      "unit_price": 0,
-      "line_total": 0
+      "description": "text",
+      "hsn_sac": "code",
+      "quantity": number,
+      "unit_price": number,
+      "total_amount": number,
+      "serial_number": "value" (if available)
     }
-  ]
-}`,
+  ],
+  "document_quality_notes": "Any issues with legibility or missing data"
+}
+
+Special Instructions:
+- For dates: Standardize to DD-MM-YYYY format
+- For numbers: Remove currency symbols and thousand separators
+- For addresses: Preserve exact formatting with line breaks
+- For line items: Create separate objects for each item
+- For seals/signatures: Capture the clearest visible instance
+- Include confidence scores (0-100) for each extracted field
+- Flag any ambiguous interpretations in 'document_quality_notes'
+
+Return ONLY the JSON object. Do not include any explanatory text, markdown formatting, or additional commentary outside the JSON structure.`,
 
   'po-extraction': `You are an expert AI assistant specialized in extracting structured data from Purchase Order documents. Extract the following information and return it in JSON format:
 
@@ -151,7 +148,7 @@ export const ExtractionConfig: React.FC<ExtractionConfigProps> = ({
   step,
   onConfigUpdate
 }) => {
-  const currentType = step.config.processingConfig?.type || 'general-ocr';
+  const currentType = step.config.processingConfig?.type || 'invoice-extraction';
   const currentPrompt = step.config.ocrSettings?.customPrompt || '';
 
   // Initialize with default prompt if empty

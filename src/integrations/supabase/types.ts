@@ -245,52 +245,100 @@ export type Database = {
           },
         ]
       }
-      invoice_table: {
+      invoice_line_items: {
         Row: {
-          attachment_invoice_name: string | null
-          created_at: string
-          details: Json | null
-          email_date: string | null
-          email_header: string | null
+          description: string | null
+          hsn_sac: string | null
           id: number
-          invoice_date: string | null
-          invoice_number: number
-          po_number: number | null
-          user_id: string | null
+          invoice_id: number | null
+          item_confidence: number | null
+          item_index: number
+          quantity: number | null
+          serial_number: string | null
+          total_amount: number
+          unit_price: number | null
         }
         Insert: {
-          attachment_invoice_name?: string | null
-          created_at?: string
-          details?: Json | null
-          email_date?: string | null
-          email_header?: string | null
+          description?: string | null
+          hsn_sac?: string | null
           id?: number
-          invoice_date?: string | null
-          invoice_number: number
-          po_number?: number | null
-          user_id?: string | null
+          invoice_id?: number | null
+          item_confidence?: number | null
+          item_index: number
+          quantity?: number | null
+          serial_number?: string | null
+          total_amount: number
+          unit_price?: number | null
         }
         Update: {
-          attachment_invoice_name?: string | null
-          created_at?: string
-          details?: Json | null
-          email_date?: string | null
-          email_header?: string | null
+          description?: string | null
+          hsn_sac?: string | null
           id?: number
-          invoice_date?: string | null
-          invoice_number?: number
-          po_number?: number | null
-          user_id?: string | null
+          invoice_id?: number | null
+          item_confidence?: number | null
+          item_index?: number
+          quantity?: number | null
+          serial_number?: string | null
+          total_amount?: number
+          unit_price?: number | null
         }
         Relationships: [
           {
-            foreignKeyName: "invoice_table_po_number_fkey"
-            columns: ["po_number"]
+            foreignKeyName: "invoice_line_items_invoice_id_fkey"
+            columns: ["invoice_id"]
             isOneToOne: false
-            referencedRelation: "po_table"
-            referencedColumns: ["po_number"]
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
           },
         ]
+      }
+      invoices: {
+        Row: {
+          bill_to_gst_number: string | null
+          confidence_score: number | null
+          document_quality_notes: string | null
+          extraction_date: string | null
+          id: number
+          invoice_date: string
+          invoice_number: string
+          po_number: string | null
+          raw_json: Json
+          seal_and_sign_present: boolean | null
+          seal_sign_image: string | null
+          shipping_address: string | null
+          supplier_gst_number: string | null
+        }
+        Insert: {
+          bill_to_gst_number?: string | null
+          confidence_score?: number | null
+          document_quality_notes?: string | null
+          extraction_date?: string | null
+          id?: number
+          invoice_date: string
+          invoice_number: string
+          po_number?: string | null
+          raw_json: Json
+          seal_and_sign_present?: boolean | null
+          seal_sign_image?: string | null
+          shipping_address?: string | null
+          supplier_gst_number?: string | null
+        }
+        Update: {
+          bill_to_gst_number?: string | null
+          confidence_score?: number | null
+          document_quality_notes?: string | null
+          extraction_date?: string | null
+          id?: number
+          invoice_date?: string
+          invoice_number?: string
+          po_number?: string | null
+          raw_json?: Json
+          seal_and_sign_present?: boolean | null
+          seal_sign_image?: string | null
+          shipping_address?: string | null
+          supplier_gst_number?: string | null
+        }
+        Relationships: []
       }
       po_table: {
         Row: {
