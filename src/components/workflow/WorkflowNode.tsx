@@ -22,23 +22,23 @@ import { WorkflowStep } from '@/types/workflow';
 const getStepIcon = (type: string) => {
   switch (type) {
     case 'data-source':
-      return <Mail className="h-4 w-4" />;
+      return <Mail className="h-3 w-3" />;
     case 'document-processing':
-      return <FileText className="h-4 w-4" />;
+      return <FileText className="h-3 w-3" />;
     case 'data-storage':
-      return <Database className="h-4 w-4" />;
+      return <Database className="h-3 w-3" />;
     case 'data-comparison':
-      return <GitCompare className="h-4 w-4" />;
+      return <GitCompare className="h-3 w-3" />;
     case 'analytics':
-      return <BarChart3 className="h-4 w-4" />;
+      return <BarChart3 className="h-3 w-3" />;
     case 'notification':
-      return <Bell className="h-4 w-4" />;
+      return <Bell className="h-3 w-3" />;
     case 'conditional':
-      return <GitBranch className="h-4 w-4" />;
+      return <GitBranch className="h-3 w-3" />;
     case 'parallel':
-      return <Zap className="h-4 w-4" />;
+      return <Zap className="h-3 w-3" />;
     default:
-      return <Settings className="h-4 w-4" />;
+      return <Settings className="h-3 w-3" />;
   }
 };
 
@@ -125,52 +125,52 @@ export const WorkflowNode: React.FC<NodeProps> = ({ data, selected }) => {
       <Handle
         type="target"
         position={Position.Left}
-        className="w-3 h-3 !bg-blue-500 border-2 border-white shadow-md"
+        className="w-2 h-2 !bg-blue-500 border border-white shadow-sm"
       />
       
-      <Card className={`w-52 ${colors.bg} ${colors.border} border shadow-sm transition-all duration-200 hover:shadow-md ${selected ? 'ring-2 ring-blue-500' : ''}`}>
-        <CardContent className="p-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <div className={`p-1.5 rounded-md bg-gray-50 ${colors.icon} flex-shrink-0`}>
+      <Card className={`w-40 ${colors.bg} ${colors.border} border shadow-sm transition-all duration-200 hover:shadow-md ${selected ? 'ring-1 ring-blue-400' : ''}`}>
+        <CardContent className="p-2">
+          <div className="flex items-start justify-between gap-1">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <div className={`p-1 rounded bg-gray-50 ${colors.icon} flex-shrink-0`}>
                 {getStepIcon(step.type)}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="font-medium text-sm text-gray-900 truncate">
+                <div className="font-medium text-xs text-gray-900 truncate leading-tight">
                   {step.name}
                 </div>
-                <Badge className={`text-xs mt-1 ${colors.badge} border text-[10px] px-1.5 py-0.5`}>
+                <Badge className={`text-[9px] mt-0.5 ${colors.badge} border px-1 py-0 h-4 leading-none`}>
                   {step.type.replace('-', ' ').replace('_', ' ')}
                 </Badge>
               </div>
             </div>
             
             {isEditable && (
-              <div className="flex gap-1 flex-shrink-0">
+              <div className="flex gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 w-6 p-0 hover:bg-gray-100"
+                  className="h-4 w-4 p-0 hover:bg-gray-100 rounded"
                   onClick={handleConfigClick}
                   title="Configure"
                 >
-                  <Settings className="h-3 w-3" />
+                  <Settings className="h-2.5 w-2.5" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 w-6 p-0 hover:bg-red-100 hover:text-red-600"
+                  className="h-4 w-4 p-0 hover:bg-red-100 hover:text-red-600 rounded"
                   onClick={handleDeleteClick}
                   title="Delete"
                 >
-                  <Trash2 className="h-3 w-3" />
+                  <Trash2 className="h-2.5 w-2.5" />
                 </Button>
               </div>
             )}
           </div>
           
           {step.description && (
-            <p className="text-xs text-gray-500 mt-2 line-clamp-2">
+            <p className="text-[10px] text-gray-500 mt-1 line-clamp-1 leading-tight">
               {step.description}
             </p>
           )}
@@ -180,11 +180,11 @@ export const WorkflowNode: React.FC<NodeProps> = ({ data, selected }) => {
       <Handle
         type="source"
         position={Position.Right}
-        className="w-3 h-3 !bg-blue-500 border-2 border-white shadow-md"
+        className="w-2 h-2 !bg-blue-500 border border-white shadow-sm"
       />
       
       {step.isActive && (
-        <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
+        <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border border-white" />
       )}
     </div>
   );
