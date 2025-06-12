@@ -116,96 +116,161 @@ export class RealWorkflowEngine extends WorkflowEngine {
   private async executeDocumentSource(step: WorkflowStep, context: ProcessingContext): Promise<any> {
     console.log('📧 Executing document source step...');
     
-    // Extract source configuration with proper fallbacks and type checking
     const sourceConfig = step.config?.sourceConfig || step.config?.emailConfig || {};
-    const gmailFilters = {
-      ...sourceConfig,
-      limit: (sourceConfig as any)?.limit || 50,
-      includeAttachments: true
-    };
+    const filters = sourceConfig.filters || [];
+    const useIntelligentFiltering = sourceConfig.useIntelligentFiltering || false;
     
-    // Mock result for now - replace with actual Gmail service call
-    const result = {
-      success: true,
-      totalProcessed: 5,
-      emails: [],
-      documents: []
-    };
+    console.log('📧 Gmail filters:', filters, 'Intelligent filtering:', useIntelligentFiltering);
     
-    console.log(`📧 Document source processed ${result.totalProcessed} emails`);
-    return result;
+    try {
+      const result = await this.gmailService.fetchEmailsWithAttachments(filters, useIntelligentFiltering);
+      
+      console.log(`📧 Document source processed ${result.count} emails`);
+      
+      return {
+        success: true,
+        totalProcessed: result.count,
+        emails: result.emails,
+        documents: result.files,
+        source: 'gmail'
+      };
+    } catch (error) {
+      console.error('❌ Document source failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Document source failed'
+      };
+    }
   }
 
   private async executeDocumentProcessing(step: WorkflowStep, context: ProcessingContext): Promise<any> {
     console.log('🔍 Executing document processing step...');
     
-    // Extract processing configuration and custom prompt with proper type checking
     const processingConfig = step.config?.processingConfig || {};
     const ocrSettings = step.config?.ocrSettings || {};
     const customPrompt = ocrSettings.customPrompt;
     
     console.log('🔧 Processing config:', {
-      type: (processingConfig as any)?.type || 'invoice-extraction',
+      type: processingConfig.type || 'invoice-extraction',
       hasCustomPrompt: !!customPrompt,
       promptLength: customPrompt?.length || 0
     });
     
-    // Enhanced context with custom prompt
     const enhancedContext = {
       ...context,
       customPrompt,
-      processingType: (processingConfig as any)?.type || 'invoice-extraction',
-      confidence: (processingConfig as any)?.confidence || 0.8,
+      processingType: processingConfig.type || 'invoice-extraction',
+      confidence: processingConfig.confidence || 0.8,
       language: ocrSettings.language || 'eng'
     };
     
-    // Create mock files array for the service call
-    const mockFiles = context.documents || [];
-    const processingType = (processingConfig as any)?.type || 'invoice-extraction';
+    // Use actual documents from context (from previous step)
+    const files = context.documents || [];
+    const processingType = processingConfig.type || 'invoice-extraction';
     
-    const result = await this.documentService.processDocuments(mockFiles, processingType);
-    console.log(`🔍 Document processing completed: ${result.processedCount} documents`);
-    return result;
+    try {
+      const result = await this.documentService.processDocuments(files, processingType);
+      console.log(`🔍 Document processing completed: ${result.processedCount} documents`);
+      
+      return {
+        success: true,
+        extractedData: result.extractedData,
+        processedCount: result.processedCount,
+        successCount: result.successCount
+      };
+    } catch (error) {
+      console.error('❌ Document processing failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Document processing failed'
+      };
+    }
   }
 
   private async executeDataComparison(step: WorkflowStep, context: ProcessingContext): Promise<any> {
     console.log('⚖️ Executing data comparison step...');
     
     const comparisonConfig = step.config?.comparisonConfig || {};
+    const extractedData = context.extractedData || [];
     
-    // Mock result for now - replace with actual comparison service call
-    const result = {
-      success: true,
-      comparisons: [],
-      processedCount: context.processedCount || 0
-    };
+    if (extractedData.length === 0) {
+      console.log('⚠️ No extracted data available for comparison');
+      return {
+        success: true,
+        comparisons: [],
+        processedCount: 0,
+        message: 'No data available for comparison'
+      };
+    }
     
-    console.log(`⚖️ Data comparison completed: ${result.comparisons?.length || 0} comparisons`);
-    return result;
+    try {
+      // Use the actual comparison service
+      const result = await this.comparisonService.compareDocuments(extractedData, comparisonConfig);
+      
+      console.log(`⚖️ Data comparison completed: ${result.comparisons?.length || 0} comparisons`);
+      
+      return {
+        success: true,
+        comparisons: result.comparisons,
+        processedCount: result.processedCount || extractedData.length
+      };
+    } catch (error) {
+      console.error('❌ Data comparison failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Data comparison failed'
+      };
+    }
   }
 
   private async executeDataStorage(step: WorkflowStep, context: ProcessingContext): Promise<any> {
     console.log('💾 Executing data storage step...');
     
     const storageConfig = step.config?.storageConfig || {};
+    const extractedData = context.extractedData || [];
     
-    // Create mock extracted data for the service call
-    const mockExtractedData = context.extractedData || [];
+    if (extractedData.length === 0) {
+      console.log('⚠️ No extracted data to store');
+      return {
+        success: true,
+        storedCount: 0,
+        message: 'No data to store'
+      };
+    }
     
-    const result = await this.databaseService.storeData(mockExtractedData, storageConfig);
-    
-    console.log(`💾 Data storage completed: ${result.storedCount} records`);
-    return result;
+    try {
+      const result = await this.databaseService.storeData(extractedData, storageConfig);
+      
+      console.log(`💾 Data storage completed: ${result.recordsStored} records stored`);
+      
+      return {
+        success: true,
+        storedCount: result.recordsStored,
+        recordsProcessed: result.recordsProcessed
+      };
+    } catch (error) {
+      console.error('❌ Data storage failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Data storage failed'
+      };
+    }
   }
 
   private async executeNotification(step: WorkflowStep, context: ProcessingContext): Promise<any> {
     console.log('📬 Executing notification step...');
     
-    // Mock notification for now
+    // For now, return a simple success notification
+    // This could be extended to use actual notification services
+    const processedCount = context.processedCount || 0;
+    const storedCount = context.storedCount || 0;
+    
+    console.log(`📬 Workflow completed: ${processedCount} documents processed, ${storedCount} records stored`);
+    
     return {
       success: true,
       notificationsSent: 1,
-      recipients: ['user@example.com']
+      message: `Workflow completed successfully: ${processedCount} documents processed, ${storedCount} records stored`
     };
   }
 }
