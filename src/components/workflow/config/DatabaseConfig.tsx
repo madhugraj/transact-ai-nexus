@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -36,6 +35,7 @@ export const DatabaseConfig: React.FC<DatabaseConfigProps> = ({
   const [loadingConnections, setLoadingConnections] = useState(false);
   const [loadingTables, setLoadingTables] = useState(false);
   const [hasTableLoadError, setHasTableLoadError] = useState(false);
+  const [currentTableName, setCurrentTableName] = useState(step.config.storageConfig?.table || '');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -47,6 +47,19 @@ export const DatabaseConfig: React.FC<DatabaseConfigProps> = ({
       loadAvailableTables(step.config.storageConfig.connection);
     }
   }, [step.config.storageConfig?.connection]);
+
+  // Sync local state with step config
+  useEffect(() => {
+    setCurrentTableName(step.config.storageConfig?.table || '');
+  }, [step.config.storageConfig?.table]);
+
+  const handleTableNameChange = (value: string) => {
+    setCurrentTableName(value);
+    onConfigUpdate('storageConfig', {
+      ...step.config.storageConfig,
+      table: value
+    });
+  };
 
   const loadAvailableConnections = async () => {
     setLoadingConnections(true);
@@ -125,7 +138,7 @@ export const DatabaseConfig: React.FC<DatabaseConfigProps> = ({
         // If Supabase query fails or returns no results, fall back to hardcoded tables
         if (tables.length === 0) {
           tables = [
-            { name: 'invoice_table', schema: 'public' },
+            { name: 'invoices', schema: 'public' },
             { name: 'po_table', schema: 'public' },
             { name: 'compare_po_invoice_table', schema: 'public' },
             { name: 'compare_po_multi_invoice', schema: 'public' },
@@ -172,7 +185,7 @@ export const DatabaseConfig: React.FC<DatabaseConfigProps> = ({
       
       // Even if there's an error, populate some fallback tables
       setAvailableTables([
-        { name: 'invoice_table', schema: 'public' },
+        { name: 'invoices', schema: 'public' },
         { name: 'po_table', schema: 'public' },
         { name: 'compare_po_invoice_table', schema: 'public' }
       ]);
@@ -230,48 +243,42 @@ export const DatabaseConfig: React.FC<DatabaseConfigProps> = ({
 
         <div>
           <Label>Target Table Name</Label>
-          <div className="flex gap-2">
-            <Select
-              value={step.config.storageConfig?.table || ''}
-              onValueChange={(value) => onConfigUpdate('storageConfig', {
-                ...step.config.storageConfig,
-                table: value
-              })}
-            >
-              <SelectTrigger className="flex-1">
-                <SelectValue placeholder="Select a table or enter custom name" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableTables.map(table => (
-                  <SelectItem key={`${table.schema}.${table.name}`} value={table.name}>
-                    {table.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => step.config.storageConfig?.connection && 
-                loadAvailableTables(step.config.storageConfig.connection)}
-              disabled={loadingTables || !step.config.storageConfig?.connection}
-            >
-              <RefreshCw className={`h-3 w-3 ${loadingTables ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
-          <div className="flex items-center mt-2">
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <Select
+                value={currentTableName}
+                onValueChange={handleTableNameChange}
+              >
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Select a table or enter custom name" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTables.map(table => (
+                    <SelectItem key={`${table.schema}.${table.name}`} value={table.name}>
+                      {table.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => step.config.storageConfig?.connection && 
+                  loadAvailableTables(step.config.storageConfig.connection)}
+                disabled={loadingTables || !step.config.storageConfig?.connection}
+              >
+                <RefreshCw className={`h-3 w-3 ${loadingTables ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
             <Input
-              value={step.config.storageConfig?.table || ''}
-              onChange={(e) => onConfigUpdate('storageConfig', {
-                ...step.config.storageConfig,
-                table: e.target.value
-              })}
-              placeholder="e.g., extracted_invoices, processed_pos"
-              className="flex-1"
+              value={currentTableName}
+              onChange={(e) => handleTableNameChange(e.target.value)}
+              placeholder="e.g., invoices, po_table, extracted_json"
+              className="w-full"
             />
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Table will be created automatically if it doesn't exist
+            Select from dropdown or type a custom table name. Table will be created automatically if it doesn't exist.
           </p>
         </div>
 
@@ -349,7 +356,7 @@ export const DatabaseConfig: React.FC<DatabaseConfigProps> = ({
           <p className="font-medium mb-1">Storage Configuration:</p>
           <ul className="text-xs text-muted-foreground space-y-1">
             <li>• Connection: {step.config.storageConfig?.connection ? availableConnections.find(c => c.id === step.config.storageConfig?.connection)?.name || step.config.storageConfig?.connection : 'Default Supabase'}</li>
-            <li>• Table: {step.config.storageConfig?.table || 'Not specified'}</li>
+            <li>• Table: {currentTableName || 'Not specified'}</li>
             <li>• Action: {step.config.storageConfig?.action || 'Insert'}</li>
             <li>• Auto-create: {step.config.databaseOptions?.createIfNotExists !== false ? 'Yes' : 'No'}</li>
             <li>• Validation: {step.config.storageConfig?.validateBeforeInsert !== false ? 'Enabled' : 'Disabled'}</li>
