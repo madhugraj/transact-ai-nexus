@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { InvoiceDataExtractionAgent } from '@/services/agents/InvoiceDataExtractionAgent';
 import { InvoiceDetectionAgent } from '@/services/agents/InvoiceDetectionAgent';
@@ -38,8 +37,20 @@ export class DocumentProcessingService {
           hasContent: !!file.content,
           hasFile: !!file.file,
           type: file.type,
-          size: file.size
+          size: file.size,
+          contentLength: file.content ? file.content.length : 0
         });
+        
+        // Check if we have actual file content
+        if (!file.content && !file.file) {
+          console.error('❌ No file content available for processing:', file.name);
+          extractedData.push({
+            fileName: file.name || file.filename,
+            error: 'No file content available - attachment may not have been downloaded properly',
+            processedAt: new Date().toISOString()
+          });
+          continue;
+        }
         
         // Convert file object to actual File if needed
         let fileObj = file;
@@ -58,6 +69,11 @@ export class DocumentProcessingService {
               base64Data = base64Data.split(',')[1];
             }
             
+            // Validate base64 content
+            if (!base64Data || base64Data.length === 0) {
+              throw new Error('Empty or invalid base64 content');
+            }
+            
             // Convert base64 to blob
             const byteCharacters = atob(base64Data);
             const byteNumbers = new Array(byteCharacters.length);
@@ -71,7 +87,12 @@ export class DocumentProcessingService {
             console.log('✅ Successfully created File from base64, size:', fileObj.size);
           } catch (conversionError) {
             console.error('❌ Failed to convert base64 to File:', conversionError);
-            throw new Error(`Failed to convert file content: ${conversionError.message}`);
+            extractedData.push({
+              fileName: file.name || file.filename,
+              error: `Failed to convert file content: ${conversionError.message}`,
+              processedAt: new Date().toISOString()
+            });
+            continue;
           }
         } else if (file instanceof File) {
           // Already a File object
@@ -79,13 +100,23 @@ export class DocumentProcessingService {
           console.log('✅ Already a File object');
         } else {
           console.error('❌ Invalid file format:', file);
-          throw new Error('Invalid file format - no usable file content found');
+          extractedData.push({
+            fileName: file.name || file.filename,
+            error: 'Invalid file format - no usable file content found',
+            processedAt: new Date().toISOString()
+          });
+          continue;
         }
         
         // Validate the File object
         if (!(fileObj instanceof File)) {
           console.error('❌ Not a valid File object:', typeof fileObj);
-          throw new Error('Failed to create valid File object');
+          extractedData.push({
+            fileName: file.name || file.filename,
+            error: 'Failed to create valid File object',
+            processedAt: new Date().toISOString()
+          });
+          continue;
         }
         
         console.log('✅ File object ready for processing:', {
