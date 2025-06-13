@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -53,9 +54,9 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
       const hasValidTokens = authService.hasValidTokens();
       const tokens = authService.getStoredTokens();
       
-      console.log('Auth check results:', { hasValidTokens, hasAccessToken: !!tokens.accessToken });
+      console.log('Auth check results:', { hasValidTokens, hasAccessToken: !!tokens?.accessToken });
       
-      if (hasValidTokens && tokens.accessToken) {
+      if (hasValidTokens && tokens && tokens.accessToken) {
         console.log('Found valid stored tokens, setting connected state');
         setAccessToken(tokens.accessToken);
         setIsConnected(true);
