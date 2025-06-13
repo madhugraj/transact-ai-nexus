@@ -19,6 +19,20 @@ serve(async (req) => {
       throw new Error('Authorization code is required');
     }
 
+    // Get the client secret from environment variables
+    const CLIENT_ID = '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com';
+    const CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') || 
+                         Deno.env.get('Client_secret') || 
+                         Deno.env.get('CLIENT_SECRET') ||
+                         Deno.env.get('client_secret');
+
+    if (!CLIENT_SECRET) {
+      console.error('❌ Google client secret not configured');
+      throw new Error('Google client secret not configured. Please add GOOGLE_CLIENT_SECRET to your Supabase secrets.');
+    }
+
+    console.log('✅ Client secret found, proceeding with token exchange');
+
     // Exchange code for tokens
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -26,7 +40,8 @@ serve(async (req) => {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        client_id: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
         code,
         grant_type: 'authorization_code',
         redirect_uri: redirectUri,
