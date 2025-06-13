@@ -34,23 +34,77 @@ export class DocumentProcessingService {
     for (const file of files) {
       try {
         console.log('📄 REAL Processing file:', file.name || file.filename);
+        console.log('📄 File details:', {
+          hasContent: !!file.content,
+          hasFile: !!file.file,
+          type: file.type,
+          size: file.size
+        });
         
         // Convert file object to actual File if needed
         let fileObj = file;
-        if (file.content && file.name) {
+        
+        if (file.file && file.file instanceof File) {
+          // Direct File object
+          fileObj = file.file;
+          console.log('✅ Using direct File object');
+        } else if (file.content && file.name) {
           // Convert base64 content to File object
-          const response = await fetch(file.content);
-          const blob = await response.blob();
-          fileObj = new File([blob], file.name, { type: file.type || 'application/pdf' });
+          console.log('🔄 Converting base64 content to File object');
+          try {
+            // Remove data URL prefix if present
+            let base64Data = file.content;
+            if (base64Data.startsWith('data:')) {
+              base64Data = base64Data.split(',')[1];
+            }
+            
+            // Convert base64 to blob
+            const byteCharacters = atob(base64Data);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: file.type || 'application/pdf' });
+            
+            fileObj = new File([blob], file.name, { type: file.type || 'application/pdf' });
+            console.log('✅ Successfully created File from base64, size:', fileObj.size);
+          } catch (conversionError) {
+            console.error('❌ Failed to convert base64 to File:', conversionError);
+            throw new Error(`Failed to convert file content: ${conversionError.message}`);
+          }
+        } else if (file instanceof File) {
+          // Already a File object
+          fileObj = file;
+          console.log('✅ Already a File object');
+        } else {
+          console.error('❌ Invalid file format:', file);
+          throw new Error('Invalid file format - no usable file content found');
         }
+        
+        // Validate the File object
+        if (!(fileObj instanceof File)) {
+          console.error('❌ Not a valid File object:', typeof fileObj);
+          throw new Error('Failed to create valid File object');
+        }
+        
+        console.log('✅ File object ready for processing:', {
+          name: fileObj.name,
+          size: fileObj.size,
+          type: fileObj.type
+        });
         
         let result;
         
         switch (processingType) {
           case 'invoice-extraction':
             // First detect if it's an invoice
+            console.log('🔍 Starting invoice detection...');
             const invoiceDetection = await this.invoiceDetectionAgent.process(fileObj);
+            console.log('🔍 Invoice detection result:', invoiceDetection);
+            
             if (invoiceDetection.success && invoiceDetection.data?.is_invoice) {
+              console.log('✅ Invoice detected, extracting data...');
               // Extract invoice data
               const extractionResult = await this.invoiceExtractionAgent.process(fileObj);
               if (extractionResult.success) {
@@ -63,7 +117,9 @@ export class DocumentProcessingService {
                   extraction_confidence: extractionResult.data?.extraction_confidence || 0.8
                 };
                 successCount++;
+                console.log('✅ Invoice extraction successful');
               } else {
+                console.error('❌ Invoice extraction failed:', extractionResult.error);
                 result = {
                   fileName: file.name || file.filename,
                   error: extractionResult.error || 'Invoice extraction failed',
@@ -71,6 +127,7 @@ export class DocumentProcessingService {
                 };
               }
             } else {
+              console.log('❌ Document not detected as invoice');
               result = {
                 fileName: file.name || file.filename,
                 error: 'Document is not detected as an invoice',
