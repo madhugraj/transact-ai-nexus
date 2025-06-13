@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -39,11 +38,11 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   const [hasLoadedInitialEmails, setHasLoadedInitialEmails] = useState(false);
   const { toast } = useToast();
 
-  // Use DYNAMIC redirect URI based on current origin
+  // Use DYNAMIC redirect URI based on current origin - FIXED
   const authService = new GoogleAuthService({
     clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
     scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
-    redirectUri: `${window.location.origin}/oauth/callback` // DYNAMIC based on current origin
+    redirectUri: `${window.location.origin}/oauth/callback`
   }, 'gmail_auth_tokens');
 
   // Enhanced authentication check with better persistence
@@ -94,33 +93,56 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   }, [hasLoadedInitialEmails]);
 
   const handleGmailAuth = async () => {
-    console.log('Starting Gmail authentication...');
+    console.log('🔗 Starting Gmail authentication with redirect URI:', `${window.location.origin}/oauth/callback`);
     setIsConnecting(true);
     setAuthError('');
 
     try {
       const result = await authService.authenticateWithPopup();
-      console.log('Authentication result:', result);
+      console.log('📧 Authentication result:', result);
       
       if (result.success && result.accessToken) {
         setAccessToken(result.accessToken);
         setIsConnected(true);
         setShowAuthDialog(false);
-        setHasLoadedInitialEmails(false); // Reset to allow loading
+        setHasLoadedInitialEmails(false);
+        
+        // Test the connection immediately
         await loadGmailMessages(result.accessToken);
         setHasLoadedInitialEmails(true);
         
         toast({
           title: "Connected to Gmail",
-          description: "Successfully authenticated with your Gmail account. Connection will persist across navigation."
+          description: "Successfully authenticated with your Gmail account."
         });
       } else {
-        console.error('Authentication failed:', result.error);
-        setAuthError(result.error || 'Authentication failed');
+        console.error('❌ Authentication failed:', result.error);
+        
+        // Provide specific error messages for common issues
+        let errorMessage = result.error || 'Authentication failed';
+        if (result.error?.includes('redirect_uri_mismatch')) {
+          errorMessage = 'Redirect URI mismatch. Please ensure your Google Cloud Console is configured correctly.';
+        } else if (result.error?.includes('popup')) {
+          errorMessage = 'Please allow popups for this site and try again.';
+        }
+        
+        setAuthError(errorMessage);
+        toast({
+          title: "Authentication Failed",
+          description: errorMessage,
+          variant: "destructive"
+        });
       }
     } catch (error) {
-      console.error('Authentication error:', error);
-      setAuthError(error instanceof Error ? error.message : 'Authentication failed');
+      console.error('❌ Authentication error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
+      setAuthError(errorMessage);
+      
+      toast({
+        title: "Authentication Error",
+        description: errorMessage,
+        variant: "destructive"
+      });
     } finally {
       setIsConnecting(false);
     }
@@ -148,10 +170,12 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   };
 
   const loadGmailMessages = async (token: string, forceRefresh: boolean = false) => {
-    console.log('Loading Gmail messages...', forceRefresh ? '(forced refresh)' : '');
+    console.log('📧 Loading Gmail messages...', forceRefresh ? '(forced refresh)' : '');
     setIsLoading(true);
+    setAuthError(''); // Clear any previous errors
+    
     try {
-      // First, get the list of message IDs
+      // First, get the list of message IDs with proper error handling
       const { data, error } = await supabase.functions.invoke('gmail', {
         body: {
           accessToken: token,
@@ -162,23 +186,35 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
       });
 
       if (error) {
-        console.error('Gmail API error:', error);
-        if (error.message && error.message.includes('invalid_grant')) {
+        console.error('❌ Gmail API error:', error);
+        
+        // Handle authentication errors specifically
+        if (error.message && (error.message.includes('401') || error.message.includes('invalid_grant'))) {
+          console.log('🔄 Authentication expired, clearing tokens...');
           authService.clearTokens();
           setIsConnected(false);
           setAccessToken('');
           setHasLoadedInitialEmails(false);
-          throw new Error('Session expired. Please reconnect to Gmail.');
+          setAuthError('Your Gmail session has expired. Please reconnect.');
+          
+          toast({
+            title: "Session Expired",
+            description: "Please reconnect to Gmail to continue.",
+            variant: "destructive"
+          });
+          return;
         }
-        throw error;
+        
+        throw new Error(error.message || 'Failed to fetch emails');
       }
 
-      console.log('Gmail messages response:', data);
+      console.log('📧 Gmail messages response:', data);
+      
       if (data.success && data.data?.messages) {
         const messageIds = data.data.messages.map((msg: any) => msg.id);
-        console.log(`Found ${messageIds.length} message IDs, fetching full details...`);
+        console.log(`📧 Found ${messageIds.length} message IDs, fetching details...`);
         
-        // Fetch full details for each message
+        // Fetch full details for first 10 messages with better error handling
         const emailPromises = messageIds.slice(0, 10).map(async (messageId: string) => {
           try {
             const { data: emailData, error: emailError } = await supabase.functions.invoke('gmail', {
@@ -190,14 +226,13 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
             });
 
             if (emailError || !emailData?.success) {
-              console.error('Failed to get email details for:', messageId, emailError || emailData?.error);
+              console.error('❌ Failed to get email details for:', messageId, emailError || emailData?.error);
               return null;
             }
 
             const fullEmail = emailData.data;
             const headers = fullEmail.payload?.headers || [];
             
-            // Check for attachments
             const hasAttachments = checkForAttachments(fullEmail.payload);
             
             return {
@@ -210,7 +245,7 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
               labels: fullEmail.labelIds || []
             };
           } catch (error) {
-            console.error('Error processing email:', messageId, error);
+            console.error('❌ Error processing email:', messageId, error);
             return null;
           }
         });
@@ -219,23 +254,33 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
         const validEmails = emailResults.filter(email => email !== null) as GmailMessage[];
         
         setEmails(validEmails);
-        console.log(`Successfully loaded ${validEmails.length} emails with full details`);
+        console.log(`✅ Successfully loaded ${validEmails.length} emails`);
         
         if (forceRefresh) {
           toast({
-            title: "Emails refreshed",
+            title: "Emails Refreshed",
             description: `Loaded ${validEmails.length} emails from Gmail`
           });
         }
       } else {
-        console.log('No messages found or API call failed');
+        console.log('⚠️ No messages found or API call failed');
         setEmails([]);
+        
+        if (forceRefresh) {
+          toast({
+            title: "No Emails Found",
+            description: "No emails with attachments were found matching your search."
+          });
+        }
       }
     } catch (error) {
-      console.error('Error loading emails:', error);
+      console.error('❌ Error loading emails:', error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to load emails from Gmail";
+      setAuthError(errorMessage);
+      
       toast({
-        title: "Error loading emails",
-        description: error instanceof Error ? error.message : "Failed to load emails from Gmail",
+        title: "Error Loading Emails",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -300,11 +345,25 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   if (!isConnected) {
     return (
       <div className="space-y-4">
-        <div className="text-xs text-yellow-600 bg-yellow-50 p-2 rounded">
-          Using dynamic redirect URI: {window.location.origin}/oauth/callback
+        <div className="text-xs text-blue-600 bg-blue-50 p-3 rounded border">
+          <p className="font-medium mb-1">📍 Setup Required:</p>
+          <p>Using redirect URI: <code>{window.location.origin}/oauth/callback</code></p>
+          <p className="mt-2">If authentication fails, add this redirect URI to your Google Cloud Console OAuth settings.</p>
         </div>
-        <Button onClick={() => setShowAuthDialog(true)} className="w-full">
-          Connect to Gmail
+        
+        {authError && (
+          <div className="text-xs text-red-600 bg-red-50 p-3 rounded border">
+            <p className="font-medium mb-1">❌ Authentication Error:</p>
+            <p>{authError}</p>
+          </div>
+        )}
+        
+        <Button 
+          onClick={() => setShowAuthDialog(true)} 
+          className="w-full"
+          disabled={isConnecting}
+        >
+          {isConnecting ? 'Connecting...' : 'Connect to Gmail'}
         </Button>
         
         <CompactAuthDialog
