@@ -1,3 +1,4 @@
+
 import { WorkflowEngine } from './WorkflowEngine';
 import { WorkflowConfig, WorkflowStep, ProcessingContext, WorkflowExecution } from '@/types/workflow';
 import { GmailWorkflowService } from './GmailWorkflowService';
@@ -143,7 +144,7 @@ export class RealWorkflowEngine extends WorkflowEngine {
   }
 
   private async executeDocumentProcessing(step: WorkflowStep, context: ProcessingContext): Promise<any> {
-    console.log('🔍 Executing document processing step...');
+    console.log('🔍 Executing REAL document processing step...');
     
     const processingConfig = step.config?.processingConfig || {};
     const ocrSettings = step.config?.ocrSettings || {};
@@ -152,7 +153,7 @@ export class RealWorkflowEngine extends WorkflowEngine {
     // Get processing type with proper fallback and type safety
     const processingType = (processingConfig as any)?.type || 'invoice-extraction';
     
-    console.log('🔧 Processing config:', {
+    console.log('🔧 REAL Processing config:', {
       type: processingType,
       hasCustomPrompt: !!customPrompt,
       promptLength: customPrompt?.length || 0
@@ -169,9 +170,21 @@ export class RealWorkflowEngine extends WorkflowEngine {
     // Use actual documents from context (from previous step)
     const files = context.documents || [];
     
+    if (!files || files.length === 0) {
+      console.log('⚠️ No files available for processing');
+      return {
+        success: true,
+        extractedData: [],
+        processedCount: 0,
+        successCount: 0,
+        message: 'No files to process'
+      };
+    }
+    
     try {
+      console.log('🚀 Starting REAL document processing with', files.length, 'files');
       const result = await this.documentService.processDocuments(files, processingType);
-      console.log(`🔍 Document processing completed: ${result.processedCount} documents`);
+      console.log(`🔍 REAL Document processing completed: ${result.processedCount} documents, ${result.successCount} successful`);
       
       return {
         success: true,
@@ -180,7 +193,7 @@ export class RealWorkflowEngine extends WorkflowEngine {
         successCount: result.successCount
       };
     } catch (error) {
-      console.error('❌ Document processing failed:', error);
+      console.error('❌ REAL Document processing failed:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Document processing failed'
