@@ -1,4 +1,6 @@
 
+import { supabase } from '@/integrations/supabase/client';
+
 interface GoogleAuthConfig {
   clientId: string;
   scopes: string[];
@@ -33,14 +35,12 @@ export class GoogleAuthService {
     try {
       console.log('🔗 Starting Google authentication...');
       
-      // Build the auth URL with proper parameters
       const authUrl = this.buildAuthUrl();
       console.log('🔗 Auth URL:', authUrl);
       
       const result = await this.openPopupAndWaitForResult(authUrl);
       
       if (result.success && result.code) {
-        // Exchange code for tokens
         const tokenResult = await this.exchangeCodeForTokens(result.code);
         
         if (tokenResult.success) {
@@ -115,7 +115,6 @@ export class GoogleAuthService {
 
       window.addEventListener('message', messageListener);
 
-      // Timeout after 5 minutes
       setTimeout(() => {
         clearInterval(checkClosed);
         window.removeEventListener('message', messageListener);
@@ -129,36 +128,32 @@ export class GoogleAuthService {
 
   private async exchangeCodeForTokens(code: string): Promise<AuthResult> {
     try {
-      console.log('🔄 Exchanging code for tokens...');
+      console.log('🔄 Exchanging code for tokens via edge function...');
       
-      const response = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          client_id: this.config.clientId,
-          client_secret: '', // This should be handled by backend in production
+      const { data, error } = await supabase.functions.invoke('google-oauth', {
+        body: {
           code,
-          grant_type: 'authorization_code',
-          redirect_uri: this.config.redirectUri,
-        }),
+          redirectUri: this.config.redirectUri,
+        },
       });
 
-      if (!response.ok) {
-        const error = await response.text();
-        console.error('❌ Token exchange failed:', error);
-        throw new Error(`Token exchange failed: ${response.status}`);
+      if (error) {
+        console.error('❌ Edge function error:', error);
+        throw new Error(`Token exchange failed: ${error.message}`);
       }
 
-      const data = await response.json();
+      if (!data.success) {
+        console.error('❌ Token exchange failed:', data.error);
+        throw new Error(data.error || 'Token exchange failed');
+      }
+
       console.log('✅ Token exchange successful');
 
       return {
         success: true,
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
-        expiresIn: data.expires_in,
+        accessToken: data.data.access_token,
+        refreshToken: data.data.refresh_token,
+        expiresIn: data.data.expires_in,
       };
     } catch (error) {
       console.error('❌ Token exchange error:', error);
@@ -173,7 +168,6 @@ export class GoogleAuthService {
     const tokens = this.getStoredTokens();
     if (!tokens) return false;
     
-    // Check if token is expired (with 5 minute buffer)
     const isExpired = Date.now() >= (tokens.expiresAt - 5 * 60 * 1000);
     return !isExpired;
   }
