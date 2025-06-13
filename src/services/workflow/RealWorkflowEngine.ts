@@ -1,4 +1,3 @@
-
 import { WorkflowEngine } from './WorkflowEngine';
 import { WorkflowConfig, WorkflowStep, ProcessingContext, WorkflowExecution } from '@/types/workflow';
 import { GmailWorkflowService } from './GmailWorkflowService';
@@ -268,59 +267,39 @@ export class RealWorkflowEngine extends WorkflowEngine {
     }
     
     try {
-      const tableName = (storageConfig as any)?.table || 'extracted_json';
+      // Determine the correct table based on processing type
+      const processingType = context.processingType || 'invoice-extraction';
+      let tableName = 'extracted_json'; // Default fallback
+      
+      if (processingType === 'invoice-extraction') {
+        tableName = 'invoices';
+      } else if (processingType === 'po-extraction') {
+        tableName = 'po_table';
+      }
+      
+      // Allow config override but warn if using non-existent table
+      const configTable = (storageConfig as any)?.table;
+      if (configTable && configTable !== 'invoice_table') {
+        tableName = configTable;
+      } else if (configTable === 'invoice_table') {
+        console.warn('⚠️ invoice_table does not exist, using invoices table instead');
+        tableName = 'invoices';
+      }
+      
       const connection = (storageConfig as any)?.connection || 'default';
       
       console.log('💾 Storing data to database with config:', {
         connection,
         table: tableName,
-        recordCount: extractedData.length
+        recordCount: extractedData.length,
+        processingType
       });
       
-      // Improved data transformation - handle different data formats consistently
-      const transformedData = extractedData.map((data, index) => {
-        // If data is already in the right format for extracted_json, use it
-        if (data && typeof data === 'object' && data.json_extract && data.file_name) {
-          return data;
-        }
-        
-        // Handle different data formats and transform to extracted_json format
-        let jsonExtract;
-        let fileName;
-        
-        if (typeof data === 'string') {
-          try {
-            jsonExtract = JSON.parse(data);
-            fileName = `parsed_document_${index + 1}_${Date.now()}`;
-          } catch (e) {
-            jsonExtract = { raw_text: data };
-            fileName = `text_document_${index + 1}_${Date.now()}`;
-          }
-        } else if (typeof data === 'object' && data !== null) {
-          jsonExtract = data;
-          fileName = data.fileName || data.file_name || data.filename || `extracted_document_${index + 1}_${Date.now()}`;
-        } else {
-          jsonExtract = { data };
-          fileName = `unknown_document_${index + 1}_${Date.now()}`;
-        }
-        
-        // Return in extracted_json table format
-        return {
-          json_extract: jsonExtract,
-          file_name: fileName
-        };
-      });
-      
-      console.log('📄 Transformed data for storage:', {
-        recordCount: transformedData.length,
-        tableName,
-        sampleRecord: transformedData[0] ? Object.keys(transformedData[0]) : 'none'
-      });
-      
-      const result = await this.databaseService.storeData(transformedData, {
+      const result = await this.databaseService.storeData(extractedData, {
         table: tableName,
         connection,
-        action: 'insert'
+        action: 'insert',
+        processingType
       });
       
       console.log('💾 Data storage completed:', result.recordsStored, 'records stored');
