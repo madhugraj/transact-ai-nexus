@@ -34,7 +34,7 @@ export class DatabaseStorageService {
       
       console.log('📄 Attempting to insert', validData.length, 'valid records to table:', tableName);
       
-      // Insert data into the specified table
+      // Try to insert data into the specified table
       const { data: insertedData, error } = await supabase
         .from(tableName)
         .insert(validData)
@@ -42,16 +42,31 @@ export class DatabaseStorageService {
       
       if (error) {
         console.error('❌ Database insertion error:', error);
+        console.log('🔄 Error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
         
-        // If the specified table doesn't exist or there's a schema mismatch,
-        // try storing in extracted_json as fallback
-        if (tableName !== 'extracted_json' && (error.code === '42P01' || error.code === '42703')) {
+        // Always try fallback to extracted_json if the main table fails
+        // This handles cases where the table doesn't exist or has schema mismatches
+        if (tableName !== 'extracted_json') {
           console.log('🔄 Trying fallback insertion to extracted_json table...');
           
-          const fallbackData = validData.map((record, index) => ({
-            json_extract: record,
-            file_name: record.file_name || record.fileName || `workflow_record_${index + 1}_${Date.now()}`
-          }));
+          const fallbackData = validData.map((record, index) => {
+            // Ensure the record has the right structure for extracted_json table
+            if (record.json_extract && record.file_name) {
+              // Already in correct format
+              return record;
+            } else {
+              // Transform to extracted_json format
+              return {
+                json_extract: record,
+                file_name: record.file_name || record.fileName || `workflow_record_${index + 1}_${Date.now()}`
+              };
+            }
+          });
           
           const { data: fallbackInserted, error: fallbackError } = await supabase
             .from('extracted_json')
@@ -83,6 +98,33 @@ export class DatabaseStorageService {
       
     } catch (error) {
       console.error('❌ DatabaseStorageService error:', error);
+      
+      // Final fallback attempt to extracted_json if we haven't tried it yet
+      if (tableName !== 'extracted_json') {
+        try {
+          console.log('🔄 Final fallback attempt to extracted_json...');
+          
+          const finalFallbackData = data.map((record, index) => ({
+            json_extract: typeof record === 'object' ? record : { raw_data: record },
+            file_name: `final_fallback_${index + 1}_${Date.now()}`
+          }));
+          
+          const { data: finalInserted, error: finalError } = await supabase
+            .from('extracted_json')
+            .insert(finalFallbackData)
+            .select();
+          
+          if (!finalError) {
+            console.log('✅ Final fallback successful:', finalInserted?.length || 0, 'records');
+            return {
+              recordsStored: finalInserted?.length || 0,
+              recordsProcessed: data.length
+            };
+          }
+        } catch (fallbackError) {
+          console.error('❌ Final fallback also failed:', fallbackError);
+        }
+      }
       
       // Return partial success if some data processing occurred
       return {

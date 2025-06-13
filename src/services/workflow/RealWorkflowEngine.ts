@@ -255,7 +255,6 @@ export class RealWorkflowEngine extends WorkflowEngine {
     }
     
     try {
-      // Ensure we have a valid table name
       const tableName = (storageConfig as any)?.table || 'extracted_json';
       const connection = (storageConfig as any)?.connection || 'default';
       
@@ -265,39 +264,45 @@ export class RealWorkflowEngine extends WorkflowEngine {
         recordCount: extractedData.length
       });
       
-      // Transform the data to match the expected database schema
+      // Improved data transformation - handle different data formats consistently
       const transformedData = extractedData.map((data, index) => {
-        // Handle different data formats
+        // If data is already in the right format for extracted_json, use it
+        if (data && typeof data === 'object' && data.json_extract && data.file_name) {
+          return data;
+        }
+        
+        // Handle different data formats and transform to extracted_json format
+        let jsonExtract;
+        let fileName;
+        
         if (typeof data === 'string') {
           try {
-            return {
-              json_extract: JSON.parse(data),
-              file_name: `processed_document_${index + 1}`,
-              created_at: new Date().toISOString()
-            };
+            jsonExtract = JSON.parse(data);
+            fileName = `parsed_document_${index + 1}_${Date.now()}`;
           } catch (e) {
-            return {
-              json_extract: { raw_text: data },
-              file_name: `processed_document_${index + 1}`,
-              created_at: new Date().toISOString()
-            };
+            jsonExtract = { raw_text: data };
+            fileName = `text_document_${index + 1}_${Date.now()}`;
           }
         } else if (typeof data === 'object' && data !== null) {
-          return {
-            json_extract: data,
-            file_name: data.fileName || data.file_name || `processed_document_${index + 1}`,
-            created_at: new Date().toISOString()
-          };
+          jsonExtract = data;
+          fileName = data.fileName || data.file_name || data.filename || `extracted_document_${index + 1}_${Date.now()}`;
         } else {
-          return {
-            json_extract: { data },
-            file_name: `processed_document_${index + 1}`,
-            created_at: new Date().toISOString()
-          };
+          jsonExtract = { data };
+          fileName = `unknown_document_${index + 1}_${Date.now()}`;
         }
+        
+        // Return in extracted_json table format
+        return {
+          json_extract: jsonExtract,
+          file_name: fileName
+        };
       });
       
-      console.log('📄 Transformed data for storage:', transformedData.length, 'records');
+      console.log('📄 Transformed data for storage:', {
+        recordCount: transformedData.length,
+        tableName,
+        sampleRecord: transformedData[0] ? Object.keys(transformedData[0]) : 'none'
+      });
       
       const result = await this.databaseService.storeData(transformedData, {
         table: tableName,
@@ -309,42 +314,15 @@ export class RealWorkflowEngine extends WorkflowEngine {
       
       return {
         success: true,
-        storedCount: result.recordsStored || transformedData.length,
-        recordsProcessed: result.recordsProcessed || transformedData.length
+        storedCount: result.recordsStored,
+        recordsProcessed: result.recordsProcessed
       };
     } catch (error) {
       console.error('❌ Data storage failed:', error);
-      
-      // Try fallback storage to extracted_json table
-      try {
-        console.log('🔄 Attempting fallback storage to extracted_json table...');
-        
-        const fallbackData = extractedData.map((data, index) => ({
-          json_extract: typeof data === 'object' ? data : { raw_data: data },
-          file_name: `workflow_document_${index + 1}_${Date.now()}`
-        }));
-        
-        const fallbackResult = await this.databaseService.storeData(fallbackData, {
-          table: 'extracted_json',
-          connection: 'default',
-          action: 'insert'
-        });
-        
-        console.log('✅ Fallback storage successful:', fallbackResult.recordsStored, 'records');
-        
-        return {
-          success: true,
-          storedCount: fallbackResult.recordsStored || fallbackData.length,
-          recordsProcessed: fallbackResult.recordsProcessed || fallbackData.length,
-          message: 'Data stored using fallback method'
-        };
-      } catch (fallbackError) {
-        console.error('❌ Fallback storage also failed:', fallbackError);
-        return {
-          success: false,
-          error: `Storage failed: ${error instanceof Error ? error.message : 'Unknown error'}. Fallback also failed: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`
-        };
-      }
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Data storage failed'
+      };
     }
   }
 
