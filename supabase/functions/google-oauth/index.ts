@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 
 const corsHeaders = {
@@ -19,12 +18,9 @@ serve(async (req) => {
       throw new Error('Authorization code is required');
     }
 
-    // Get the client secret from environment variables
+    // Get the client secret from environment variables using a standard name
     const CLIENT_ID = '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com';
-    const CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') || 
-                         Deno.env.get('Client_secret') || 
-                         Deno.env.get('CLIENT_SECRET') ||
-                         Deno.env.get('client_secret');
+    const CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET');
 
     if (!CLIENT_SECRET) {
       console.error('❌ Google client secret not configured');
