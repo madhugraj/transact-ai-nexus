@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -15,6 +14,7 @@ interface CompactAuthDialogProps {
   onConnect: () => void;
   onDisconnect: () => void;
   error?: string;
+  redirectUri?: string;
 }
 
 const CompactAuthDialog: React.FC<CompactAuthDialogProps> = ({
@@ -26,7 +26,8 @@ const CompactAuthDialog: React.FC<CompactAuthDialogProps> = ({
   isConnected,
   onConnect,
   onDisconnect,
-  error
+  error,
+  redirectUri
 }) => {
   const isRedirectUriError = error && error.includes('redirect_uri_mismatch');
   
@@ -61,7 +62,7 @@ const CompactAuthDialog: React.FC<CompactAuthDialogProps> = ({
                     You need to add this EXACT redirect URI to your Google Cloud Console:
                   </p>
                   <code className="block p-2 bg-white border rounded text-xs break-all">
-                    https://transact-ai-nexus.lovable.app/oauth/callback
+                    {redirectUri || 'Could not determine Redirect URI. Please check your connector settings.'}
                   </code>
                   <div className="mt-2">
                     <a 
@@ -122,4 +123,3 @@ const CompactAuthDialog: React.FC<CompactAuthDialogProps> = ({
 };
 
 export default CompactAuthDialog;
-

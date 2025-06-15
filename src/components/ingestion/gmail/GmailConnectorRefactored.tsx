@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -39,11 +38,13 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   const [hasLoadedInitialEmails, setHasLoadedInitialEmails] = useState(false);
   const { toast } = useToast();
 
+  const redirectUri = `${window.location.origin}/oauth/callback`;
+
   // Use DYNAMIC redirect URI based on current origin - FIXED
   const authService = new GoogleAuthService({
     clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
     scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
-    redirectUri: `${window.location.origin}/oauth/callback`
+    redirectUri: redirectUri
   }, 'gmail_auth_tokens');
 
   // Enhanced authentication check with better persistence
@@ -348,7 +349,7 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
       <div className="space-y-4">
         <div className="text-xs text-blue-600 bg-blue-50 p-3 rounded border">
           <p className="font-medium mb-1">📍 Setup Required:</p>
-          <p>Using redirect URI: <code>{window.location.origin}/oauth/callback</code></p>
+          <p>Using redirect URI: <code>{redirectUri}</code></p>
           <p className="mt-2">If authentication fails, add this redirect URI to your Google Cloud Console OAuth settings.</p>
         </div>
         
@@ -377,6 +378,7 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
           onConnect={handleGmailAuth}
           onDisconnect={handleDisconnect}
           error={authError}
+          redirectUri={redirectUri}
         />
       </div>
     );
