@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -38,9 +39,11 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   const [hasLoadedInitialEmails, setHasLoadedInitialEmails] = useState(false);
   const { toast } = useToast();
 
+  // Use the actual current domain for redirect URI
   const redirectUri = `${window.location.origin}/oauth/callback`;
+  console.log('🔧 Gmail connector using redirect URI:', redirectUri);
 
-  // Use DYNAMIC redirect URI based on current origin - FIXED
+  // Use DYNAMIC redirect URI based on current origin
   const authService = new GoogleAuthService({
     clientId: '59647658413-2aq8dou9iikfe6dq6ujsp1aiaku5r985.apps.googleusercontent.com',
     scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
@@ -95,7 +98,7 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
   }, [hasLoadedInitialEmails]);
 
   const handleGmailAuth = async () => {
-    console.log('🔗 Starting Gmail authentication with redirect URI:', `${window.location.origin}/oauth/callback`);
+    console.log('🔗 Starting Gmail authentication with redirect URI:', redirectUri);
     setIsConnecting(true);
     setAuthError('');
 
@@ -123,7 +126,7 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
         // Provide specific error messages for common issues
         let errorMessage = result.error || 'Authentication failed';
         if (result.error?.includes('redirect_uri_mismatch')) {
-          errorMessage = 'Redirect URI mismatch. Please ensure your Google Cloud Console is configured correctly.';
+          errorMessage = `Redirect URI mismatch. Please ensure this exact URI is added to your Google Cloud Console: ${redirectUri}`;
         } else if (result.error?.includes('popup')) {
           errorMessage = 'Please allow popups for this site and try again.';
         }
@@ -348,9 +351,10 @@ const GmailConnectorRefactored = ({ onEmailsImported }: GmailConnectorProps) => 
     return (
       <div className="space-y-4">
         <div className="text-xs text-blue-600 bg-blue-50 p-3 rounded border">
-          <p className="font-medium mb-1">📍 Setup Required:</p>
-          <p>Using redirect URI: <code>{redirectUri}</code></p>
-          <p className="mt-2">If authentication fails, add this redirect URI to your Google Cloud Console OAuth settings.</p>
+          <p className="font-medium mb-1">📍 Current Setup:</p>
+          <p>Domain: <code>{window.location.origin}</code></p>
+          <p>Redirect URI: <code>{redirectUri}</code></p>
+          <p className="mt-2">Make sure this EXACT redirect URI is added to your Google Cloud Console OAuth settings.</p>
         </div>
         
         {authError && (

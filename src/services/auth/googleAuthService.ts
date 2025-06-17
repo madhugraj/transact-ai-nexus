@@ -34,6 +34,7 @@ export class GoogleAuthService {
   async authenticateWithPopup(): Promise<AuthResult> {
     try {
       console.log('🔗 Starting Google authentication...');
+      console.log('🔗 Using redirect URI:', this.config.redirectUri);
       
       const authUrl = this.buildAuthUrl();
       console.log('🔗 Auth URL:', authUrl);
@@ -129,6 +130,7 @@ export class GoogleAuthService {
   private async exchangeCodeForTokens(code: string): Promise<AuthResult> {
     try {
       console.log('🔄 Exchanging code for tokens via edge function...');
+      console.log('🔄 Using redirect URI for token exchange:', this.config.redirectUri);
       
       const { data, error } = await supabase.functions.invoke('google-oauth', {
         body: {
